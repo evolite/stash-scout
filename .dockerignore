@@ -1,0 +1,8 @@
+node_modules
+dist-server
+frontend/dist
+data
+.env
+.git
+.claude
+*.md
