@@ -4,7 +4,7 @@ import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
 import { getSceneStatus } from "../stateMachine.js";
 
-export function sceneStatusRouter(cfg: AppConfig, localStash?: LocalStashClient, whisparr?: WhisparrClient) {
+export function sceneStatusRouter(cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
 
   // Batched status lookup for a whole grid page: /api/scenes/status?ids=a,b,c

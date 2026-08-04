@@ -1,11 +1,13 @@
 import { Router } from "express";
+import type { AppConfig } from "../config.js";
+import { isWhisparrConfigured } from "../config.js";
 import type { WhisparrClient } from "../whisparrClient.js";
 
-export function whisparrRouter(whisparr?: WhisparrClient) {
+export function whisparrRouter(cfg: AppConfig, whisparr: WhisparrClient) {
   const router = Router();
 
   router.post("/whisparr/scenes/:stashId", async (req, res) => {
-    if (!whisparr) return void res.status(400).json({ error: "Whisparr not configured" });
+    if (!isWhisparrConfigured(cfg)) return void res.status(400).json({ error: "Whisparr not configured" });
     try {
       res.json(await whisparr.addScene(req.params.stashId));
     } catch (err) {
@@ -14,7 +16,7 @@ export function whisparrRouter(whisparr?: WhisparrClient) {
   });
 
   router.post("/whisparr/scenes/:movieId/monitor", async (req, res) => {
-    if (!whisparr) return void res.status(400).json({ error: "Whisparr not configured" });
+    if (!isWhisparrConfigured(cfg)) return void res.status(400).json({ error: "Whisparr not configured" });
     try {
       res.json(await whisparr.setMonitored(Number(req.params.movieId), !!req.body.monitored));
     } catch (err) {
@@ -23,7 +25,7 @@ export function whisparrRouter(whisparr?: WhisparrClient) {
   });
 
   router.get("/whisparr/options", async (_req, res) => {
-    if (!whisparr) return void res.status(400).json({ error: "Whisparr not configured" });
+    if (!isWhisparrConfigured(cfg)) return void res.status(400).json({ error: "Whisparr not configured" });
     try {
       const [rootFolders, qualityProfiles] = await Promise.all([
         whisparr.getRootFolders(),

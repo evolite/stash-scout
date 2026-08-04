@@ -368,3 +368,20 @@ input, select, textarea {
 }
 .status-dot.ok { background: var(--success); }
 .status-dot.bad { background: var(--danger); }
+
+.SettingsSection {
+  max-width: 480px;
+  background: var(--card-bg);
+  border-radius: 3px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.SettingsSection h4 {
+  margin: 0;
+}
+.SettingsSection .btn {
+  align-self: flex-start;
+}

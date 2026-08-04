@@ -102,4 +102,26 @@ export const api = {
       `/api/settings`,
     ),
   testSettings: () => req<{ stashdb: boolean; localStash: boolean; whisparr: boolean }>(`/api/settings/test`),
+  getConfig: () =>
+    req<{
+      stashdbUrl: string;
+      stashdbApiKeySet: boolean;
+      localStashUrl: string;
+      localStashApiKeySet: boolean;
+      localStashRootUrl: string;
+      whisparrBaseUrl: string;
+      whisparrApiKeySet: boolean;
+      whisparrRootFolderPath: string;
+      whisparrQualityProfileId: number | null;
+      cfAccessClientId: string;
+      cfAccessClientSecretSet: boolean;
+    }>(`/api/settings/config`),
+  updateConfig: (patch: Record<string, string | number | null>) =>
+    req(`/api/settings/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  whisparrOptions: () =>
+    req<{ rootFolders: { id: number; path: string }[]; qualityProfiles: { id: number; name: string }[] }>(`/api/whisparr/options`),
 };

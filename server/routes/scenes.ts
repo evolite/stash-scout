@@ -14,7 +14,7 @@ import { getSceneStatus } from "../stateMachine.js";
 const ALREADY_ADDED_KINDS = new Set(["in-stash", "monitored", "previously-added", "downloading"]);
 const MAX_STATUS_ROUNDS = 5;
 
-export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash?: LocalStashClient, whisparr?: WhisparrClient) {
+export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
 
   router.get("/scenes", async (req, res) => {

@@ -67,7 +67,10 @@ function throttle(): Promise<void> {
 const CACHE_TTL_MS = 20_000;
 const responseCache = new Map<string, { at: number; data: unknown }>();
 
-async function gql<T>(url: string, apiKey: string, query: string, variables: unknown): Promise<T> {
+async function gql<T>(url: string, apiKey: string | undefined, query: string, variables: unknown): Promise<T> {
+  if (!apiKey) {
+    throw new Error("StashDB is not configured — add an API key in Settings.");
+  }
   const cacheKey = query + JSON.stringify(variables);
   const cached = responseCache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
@@ -108,16 +111,41 @@ const excludeCache = new Map<string, ExcludeCacheEntry>();
 // Merged "watched filters" feed — same idea as excludeCache but fanning out to
 // several source filters, deduping by scene id, and keeping each source's own
 // page cursor so growing the feed doesn't restart every source from page 1.
+//
+// Results are kept per-source (each individually date-desc, as StashDB returns
+// them) rather than combined into one globally date-sorted list, and the output
+// round-robins one scene from each source in turn. A pure global date sort would
+// let one prolific filter's results fill the entire visible page before a rarer
+// filter's results ever surfaced — round-robin guarantees every watched filter
+// gets representation instead of the most active one crowding out the rest.
 const MERGED_FEED_TTL_MS = 5 * 60_000;
 const MAX_MERGE_ROUNDS = 3;
 interface MergedFeedEntry {
-  scenes: Scene[];
+  perSource: Scene[][];
   seen: Set<string>;
   cursors: { internalPage: number; exhausted: boolean }[];
   exhaustedAll: boolean;
   at: number;
 }
 const mergedFeedCache = new Map<string, MergedFeedEntry>();
+
+function interleave(perSource: Scene[][], ignoredIds: Set<string>): Scene[] {
+  const lists = perSource.map((list) => list.filter((s) => !ignoredIds.has(s.id)));
+  const idx = lists.map(() => 0);
+  const result: Scene[] = [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (let i = 0; i < lists.length; i++) {
+      if (idx[i] < lists[i].length) {
+        result.push(lists[i][idx[i]]);
+        idx[i]++;
+        added = true;
+      }
+    }
+  }
+  return result;
+}
 
 export class StashDBClient {
   constructor(private cfg: AppConfig) {}
@@ -190,9 +218,10 @@ export class StashDBClient {
     };
   }
 
-  // Merges several saved filters (the Watched feed) into one paginated, deduped,
-  // date-sorted result, cached per filter-set so paging forward reuses each
-  // source's already-fetched pages instead of re-querying every source again.
+  // Merges several saved filters (the Watched feed) into one paginated, deduped
+  // result — round-robinned across sources (see interleave() above) — cached per
+  // filter-set so paging forward reuses each source's already-fetched pages
+  // instead of re-querying every source again.
   async queryMergedFeed(
     sources: { input: Partial<SceneQueryInput>; excludeTagIds: string[] }[],
     page: number,
@@ -204,7 +233,7 @@ export class StashDBClient {
     let entry = mergedFeedCache.get(cacheKey);
     if (!entry || Date.now() - entry.at > MERGED_FEED_TTL_MS) {
       entry = {
-        scenes: [],
+        perSource: sources.map(() => []),
         seen: new Set(),
         cursors: sources.map(() => ({ internalPage: 1, exhausted: false })),
         exhaustedAll: false,
@@ -212,18 +241,14 @@ export class StashDBClient {
       };
       mergedFeedCache.set(cacheKey, entry);
     }
-    // Visible = accumulated minus whatever's been ignored since — filtered here
+    // Visible = interleaved minus whatever's been ignored since — filtered here
     // (not just skipped on insert) so a scene ignored after being cached
     // disappears immediately rather than waiting for the cache to expire.
-    const visible = () => entry!.scenes.filter((s) => !ignoredIds.has(s.id));
+    const visible = () => interleave(entry!.perSource, ignoredIds);
+    const totalFetched = () => entry!.perSource.reduce((n, list) => n + list.length, 0);
 
     let round = 0;
-    while (
-      visible().length < skip + perPage &&
-      !entry.exhaustedAll &&
-      entry.scenes.length < MAX_CACHED_SCENES &&
-      round < MAX_MERGE_ROUNDS
-    ) {
+    while (visible().length < skip + perPage && !entry.exhaustedAll && totalFetched() < MAX_CACHED_SCENES && round < MAX_MERGE_ROUNDS) {
       for (let i = 0; i < sources.length; i++) {
         const cursor = entry.cursors[i];
         if (cursor.exhausted) continue;
@@ -233,12 +258,11 @@ export class StashDBClient {
         for (const scene of scenes) {
           if (entry.seen.has(scene.id) || scene.tags.some((t) => excludeSet.has(t.id))) continue;
           entry.seen.add(scene.id);
-          entry.scenes.push(scene);
+          entry.perSource[i].push(scene);
         }
         if (scenes.length < MAX_PER_PAGE) cursor.exhausted = true;
         else cursor.internalPage++;
       }
-      entry.scenes.sort((a, b) => (b.release_date ?? "").localeCompare(a.release_date ?? ""));
       entry.exhaustedAll = entry.cursors.every((c) => c.exhausted);
       round++;
     }
