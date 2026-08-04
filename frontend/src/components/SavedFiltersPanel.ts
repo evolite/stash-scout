@@ -1,7 +1,7 @@
 import { api, type SavedFilter, type SceneFilter } from "../api.js";
 
 export async function renderSavedFiltersPanel(
-  currentFilter: SceneFilter,
+  getCurrentFilter: () => SceneFilter,
   onLoad: (filter: SceneFilter) => void,
 ): Promise<HTMLElement> {
   const wrap = document.createElement("div");
@@ -69,7 +69,7 @@ export async function renderSavedFiltersPanel(
   saveBtn.textContent = "Save current";
   saveBtn.addEventListener("click", async () => {
     if (!nameInput.value.trim()) return;
-    await api.saveFilter(nameInput.value.trim(), currentFilter);
+    await api.saveFilter(nameInput.value.trim(), getCurrentFilter());
     nameInput.value = "";
     await refresh();
   });

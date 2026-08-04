@@ -21,7 +21,7 @@ export function renderBrowseView(): HTMLElement {
   function renderSidebar() {
     sidebarCol.innerHTML = "";
     sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter));
-    renderSavedFiltersPanel(filter, loadSavedFilter).then((panel) => {
+    renderSavedFiltersPanel(() => filter, loadSavedFilter).then((panel) => {
       sidebarCol.appendChild(panel);
     });
   }

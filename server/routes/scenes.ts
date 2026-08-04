@@ -38,7 +38,10 @@ export function scenesRouter(stashdb: StashDBClient) {
     }
   });
 
-  // The Watched feed merges every saved filter marked `watched: true`.
+  // The Watched feed merges every saved filter marked `watched: true`, restricted
+  // to scenes released in the last 30 days — this is meant to be a "what's new"
+  // feed, not a full archive browse of the same filters.
+  const WATCHED_WINDOW_DAYS = 30;
   router.get("/watched-feed", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;
@@ -51,8 +54,15 @@ export function scenesRouter(stashdb: StashDBClient) {
         return;
       }
 
-      const sources = watchedFilters.map((f) => parseStashFilter(f.filter as Record<string, unknown>));
-      const cacheKey = JSON.stringify(watchedFilters.map((f) => ({ id: f.id, filter: f.filter })));
+      const cutoff = new Date(Date.now() - WATCHED_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const sources = watchedFilters.map((f) => {
+        const { input, excludeTagIds } = parseStashFilter(f.filter as Record<string, unknown>);
+        input.date = { value: cutoff, modifier: "GREATER_THAN" };
+        return { input, excludeTagIds };
+      });
+      // cutoff (changes daily) is folded into the cache key so the window rolls
+      // forward instead of serving yesterday's cached results indefinitely.
+      const cacheKey = JSON.stringify({ cutoff, filters: watchedFilters.map((f) => ({ id: f.id, filter: f.filter })) });
       const result = await stashdb.queryMergedFeed(sources, page, perPage, cacheKey);
       res.json(result);
     } catch (err) {
