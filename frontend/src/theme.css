@@ -347,41 +347,82 @@ input, select, textarea {
   padding: 0;
 }
 
-.SettingsGrid {
-  display: grid;
-  gap: 1rem;
-  max-width: 480px;
-}
-.SettingsRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--card-bg);
-  border-radius: 3px;
-  padding: 0.75rem 1rem;
-}
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 .status-dot.ok { background: var(--success); }
 .status-dot.bad { background: var(--danger); }
+.status-dot.unknown { background: var(--secondary); }
 
-.SettingsSection {
-  max-width: 480px;
+.SettingsGrid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.SettingsCard {
   background: var(--card-bg);
   border-radius: 3px;
-  padding: 1rem;
-  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
-.SettingsSection h4 {
+.SettingsCard--wide {
+  grid-column: 1 / -1;
+}
+.SettingsCard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.SettingsCard-header h4 {
   margin: 0;
+  font-size: 0.9rem;
 }
-.SettingsSection .btn {
+
+.SettingsField {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+.SettingsField span {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.SettingsField input,
+.SettingsField select {
+  width: 100%;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.8rem;
+}
+
+.SettingsCard-linkBtn {
   align-self: flex-start;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.SettingsCard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+.SettingsCard-note {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.SettingsCard-footer .btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  flex-shrink: 0;
 }
