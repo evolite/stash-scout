@@ -60,6 +60,8 @@ export const api = {
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}`),
   watchedFeed: (page: number, perPage: number) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/watched-feed?page=${page}&per_page=${perPage}`),
+  favoritesFeed: (page: number, perPage: number) =>
+    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/favorites-feed?page=${page}&per_page=${perPage}`),
   searchTags: (term: string) => req<{ id: string; name: string }[]>(`/api/tags/search?term=${encodeURIComponent(term)}`),
   tagsByIds: (ids: string[]) => (ids.length ? req<{ id: string; name: string }[]>(`/api/tags/byIds?ids=${ids.join(",")}`) : Promise.resolve([])),
   sceneStatuses: (ids: string[]) =>

@@ -11,6 +11,7 @@ export interface SceneQueryInput {
   performers?: { value: string[]; modifier: "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" };
   studios?: { value: string[]; modifier: "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" };
   date?: { value: string; modifier: "EQUALS" | "GREATER_THAN" | "LESS_THAN" };
+  favorites?: "PERFORMER" | "STUDIO" | "ALL";
   page: number;
   per_page: number;
   sort: string;

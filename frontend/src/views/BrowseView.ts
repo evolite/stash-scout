@@ -108,7 +108,7 @@ export function renderBrowseView(): HTMLElement {
   }
 
   renderSidebar();
-  load();
+  contentCol.innerHTML = "<p>Set your filters and click <strong>Apply filters</strong> to browse StashDB.</p>";
 
   return container;
 }
