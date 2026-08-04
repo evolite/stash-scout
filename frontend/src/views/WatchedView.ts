@@ -64,7 +64,8 @@ export function renderWatchedView(goToBrowse: () => void): HTMLElement {
     function renderGrid(scenes: Scene[]) {
       grid.innerHTML = "";
       for (const scene of scenes) {
-        grid.appendChild(renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(scenes), () => loadFeed()));
+        const card = renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(scenes), () => card.remove());
+        grid.appendChild(card);
       }
     }
 

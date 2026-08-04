@@ -21,7 +21,7 @@ const whisparr = isWhisparrConfigured(cfg) ? new WhisparrClient(cfg) : undefined
 const app = express();
 app.use(express.json());
 
-app.use("/api", scenesRouter(stashdb));
+app.use("/api", scenesRouter(stashdb, cfg, localStash, whisparr));
 app.use("/api", sceneStatusRouter(cfg, localStash, whisparr));
 app.use("/api", whisparrRouter(whisparr));
 app.use("/api", filtersRouter());

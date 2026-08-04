@@ -1,11 +1,20 @@
 import { Router } from "express";
-import type { StashDBClient } from "../stashdbClient.js";
+import type { StashDBClient, Scene } from "../stashdbClient.js";
 import { parseStashFilter } from "../filterUtils.js";
 import { readJson } from "../store.js";
 import type { SavedFilter } from "./filters.js";
 import type { IgnoredScene } from "./ignoredScenes.js";
+import type { AppConfig } from "../config.js";
+import type { LocalStashClient } from "../localStashClient.js";
+import type { WhisparrClient } from "../whisparrClient.js";
+import { getSceneStatus } from "../stateMachine.js";
 
-export function scenesRouter(stashdb: StashDBClient) {
+// Watched is a "what's new to act on" feed — scenes already playable (in Stash)
+// or already added to Whisparr in any form don't belong there.
+const ALREADY_ADDED_KINDS = new Set(["in-stash", "monitored", "previously-added", "downloading"]);
+const MAX_STATUS_ROUNDS = 5;
+
+export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash?: LocalStashClient, whisparr?: WhisparrClient) {
   const router = Router();
 
   router.get("/scenes", async (req, res) => {
@@ -48,6 +57,7 @@ export function scenesRouter(stashdb: StashDBClient) {
       const q = req.query as Record<string, unknown>;
       const page = q.page ? Number(q.page) : 1;
       const perPage = q.per_page ? Number(q.per_page) : 25;
+      const skip = (page - 1) * perPage;
 
       const watchedFilters = (await readJson<SavedFilter[]>("filters.json", [])).filter((f) => f.watched);
       if (watchedFilters.length === 0) {
@@ -65,8 +75,34 @@ export function scenesRouter(stashdb: StashDBClient) {
       // forward instead of serving yesterday's cached results indefinitely.
       const cacheKey = JSON.stringify({ cutoff, filters: watchedFilters.map((f) => ({ id: f.id, filter: f.filter })) });
       const ignoredIds = new Set((await readJson<IgnoredScene[]>("ignored-scenes.json", [])).map((s) => s.id));
-      const result = await stashdb.queryMergedFeed(sources, page, perPage, cacheKey, ignoredIds);
-      res.json(result);
+
+      // Walk raw (StashDB-side) pages, dropping already-added scenes, until we've
+      // collected enough for this page or run out — bounded by MAX_STATUS_ROUNDS
+      // since local Stash/Whisparr checks aren't rate-limited but StashDB pages
+      // still cost a call the first time they're fetched (cached after that).
+      const visible: Scene[] = [];
+      let exhausted = false;
+      for (let round = 0, rawPage = 1; round < MAX_STATUS_ROUNDS && visible.length < skip + perPage; round++, rawPage++) {
+        const raw = await stashdb.queryMergedFeed(sources, rawPage, perPage, cacheKey, ignoredIds);
+        if (raw.scenes.length === 0) {
+          exhausted = true;
+          break;
+        }
+        const statuses = await Promise.all(raw.scenes.map((s) => getSceneStatus(cfg, s.id, { localStash, whisparr })));
+        raw.scenes.forEach((scene, i) => {
+          if (!ALREADY_ADDED_KINDS.has(statuses[i].kind)) visible.push(scene);
+        });
+        if (raw.scenes.length < perPage) {
+          exhausted = true;
+          break;
+        }
+      }
+
+      res.json({
+        count: exhausted ? visible.length : visible.length + 1,
+        scenes: visible.slice(skip, skip + perPage),
+        approximateCount: !exhausted,
+      });
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
