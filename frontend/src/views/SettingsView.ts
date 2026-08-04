@@ -207,6 +207,77 @@ export function renderSettingsView(): HTMLElement {
     });
     cfSection.appendChild(cfSave);
     container.appendChild(cfSection);
+
+    // --- Global exclude tags ---
+    const excludeSection = section("Global Exclude Tags");
+    const excludeNote = document.createElement("p");
+    excludeNote.style.cssText = "color:var(--muted);font-size:0.8rem;margin:0";
+    excludeNote.textContent = "Applied everywhere scenes are fetched — Browse, Watched, and Favorites — so you don't have to add the same exclude to every filter.";
+    excludeSection.appendChild(excludeNote);
+
+    const excludeChips = document.createElement("div");
+    excludeChips.className = "WatchedTagsManage";
+    excludeSection.appendChild(excludeChips);
+
+    const excludeSearch = document.createElement("input");
+    excludeSearch.placeholder = "search tag to exclude...";
+    const excludeResults = document.createElement("div");
+    excludeResults.style.position = "relative";
+
+    async function renderExcludeChips() {
+      const tags = await api.listGlobalExcludeTags();
+      excludeChips.innerHTML = "";
+      for (const t of tags) {
+        const chip = document.createElement("span");
+        chip.className = "Chip";
+        chip.textContent = t.name;
+        const remove = document.createElement("button");
+        remove.textContent = "×";
+        remove.addEventListener("click", async () => {
+          await api.removeGlobalExcludeTag(t.id);
+          await renderExcludeChips();
+        });
+        chip.appendChild(remove);
+        excludeChips.appendChild(chip);
+      }
+      const searchWrap = document.createElement("div");
+      searchWrap.appendChild(excludeSearch);
+      searchWrap.appendChild(excludeResults);
+      excludeChips.appendChild(searchWrap);
+    }
+
+    let excludeDebounce: ReturnType<typeof setTimeout>;
+    excludeSearch.addEventListener("input", () => {
+      clearTimeout(excludeDebounce);
+      const term = excludeSearch.value.trim();
+      if (!term) {
+        excludeResults.innerHTML = "";
+        return;
+      }
+      excludeDebounce = setTimeout(async () => {
+        const matches = await api.searchTags(term);
+        excludeResults.innerHTML = "";
+        const list = document.createElement("div");
+        list.style.cssText =
+          "position:absolute;background:var(--secondary);border-radius:3px;z-index:10;max-height:200px;overflow:auto;min-width:200px";
+        for (const m of matches) {
+          const item = document.createElement("div");
+          item.textContent = m.name;
+          item.style.cssText = "padding:0.35rem 0.5rem;cursor:pointer";
+          item.addEventListener("click", async () => {
+            await api.addGlobalExcludeTag(m.id, m.name);
+            excludeSearch.value = "";
+            excludeResults.innerHTML = "";
+            await renderExcludeChips();
+          });
+          list.appendChild(item);
+        }
+        excludeResults.appendChild(list);
+      }, 250);
+    });
+
+    await renderExcludeChips();
+    container.appendChild(excludeSection);
   }
 
   render();

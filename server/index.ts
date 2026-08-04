@@ -10,6 +10,7 @@ import { sceneStatusRouter } from "./routes/sceneStatus.js";
 import { whisparrRouter } from "./routes/whisparr.js";
 import { filtersRouter } from "./routes/filters.js";
 import { ignoredScenesRouter } from "./routes/ignoredScenes.js";
+import { globalExcludeTagsRouter } from "./routes/globalExcludeTags.js";
 import { settingsRouter } from "./routes/settings.js";
 
 const cfg = await loadInitialConfig();
@@ -30,6 +31,7 @@ app.use("/api", sceneStatusRouter(cfg, localStash, whisparr));
 app.use("/api", whisparrRouter(cfg, whisparr));
 app.use("/api", filtersRouter());
 app.use("/api", ignoredScenesRouter());
+app.use("/api", globalExcludeTagsRouter());
 app.use("/api", settingsRouter(cfg, localStash, whisparr));
 
 const frontendDist = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "frontend", "dist");

@@ -40,6 +40,12 @@ export interface SavedFilter {
   watched: boolean;
 }
 
+export interface GlobalExcludeTag {
+  id: string;
+  name: string;
+  addedAt: string;
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
   if (!res.ok) throw new Error(`${path} failed: HTTP ${res.status}`);
@@ -126,4 +132,12 @@ export const api = {
     }),
   whisparrOptions: () =>
     req<{ rootFolders: { id: number; path: string }[]; qualityProfiles: { id: number; name: string }[] }>(`/api/whisparr/options`),
+  listGlobalExcludeTags: () => req<GlobalExcludeTag[]>(`/api/global-exclude-tags`),
+  addGlobalExcludeTag: (id: string, name: string) =>
+    req<GlobalExcludeTag[]>(`/api/global-exclude-tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, name }),
+    }),
+  removeGlobalExcludeTag: (id: string) => req(`/api/global-exclude-tags/${id}`, { method: "DELETE" }),
 };
