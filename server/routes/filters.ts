@@ -38,6 +38,7 @@ export function filtersRouter() {
     const entry = filters.find((f) => f.id === req.params.id);
     if (!entry) return void res.status(404).end();
     if (typeof req.body.watched === "boolean") entry.watched = req.body.watched;
+    if (req.body.filter && typeof req.body.filter === "object") entry.filter = req.body.filter;
     await writeJson(FILE, filters);
     res.json(entry);
   });

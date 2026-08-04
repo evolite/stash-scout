@@ -198,6 +198,7 @@ export class StashDBClient {
     page: number,
     perPage: number,
     cacheKey: string,
+    ignoredIds: Set<string> = new Set(),
   ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
     const skip = (page - 1) * perPage;
     let entry = mergedFeedCache.get(cacheKey);
@@ -211,10 +212,14 @@ export class StashDBClient {
       };
       mergedFeedCache.set(cacheKey, entry);
     }
+    // Visible = accumulated minus whatever's been ignored since — filtered here
+    // (not just skipped on insert) so a scene ignored after being cached
+    // disappears immediately rather than waiting for the cache to expire.
+    const visible = () => entry!.scenes.filter((s) => !ignoredIds.has(s.id));
 
     let round = 0;
     while (
-      entry.scenes.length < skip + perPage &&
+      visible().length < skip + perPage &&
       !entry.exhaustedAll &&
       entry.scenes.length < MAX_CACHED_SCENES &&
       round < MAX_MERGE_ROUNDS
@@ -238,9 +243,10 @@ export class StashDBClient {
       round++;
     }
 
+    const visibleScenes = visible();
     return {
-      count: entry.scenes.length,
-      scenes: entry.scenes.slice(skip, skip + perPage),
+      count: visibleScenes.length,
+      scenes: visibleScenes.slice(skip, skip + perPage),
       approximateCount: !entry.exhaustedAll,
     };
   }

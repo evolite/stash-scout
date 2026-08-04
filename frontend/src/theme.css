@@ -163,6 +163,19 @@ button {
 .SceneCard-status:disabled {
   cursor: default;
 }
+.SceneCard-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.SceneCard-actions .SceneCard-status {
+  width: auto;
+  flex: 1;
+  margin-top: 0;
+}
+.SceneCard-ignore {
+  flex: 0 0 auto;
+}
 .SceneCard-status.btn-play {
   background: rgba(25, 135, 84, 0.15);
   border-color: rgba(25, 135, 84, 0.3);
@@ -271,6 +284,11 @@ input, select, textarea {
   justify-content: center;
   line-height: 1;
   border-radius: 50%;
+}
+.SavedFilters-overwrite {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
 }
 .SavedFilters-saveRow {
   display: flex;

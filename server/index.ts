@@ -9,6 +9,7 @@ import { scenesRouter } from "./routes/scenes.js";
 import { sceneStatusRouter } from "./routes/sceneStatus.js";
 import { whisparrRouter } from "./routes/whisparr.js";
 import { filtersRouter } from "./routes/filters.js";
+import { ignoredScenesRouter } from "./routes/ignoredScenes.js";
 import { settingsRouter } from "./routes/settings.js";
 
 const cfg = loadConfig();
@@ -24,6 +25,7 @@ app.use("/api", scenesRouter(stashdb));
 app.use("/api", sceneStatusRouter(cfg, localStash, whisparr));
 app.use("/api", whisparrRouter(whisparr));
 app.use("/api", filtersRouter());
+app.use("/api", ignoredScenesRouter());
 app.use("/api", settingsRouter(cfg, localStash, whisparr));
 
 const frontendDist = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "frontend", "dist");

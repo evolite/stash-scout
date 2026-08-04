@@ -85,6 +85,18 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ watched }),
     }),
+  overwriteFilter: (id: string, filter: SceneFilter) =>
+    req<SavedFilter>(`/api/filters/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filter }),
+    }),
+  ignoreScene: (id: string) =>
+    req(`/api/ignored-scenes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }),
   settings: () =>
     req<{ stashdbConfigured: boolean; localStashConfigured: boolean; whisparrConfigured: boolean; whisparrFullyConfigured: boolean }>(
       `/api/settings`,

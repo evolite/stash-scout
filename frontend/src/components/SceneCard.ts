@@ -88,7 +88,12 @@ function statusButton(sceneId: string, status: SceneStatus | undefined, onChange
   return btn;
 }
 
-export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void): HTMLElement {
+export function renderSceneCard(
+  s: Scene,
+  status: SceneStatus | undefined,
+  onStatusChange: () => void,
+  onIgnore?: () => void,
+): HTMLElement {
   const card = document.createElement("div");
   card.className = "card";
 
@@ -133,7 +138,24 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   meta.appendChild(date);
   footer.appendChild(meta);
 
-  footer.appendChild(statusButton(s.id, status, onStatusChange));
+  if (onIgnore) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "SceneCard-actions";
+    actionRow.appendChild(statusButton(s.id, status, onStatusChange));
+    const ignoreBtn = document.createElement("button");
+    ignoreBtn.className = "SceneCard-status btn-monitor SceneCard-ignore";
+    ignoreBtn.textContent = "Ignore";
+    ignoreBtn.title = "Hide this scene from Watched";
+    ignoreBtn.addEventListener("click", async () => {
+      ignoreBtn.disabled = true;
+      await api.ignoreScene(s.id);
+      onIgnore();
+    });
+    actionRow.appendChild(ignoreBtn);
+    footer.appendChild(actionRow);
+  } else {
+    footer.appendChild(statusButton(s.id, status, onStatusChange));
+  }
 
   card.appendChild(footer);
   return card;

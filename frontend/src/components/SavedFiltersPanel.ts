@@ -48,6 +48,16 @@ export async function renderSavedFiltersPanel(
     name.addEventListener("click", () => onLoad(f.filter));
     row.appendChild(name);
 
+    const overwrite = document.createElement("button");
+    overwrite.className = "btn minimal SavedFilters-overwrite";
+    overwrite.textContent = "Save";
+    overwrite.title = "Overwrite with the currently applied filter";
+    overwrite.addEventListener("click", async () => {
+      await api.overwriteFilter(f.id, getCurrentFilter());
+      await refresh();
+    });
+    row.appendChild(overwrite);
+
     const del = document.createElement("button");
     del.className = "btn minimal SavedFilters-delete";
     del.textContent = "×";

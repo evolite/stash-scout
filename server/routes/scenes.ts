@@ -3,6 +3,7 @@ import type { StashDBClient } from "../stashdbClient.js";
 import { parseStashFilter } from "../filterUtils.js";
 import { readJson } from "../store.js";
 import type { SavedFilter } from "./filters.js";
+import type { IgnoredScene } from "./ignoredScenes.js";
 
 export function scenesRouter(stashdb: StashDBClient) {
   const router = Router();
@@ -63,7 +64,8 @@ export function scenesRouter(stashdb: StashDBClient) {
       // cutoff (changes daily) is folded into the cache key so the window rolls
       // forward instead of serving yesterday's cached results indefinitely.
       const cacheKey = JSON.stringify({ cutoff, filters: watchedFilters.map((f) => ({ id: f.id, filter: f.filter })) });
-      const result = await stashdb.queryMergedFeed(sources, page, perPage, cacheKey);
+      const ignoredIds = new Set((await readJson<IgnoredScene[]>("ignored-scenes.json", [])).map((s) => s.id));
+      const result = await stashdb.queryMergedFeed(sources, page, perPage, cacheKey, ignoredIds);
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
