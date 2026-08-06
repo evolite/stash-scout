@@ -1,10 +1,14 @@
 import { api, type SceneFilter } from "../api.js";
+import { iconClose } from "../icons.js";
+
+const LABEL_CLASS = "flex flex-col gap-1 text-xs text-muted";
 
 // Tag/performer/studio pickers here are simple comma-separated-id inputs backed by
 // a typeahead search — enough to exercise StashDB's INCLUDES/INCLUDES_ALL/EXCLUDES
 // modifiers without building a full multi-select widget.
 export function tagPicker(label: string, initial: string, onChange: (ids: string) => void): HTMLElement {
   const wrap = document.createElement("label");
+  wrap.className = LABEL_CLASS;
   wrap.textContent = label;
 
   const input = document.createElement("input");
@@ -12,8 +16,7 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
   input.placeholder = "search tag name...";
 
   const chips = document.createElement("div");
-  chips.className = "WatchedTagsManage";
-  chips.style.marginBottom = "0";
+  chips.className = "flex gap-2 items-center flex-wrap";
 
   let selected: { id: string; name: string }[] = initial
     ? initial.split(",").map((id) => ({ id, name: id }))
@@ -31,10 +34,12 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
     chips.innerHTML = "";
     for (const t of selected) {
       const chip = document.createElement("span");
-      chip.className = "Chip";
+      chip.className = "bg-secondary rounded-full px-3 py-1 flex items-center gap-1.5";
       chip.textContent = t.name;
       const remove = document.createElement("button");
-      remove.textContent = "×";
+      remove.className = "bg-transparent border-0 text-muted p-0 hover:text-text";
+      remove.setAttribute("aria-label", "Remove tag");
+      remove.appendChild(iconClose());
       remove.addEventListener("click", () => {
         selected = selected.filter((s) => s.id !== t.id);
         renderChips();
@@ -47,7 +52,7 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
   renderChips();
 
   const results = document.createElement("div");
-  results.style.position = "relative";
+  results.className = "relative";
 
   let debounce: ReturnType<typeof setTimeout>;
   input.addEventListener("input", () => {
@@ -61,11 +66,11 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
       const matches = await api.searchTags(term);
       results.innerHTML = "";
       const list = document.createElement("div");
-      list.style.cssText = "position:absolute;background:var(--secondary);border-radius:3px;z-index:10;max-height:200px;overflow:auto;width:100%";
+      list.className = "TagPicker-dropdown";
       for (const m of matches) {
         const item = document.createElement("div");
         item.textContent = m.name;
-        item.style.cssText = "padding:0.35rem 0.5rem;cursor:pointer";
+        item.className = "TagPicker-dropdown-item";
         item.addEventListener("click", () => {
           if (!selected.some((s) => s.id === m.id)) selected.push(m);
           renderChips();
@@ -87,11 +92,12 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
 
 export function renderFilterSidebar(current: SceneFilter, onApply: (filter: SceneFilter) => void): HTMLElement {
   const aside = document.createElement("aside");
-  aside.className = "FilterSidebar";
+  aside.className = "bg-surface rounded-lg p-4 flex flex-col gap-3";
 
   const draft: SceneFilter = { ...current };
 
   const textLabel = document.createElement("label");
+  textLabel.className = LABEL_CLASS;
   textLabel.textContent = "Text";
   const textInput = document.createElement("input");
   textInput.value = draft.text ?? "";
@@ -106,6 +112,7 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   );
 
   const modifierLabel = document.createElement("label");
+  modifierLabel.className = LABEL_CLASS;
   modifierLabel.textContent = "Tag match";
   const modifierSelect = document.createElement("select");
   for (const [value, label] of [
@@ -133,9 +140,10 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   );
 
   const dateLabel = document.createElement("label");
+  dateLabel.className = LABEL_CLASS;
   dateLabel.textContent = "Release date";
   const dateRow = document.createElement("div");
-  dateRow.style.cssText = "display:flex;gap:0.4rem";
+  dateRow.className = "flex gap-2";
   const dateModSelect = document.createElement("select");
   for (const [value, label] of [
     ["EQUALS", "On"],
@@ -159,9 +167,10 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   aside.appendChild(dateLabel);
 
   const sortLabel = document.createElement("label");
+  sortLabel.className = LABEL_CLASS;
   sortLabel.textContent = "Sort";
   const sortRow = document.createElement("div");
-  sortRow.style.cssText = "display:flex;gap:0.4rem";
+  sortRow.className = "flex gap-2";
   const sortSelect = document.createElement("select");
   for (const value of ["DATE", "TITLE", "DURATION", "TRENDING", "POPULARITY", "CREATED_AT", "UPDATED_AT"]) {
     const opt = document.createElement("option");
@@ -186,7 +195,7 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   aside.appendChild(sortLabel);
 
   const apply = document.createElement("button");
-  apply.className = "btn";
+  apply.className = "bg-accent text-white rounded px-3 py-1.5 hover:brightness-110";
   apply.textContent = "Apply filters";
   apply.addEventListener("click", () => onApply({ ...draft, page: 1 }));
   aside.appendChild(apply);

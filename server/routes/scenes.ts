@@ -57,14 +57,15 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
   });
 
   // The Watched feed merges every saved filter marked `watched: true`, restricted
-  // to scenes released in the last 30 days — this is meant to be a "what's new"
-  // feed, not a full archive browse of the same filters.
-  const WATCHED_WINDOW_DAYS = 30;
+  // to scenes released within a window (week/month/year) — this is meant to be a
+  // "what's new" feed, not a full archive browse of the same filters.
+  const WATCHED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
   router.get("/watched-feed", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;
       const page = q.page ? Number(q.page) : 1;
       const perPage = q.per_page ? Number(q.per_page) : 25;
+      const windowDays = WATCHED_WINDOW_DAYS[String(q.window ?? "week")] ?? WATCHED_WINDOW_DAYS.week;
 
       const watchedFilters = (await readJson<SavedFilter[]>("filters.json", [])).filter((f) => f.watched);
       if (watchedFilters.length === 0) {
@@ -73,7 +74,7 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       }
 
       const globalExcludes = await getGlobalExcludeIds();
-      const cutoff = new Date(Date.now() - WATCHED_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const sources = watchedFilters.map((f) => {
         const { input, excludeTagIds } = parseStashFilter(f.filter as Record<string, unknown>);
         input.date = { value: cutoff, modifier: "GREATER_THAN" };

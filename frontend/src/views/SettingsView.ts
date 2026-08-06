@@ -1,9 +1,19 @@
 import { api } from "../api.js";
+import { iconClose } from "../icons.js";
+
+const DOT_BASE = "inline-block w-[9px] h-[9px] rounded-full shrink-0";
+const DOT_OK = DOT_BASE + " bg-success";
+const DOT_BAD = DOT_BASE + " bg-danger";
+const DOT_UNKNOWN = DOT_BASE + " bg-secondary";
 
 function statusDot(ok: boolean | null): HTMLElement {
   const dot = document.createElement("span");
-  dot.className = "status-dot " + (ok === null ? "unknown" : ok ? "ok" : "bad");
+  dot.className = ok === null ? DOT_UNKNOWN : ok ? DOT_OK : DOT_BAD;
   return dot;
+}
+
+function setStatusDot(dot: HTMLElement, ok: boolean): void {
+  dot.className = ok ? DOT_OK : DOT_BAD;
 }
 
 function fieldRow(label: string, opts: { type?: string; value?: string; placeholder?: string } = {}): { row: HTMLElement; input: HTMLInputElement } {
@@ -20,12 +30,16 @@ function fieldRow(label: string, opts: { type?: string; value?: string; placehol
   return { row, input };
 }
 
+const CARD_BASE = "bg-surface rounded-lg p-3.5 flex flex-col gap-2";
+const CARD_WIDE = CARD_BASE + " col-span-full";
+
 function card(title: string, wide = false): { card: HTMLElement; header: HTMLElement; dot: HTMLElement } {
   const el = document.createElement("div");
-  el.className = "SettingsCard" + (wide ? " SettingsCard--wide" : "");
+  el.className = wide ? CARD_WIDE : CARD_BASE;
   const header = document.createElement("div");
-  header.className = "SettingsCard-header";
+  header.className = "flex items-center justify-between";
   const h = document.createElement("h4");
+  h.className = "m-0 text-sm";
   h.textContent = title;
   const dot = statusDot(null);
   header.appendChild(h);
@@ -36,11 +50,11 @@ function card(title: string, wide = false): { card: HTMLElement; header: HTMLEle
 
 function footer(saveLabel = "Save"): { row: HTMLElement; save: HTMLButtonElement; note: HTMLElement } {
   const row = document.createElement("div");
-  row.className = "SettingsCard-footer";
+  row.className = "flex items-center justify-between gap-2 mt-auto pt-1";
   const note = document.createElement("span");
-  note.className = "SettingsCard-note";
+  note.className = "text-xs text-muted";
   const save = document.createElement("button");
-  save.className = "btn";
+  save.className = "bg-accent text-white rounded px-2.5 py-1 text-xs hover:brightness-110 shrink-0";
   save.textContent = saveLabel;
   row.appendChild(note);
   row.appendChild(save);
@@ -49,19 +63,22 @@ function footer(saveLabel = "Save"): { row: HTMLElement; save: HTMLButtonElement
 
 export function renderSettingsView(): HTMLElement {
   const container = document.createElement("div");
-  container.innerHTML = "<p>Loading…</p>";
+  const loading = document.createElement("p");
+  loading.className = "text-muted text-sm";
+  loading.textContent = "Loading…";
+  container.appendChild(loading);
 
   async function render() {
     const [cfg, settings, test] = await Promise.all([api.getConfig(), api.settings(), api.testSettings()]);
     container.innerHTML = "";
 
     const grid = document.createElement("div");
-    grid.className = "SettingsGrid2";
+    grid.className = "grid gap-4 items-start grid-cols-[repeat(auto-fit,minmax(280px,1fr))]";
     container.appendChild(grid);
 
     // --- StashDB ---
     const stashdbC = card("StashDB");
-    stashdbC.dot.className = "status-dot " + (test.stashdb ? "ok" : "bad");
+    setStatusDot(stashdbC.dot, test.stashdb);
     const stashdbUrl = fieldRow("URL", { value: cfg.stashdbUrl });
     const stashdbKey = fieldRow("API Key", { type: "password", placeholder: cfg.stashdbApiKeySet ? "(unchanged)" : "not set" });
     stashdbC.card.appendChild(stashdbUrl.row);
@@ -77,7 +94,7 @@ export function renderSettingsView(): HTMLElement {
 
     // --- Local Stash ---
     const stashC = card("Local Stash");
-    stashC.dot.className = "status-dot " + (test.localStash ? "ok" : "bad");
+    setStatusDot(stashC.dot, test.localStash);
     const stashGqlUrl = fieldRow("GraphQL URL", { value: cfg.localStashUrl, placeholder: "http://localhost:9999/graphql" });
     const stashRootUrl = fieldRow("Root URL", { value: cfg.localStashRootUrl, placeholder: "http://localhost:9999" });
     const stashKey = fieldRow("API Key", { type: "password", placeholder: cfg.localStashApiKeySet ? "(unchanged)" : "not set" });
@@ -100,7 +117,7 @@ export function renderSettingsView(): HTMLElement {
 
     // --- Whisparr ---
     const whisparrC = card("Whisparr");
-    whisparrC.dot.className = "status-dot " + (test.whisparr ? "ok" : "bad");
+    setStatusDot(whisparrC.dot, test.whisparr);
     const whisparrUrl = fieldRow("Base URL", { value: cfg.whisparrBaseUrl, placeholder: "http://localhost:6969" });
     const whisparrKey = fieldRow("API Key", { type: "password", placeholder: cfg.whisparrApiKeySet ? "(unchanged)" : "not set" });
     whisparrC.card.appendChild(whisparrUrl.row);
@@ -131,7 +148,7 @@ export function renderSettingsView(): HTMLElement {
     whisparrC.card.appendChild(qualityRow);
 
     const loadOptionsBtn = document.createElement("button");
-    loadOptionsBtn.className = "btn minimal SettingsCard-linkBtn";
+    loadOptionsBtn.className = "bg-transparent text-text hover:bg-white/10 rounded px-2 py-1 text-xs self-start";
     loadOptionsBtn.textContent = "Load from Whisparr…";
     loadOptionsBtn.addEventListener("click", async () => {
       try {
@@ -197,9 +214,9 @@ export function renderSettingsView(): HTMLElement {
 
     async function retest() {
       const [s, t] = await Promise.all([api.settings(), api.testSettings()]);
-      stashdbC.dot.className = "status-dot " + (t.stashdb ? "ok" : "bad");
-      stashC.dot.className = "status-dot " + (t.localStash ? "ok" : "bad");
-      whisparrC.dot.className = "status-dot " + (t.whisparr ? "ok" : "bad");
+      setStatusDot(stashdbC.dot, t.stashdb);
+      setStatusDot(stashC.dot, t.localStash);
+      setStatusDot(whisparrC.dot, t.whisparr);
       stashF.note.textContent = "";
       stashF.note.textContent = s.localStashConfigured ? "" : "not configured";
       whisparrF.note.textContent = !s.whisparrConfigured ? "not configured" : !s.whisparrFullyConfigured ? "missing root folder / quality profile" : "";
@@ -209,29 +226,30 @@ export function renderSettingsView(): HTMLElement {
     const excludeC = card("Global Exclude Tags", true);
     excludeC.dot.remove();
     const excludeNote = document.createElement("p");
-    excludeNote.className = "SettingsCard-note";
-    excludeNote.style.margin = "0";
+    excludeNote.className = "text-xs text-muted m-0";
     excludeNote.textContent = "Applied everywhere scenes are fetched — Browse, Watched, and Favorites — instead of adding the same exclude to every filter.";
     excludeC.card.appendChild(excludeNote);
 
     const excludeChips = document.createElement("div");
-    excludeChips.className = "WatchedTagsManage";
+    excludeChips.className = "flex gap-2 items-center mb-6 flex-wrap";
     excludeC.card.appendChild(excludeChips);
 
     const excludeSearch = document.createElement("input");
     excludeSearch.placeholder = "search tag to exclude...";
     const excludeResults = document.createElement("div");
-    excludeResults.style.position = "relative";
+    excludeResults.className = "relative";
 
     async function renderExcludeChips() {
       const tags = await api.listGlobalExcludeTags();
       excludeChips.innerHTML = "";
       for (const t of tags) {
         const chip = document.createElement("span");
-        chip.className = "Chip";
+        chip.className = "bg-secondary rounded-full px-3 py-1 flex items-center gap-1.5";
         chip.textContent = t.name;
         const remove = document.createElement("button");
-        remove.textContent = "×";
+        remove.className = "bg-transparent border-0 text-muted p-0 hover:text-text";
+        remove.setAttribute("aria-label", "Remove excluded tag");
+        remove.appendChild(iconClose());
         remove.addEventListener("click", async () => {
           await api.removeGlobalExcludeTag(t.id);
           await renderExcludeChips();
@@ -257,12 +275,11 @@ export function renderSettingsView(): HTMLElement {
         const matches = await api.searchTags(term);
         excludeResults.innerHTML = "";
         const list = document.createElement("div");
-        list.style.cssText =
-          "position:absolute;background:var(--secondary);border-radius:3px;z-index:10;max-height:200px;overflow:auto;min-width:200px";
+        list.className = "TagPicker-dropdown min-w-[200px]";
         for (const m of matches) {
           const item = document.createElement("div");
           item.textContent = m.name;
-          item.style.cssText = "padding:0.35rem 0.5rem;cursor:pointer";
+          item.className = "TagPicker-dropdown-item";
           item.addEventListener("click", async () => {
             await api.addGlobalExcludeTag(m.id, m.name);
             excludeSearch.value = "";
@@ -279,8 +296,7 @@ export function renderSettingsView(): HTMLElement {
     grid.appendChild(excludeC.card);
 
     const secretsNote = document.createElement("p");
-    secretsNote.className = "SettingsCard-note";
-    secretsNote.style.marginTop = "1rem";
+    secretsNote.className = "text-xs text-muted mt-4";
     secretsNote.textContent = "Secrets are encrypted at rest and never sent back to the browser. Leave a key field blank to keep its current value.";
     container.appendChild(secretsNote);
   }

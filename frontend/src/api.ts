@@ -64,8 +64,8 @@ function qs(filter: SceneFilter): string {
 export const api = {
   queryScenes: (filter: SceneFilter) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}`),
-  watchedFeed: (page: number, perPage: number) =>
-    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/watched-feed?page=${page}&per_page=${perPage}`),
+  watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year") =>
+    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}`),
   favoritesFeed: (page: number, perPage: number) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/favorites-feed?page=${page}&per_page=${perPage}`),
   searchTags: (term: string) => req<{ id: string; name: string }[]>(`/api/tags/search?term=${encodeURIComponent(term)}`),

@@ -1,4 +1,5 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
+import { iconPlay } from "../icons.js";
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return "";
@@ -32,11 +33,16 @@ function statusButton(sceneId: string, status: SceneStatus | undefined, onChange
       btn.textContent = "Not Configured";
       btn.disabled = true;
       break;
-    case "in-stash":
+    case "in-stash": {
       btn.classList.add("btn-play");
-      btn.textContent = "Play";
+      const label = document.createElement("span");
+      label.className = "flex items-center gap-1.5";
+      label.appendChild(iconPlay());
+      label.appendChild(document.createTextNode("Play"));
+      btn.appendChild(label);
       btn.addEventListener("click", () => window.open(status.localUrl, "_blank"));
       break;
+    }
     case "not-added":
       btn.classList.add("btn-monitor");
       btn.textContent = status.whisparrConfigured ? "Add Scene" : "Not in Stash";
@@ -95,15 +101,16 @@ export function renderSceneCard(
   onIgnore?: () => void,
 ): HTMLElement {
   const card = document.createElement("div");
-  card.className = "card";
+  card.className = "bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
 
   const imageWrap = document.createElement("a");
-  imageWrap.className = "SceneCard-image";
+  imageWrap.className = "block h-[150px] bg-navbar";
   imageWrap.href = `https://stashdb.org/scenes/${s.id}`;
   imageWrap.target = "_blank";
   const image = s.images[0];
   if (image) {
     const img = document.createElement("img");
+    img.className = "w-full h-full object-cover object-top block";
     img.src = image.url;
     img.alt = "";
     imageWrap.appendChild(img);
@@ -111,26 +118,26 @@ export function renderSceneCard(
   card.appendChild(imageWrap);
 
   const footer = document.createElement("div");
-  footer.className = "SceneCard-footer";
+  footer.className = "p-3 text-xs";
 
   const titleRow = document.createElement("div");
-  titleRow.className = "SceneCard-title-row";
+  titleRow.className = "flex justify-between gap-2";
   const title = document.createElement("a");
-  title.className = "SceneCard-title";
+  title.className = "font-semibold whitespace-nowrap overflow-hidden text-ellipsis hover:text-link";
   title.textContent = s.title ?? "(untitled)";
   title.href = `https://stashdb.org/scenes/${s.id}`;
   title.target = "_blank";
   titleRow.appendChild(title);
   const duration = document.createElement("span");
-  duration.className = "SceneCard-duration";
+  duration.className = "text-muted shrink-0";
   duration.textContent = formatDuration(s.duration);
   titleRow.appendChild(duration);
   footer.appendChild(titleRow);
 
   const meta = document.createElement("div");
-  meta.className = "SceneCard-meta";
+  meta.className = "text-muted flex justify-between mt-1";
   const studio = document.createElement("span");
-  studio.className = "SceneCard-studio";
+  studio.className = "overflow-hidden text-ellipsis whitespace-nowrap";
   studio.textContent = s.studio?.name ?? "";
   meta.appendChild(studio);
   const date = document.createElement("strong");
@@ -140,10 +147,12 @@ export function renderSceneCard(
 
   if (onIgnore) {
     const actionRow = document.createElement("div");
-    actionRow.className = "SceneCard-actions";
-    actionRow.appendChild(statusButton(s.id, status, onStatusChange));
+    actionRow.className = "flex gap-1.5 mt-2";
+    const status_ = statusButton(s.id, status, onStatusChange);
+    status_.classList.add("flex-1", "mt-0");
+    actionRow.appendChild(status_);
     const ignoreBtn = document.createElement("button");
-    ignoreBtn.className = "SceneCard-status btn-monitor SceneCard-ignore";
+    ignoreBtn.className = "SceneCard-status btn-monitor shrink-0 mt-0";
     ignoreBtn.textContent = "Ignore";
     ignoreBtn.title = "Hide this scene from Watched";
     ignoreBtn.addEventListener("click", async () => {

@@ -12,7 +12,7 @@ function render() {
   root.appendChild(renderNavbar(activeTab, setTab));
 
   const content = document.createElement("main");
-  content.className = "MainContent";
+  content.className = "px-6 py-8";
   root.appendChild(content);
 
   if (activeTab === "browse") content.appendChild(renderBrowseView());
