@@ -7,6 +7,7 @@ export interface Scene {
   tags: { id: string; name: string }[];
   images: { id: string; url: string; width: number; height: number }[];
   performers: { performer: { id: string; name: string }; as: string | null }[];
+  sourceLabel?: string;
 }
 
 export interface SceneFilter {
@@ -66,10 +67,14 @@ export const api = {
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}`),
   watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year") =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}`),
-  favoritesFeed: (page: number, perPage: number) =>
-    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/favorites-feed?page=${page}&per_page=${perPage}`),
   searchTags: (term: string) => req<{ id: string; name: string }[]>(`/api/tags/search?term=${encodeURIComponent(term)}`),
   tagsByIds: (ids: string[]) => (ids.length ? req<{ id: string; name: string }[]>(`/api/tags/byIds?ids=${ids.join(",")}`) : Promise.resolve([])),
+  searchPerformers: (term: string) => req<{ id: string; name: string }[]>(`/api/performers/search?term=${encodeURIComponent(term)}`),
+  performersByIds: (ids: string[]) =>
+    ids.length ? req<{ id: string; name: string }[]>(`/api/performers/byIds?ids=${ids.join(",")}`) : Promise.resolve([]),
+  searchStudios: (term: string) => req<{ id: string; name: string }[]>(`/api/studios/search?term=${encodeURIComponent(term)}`),
+  studiosByIds: (ids: string[]) =>
+    ids.length ? req<{ id: string; name: string }[]>(`/api/studios/byIds?ids=${ids.join(",")}`) : Promise.resolve([]),
   sceneStatuses: (ids: string[]) =>
     req<Record<string, SceneStatus>>(`/api/scenes/status?ids=${ids.join(",")}`),
   addToWhisparr: (stashId: string) => req(`/api/whisparr/scenes/${stashId}`, { method: "POST" }),
@@ -92,6 +97,12 @@ export const api = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ watched }),
+    }),
+  renameFilter: (id: string, name: string) =>
+    req<SavedFilter>(`/api/filters/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
     }),
   overwriteFilter: (id: string, filter: SceneFilter) =>
     req<SavedFilter>(`/api/filters/${id}`, {

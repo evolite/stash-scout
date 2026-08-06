@@ -101,7 +101,15 @@ export function renderSceneCard(
   onIgnore?: () => void,
 ): HTMLElement {
   const card = document.createElement("div");
-  card.className = "bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
+  card.className = "relative bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
+
+  if (s.sourceLabel) {
+    const sash = document.createElement("span");
+    sash.className =
+      "absolute top-2 left-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-full bg-black/70 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-text";
+    sash.textContent = s.sourceLabel;
+    card.appendChild(sash);
+  }
 
   const imageWrap = document.createElement("a");
   imageWrap.className = "block h-[150px] bg-navbar";
@@ -152,7 +160,8 @@ export function renderSceneCard(
     status_.classList.add("flex-1", "mt-0");
     actionRow.appendChild(status_);
     const ignoreBtn = document.createElement("button");
-    ignoreBtn.className = "SceneCard-status btn-monitor shrink-0 mt-0";
+    ignoreBtn.className =
+      "shrink-0 h-9 px-2.5 rounded border border-danger/30 bg-danger/15 text-danger text-xs font-medium hover:bg-danger/25 transition-colors duration-150";
     ignoreBtn.textContent = "Ignore";
     ignoreBtn.title = "Hide this scene from Watched";
     ignoreBtn.addEventListener("click", async () => {

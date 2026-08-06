@@ -27,6 +27,9 @@ export interface Scene {
   tags: { id: string; name: string }[];
   images: { id: string; url: string; width: number; height: number }[];
   performers: { performer: { id: string; name: string }; as: string | null }[];
+  // Set only by queryMergedFeed — which saved filter (or "Favorites") first
+  // surfaced this scene, shown as a sash on the scene card in the Watched feed.
+  sourceLabel?: string;
 }
 
 const SCENE_FIELDS = `
@@ -113,40 +116,26 @@ const excludeCache = new Map<string, ExcludeCacheEntry>();
 // several source filters, deduping by scene id, and keeping each source's own
 // page cursor so growing the feed doesn't restart every source from page 1.
 //
-// Results are kept per-source (each individually date-desc, as StashDB returns
-// them) rather than combined into one globally date-sorted list, and the output
-// round-robins one scene from each source in turn. A pure global date sort would
-// let one prolific filter's results fill the entire visible page before a rarer
-// filter's results ever surfaced — round-robin guarantees every watched filter
-// gets representation instead of the most active one crowding out the rest.
+// The output round-robins one scene from each source per fetch round, appended
+// directly to a single flat `merged` list as they're found (rather than kept
+// per-source and re-interleaved by array position on every read). A pure global
+// date sort would let one prolific filter's results fill the entire visible page
+// before a rarer filter's results ever surfaced — round-robin guarantees every
+// watched filter gets representation. Appending directly (instead of recomputing
+// row-by-row from each source's current length) matters because a slower source
+// growing between two page fetches would otherwise retroactively fill earlier
+// "rows", shifting every later position and re-serving a scene already sent on a
+// previous page.
 const MERGED_FEED_TTL_MS = 5 * 60_000;
 const MAX_MERGE_ROUNDS = 3;
 interface MergedFeedEntry {
-  perSource: Scene[][];
+  merged: Scene[];
   seen: Set<string>;
   cursors: { internalPage: number; exhausted: boolean }[];
   exhaustedAll: boolean;
   at: number;
 }
 const mergedFeedCache = new Map<string, MergedFeedEntry>();
-
-function interleave(perSource: Scene[][], ignoredIds: Set<string>): Scene[] {
-  const lists = perSource.map((list) => list.filter((s) => !ignoredIds.has(s.id)));
-  const idx = lists.map(() => 0);
-  const result: Scene[] = [];
-  let added = true;
-  while (added) {
-    added = false;
-    for (let i = 0; i < lists.length; i++) {
-      if (idx[i] < lists[i].length) {
-        result.push(lists[i][idx[i]]);
-        idx[i]++;
-        added = true;
-      }
-    }
-  }
-  return result;
-}
 
 export class StashDBClient {
   constructor(private cfg: AppConfig) {}
@@ -224,7 +213,7 @@ export class StashDBClient {
   // filter-set so paging forward reuses each source's already-fetched pages
   // instead of re-querying every source again.
   async queryMergedFeed(
-    sources: { input: Partial<SceneQueryInput>; excludeTagIds: string[] }[],
+    sources: { input: Partial<SceneQueryInput>; excludeTagIds: string[]; label: string }[],
     page: number,
     perPage: number,
     cacheKey: string,
@@ -234,7 +223,7 @@ export class StashDBClient {
     let entry = mergedFeedCache.get(cacheKey);
     if (!entry || Date.now() - entry.at > MERGED_FEED_TTL_MS) {
       entry = {
-        perSource: sources.map(() => []),
+        merged: [],
         seen: new Set(),
         cursors: sources.map(() => ({ internalPage: 1, exhausted: false })),
         exhaustedAll: false,
@@ -242,14 +231,13 @@ export class StashDBClient {
       };
       mergedFeedCache.set(cacheKey, entry);
     }
-    // Visible = interleaved minus whatever's been ignored since — filtered here
-    // (not just skipped on insert) so a scene ignored after being cached
+    // Visible = the merged list minus whatever's been ignored since — filtered
+    // here (not just skipped on insert) so a scene ignored after being cached
     // disappears immediately rather than waiting for the cache to expire.
-    const visible = () => interleave(entry!.perSource, ignoredIds);
-    const totalFetched = () => entry!.perSource.reduce((n, list) => n + list.length, 0);
+    const visible = () => entry!.merged.filter((s) => !ignoredIds.has(s.id));
 
     let round = 0;
-    while (visible().length < skip + perPage && !entry.exhaustedAll && totalFetched() < MAX_CACHED_SCENES && round < MAX_MERGE_ROUNDS) {
+    while (visible().length < skip + perPage && !entry.exhaustedAll && entry.merged.length < MAX_CACHED_SCENES && round < MAX_MERGE_ROUNDS) {
       for (let i = 0; i < sources.length; i++) {
         const cursor = entry.cursors[i];
         if (cursor.exhausted) continue;
@@ -259,7 +247,8 @@ export class StashDBClient {
         for (const scene of scenes) {
           if (entry.seen.has(scene.id) || scene.tags.some((t) => excludeSet.has(t.id))) continue;
           entry.seen.add(scene.id);
-          entry.perSource[i].push(scene);
+          scene.sourceLabel = src.label;
+          entry.merged.push(scene);
         }
         if (scenes.length < MAX_PER_PAGE) cursor.exhausted = true;
         else cursor.internalPage++;
@@ -276,27 +265,27 @@ export class StashDBClient {
     };
   }
 
-  async findTags(text: string): Promise<{ id: string; name: string }[]> {
-    const data = await gql<{ searchTag: { id: string; name: string }[] }>(
+  private async search(queryName: string, text: string): Promise<{ id: string; name: string }[]> {
+    const data = await gql<Record<string, { id: string; name: string }[]>>(
       this.cfg.stashdbUrl,
       this.cfg.stashdbApiKey,
       `query ($term: String!, $limit: Int) {
-        searchTag(term: $term, limit: $limit) { id name }
+        ${queryName}(term: $term, limit: $limit) { id name }
       }`,
       { term: text, limit: 10 },
     );
-    return data.searchTag;
+    return data[queryName];
   }
 
-  // Resolves tag IDs back to names (e.g. re-populating a saved filter's chips) in
-  // one request via aliases, rather than one findTag call per id.
-  async findTagsByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
+  // Resolves ids back to names (e.g. re-populating a saved filter's chips) in one
+  // request via aliases, rather than one lookup call per id.
+  private async findByIds(queryName: string, ids: string[]): Promise<{ id: string; name: string }[]> {
     if (ids.length === 0) return [];
     const variables: Record<string, string> = {};
     const fields = ids
       .map((id, i) => {
         variables[`id${i}`] = id;
-        return `t${i}: findTag(id: $id${i}) { id name }`;
+        return `t${i}: ${queryName}(id: $id${i}) { id name }`;
       })
       .join("\n");
     const argsDecl = ids.map((_, i) => `$id${i}: ID!`).join(", ");
@@ -307,5 +296,24 @@ export class StashDBClient {
       variables,
     );
     return Object.values(data).filter((t): t is { id: string; name: string } => t !== null);
+  }
+
+  findTags(text: string): Promise<{ id: string; name: string }[]> {
+    return this.search("searchTag", text);
+  }
+  findTagsByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
+    return this.findByIds("findTag", ids);
+  }
+  findPerformers(text: string): Promise<{ id: string; name: string }[]> {
+    return this.search("searchPerformer", text);
+  }
+  findPerformersByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
+    return this.findByIds("findPerformer", ids);
+  }
+  findStudios(text: string): Promise<{ id: string; name: string }[]> {
+    return this.search("searchStudio", text);
+  }
+  findStudiosByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
+    return this.findByIds("findStudio", ids);
   }
 }

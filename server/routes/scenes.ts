@@ -56,8 +56,45 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     }
   });
 
-  // The Watched feed merges every saved filter marked `watched: true`, restricted
-  // to scenes released within a window (week/month/year) — this is meant to be a
+  router.get("/performers/search", async (req, res) => {
+    try {
+      const term = String(req.query.term ?? "");
+      res.json(await stashdb.findPerformers(term));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get("/performers/byIds", async (req, res) => {
+    try {
+      const ids = String(req.query.ids ?? "").split(",").filter(Boolean);
+      res.json(await stashdb.findPerformersByIds(ids));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get("/studios/search", async (req, res) => {
+    try {
+      const term = String(req.query.term ?? "");
+      res.json(await stashdb.findStudios(term));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get("/studios/byIds", async (req, res) => {
+    try {
+      const ids = String(req.query.ids ?? "").split(",").filter(Boolean);
+      res.json(await stashdb.findStudiosByIds(ids));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // The Watched feed merges every saved filter marked `watched: true` plus your
+  // favorited StashDB performers (treated as just another source), restricted to
+  // scenes released within a window (week/month/year) — this is meant to be a
   // "what's new" feed, not a full archive browse of the same filters.
   const WATCHED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
   router.get("/watched-feed", async (req, res) => {
@@ -68,18 +105,20 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const windowDays = WATCHED_WINDOW_DAYS[String(q.window ?? "week")] ?? WATCHED_WINDOW_DAYS.week;
 
       const watchedFilters = (await readJson<SavedFilter[]>("filters.json", [])).filter((f) => f.watched);
-      if (watchedFilters.length === 0) {
-        res.json({ count: 0, scenes: [], approximateCount: false });
-        return;
-      }
-
       const globalExcludes = await getGlobalExcludeIds();
       const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const sources = watchedFilters.map((f) => {
-        const { input, excludeTagIds } = parseStashFilter(f.filter as Record<string, unknown>);
-        input.date = { value: cutoff, modifier: "GREATER_THAN" };
-        return { input, excludeTagIds: mergeExcludeIds(excludeTagIds, globalExcludes) };
-      });
+      const sources = [
+        ...watchedFilters.map((f) => {
+          const { input, excludeTagIds } = parseStashFilter(f.filter as Record<string, unknown>);
+          input.date = { value: cutoff, modifier: "GREATER_THAN" };
+          return { input, excludeTagIds: mergeExcludeIds(excludeTagIds, globalExcludes), label: f.name };
+        }),
+        {
+          input: { favorites: "PERFORMER" as const, date: { value: cutoff, modifier: "GREATER_THAN" as const } },
+          excludeTagIds: globalExcludes,
+          label: "Favorites",
+        },
+      ];
       // cutoff (changes daily) and the global excludes are folded into the cache
       // key so the window rolls forward and a Settings change is picked up
       // immediately instead of serving a stale cached merge.
@@ -94,29 +133,6 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
         page,
         perPage,
       );
-      res.json(result);
-    } catch (err) {
-      res.status(502).json({ error: (err as Error).message });
-    }
-  });
-
-  // Everything from favorited StashDB performers that isn't already in Stash or
-  // Whisparr — no date window (unlike Watched), since the point is catching up
-  // on a backlog, not just what's new this month.
-  router.get("/favorites-feed", async (req, res) => {
-    try {
-      const q = req.query as Record<string, unknown>;
-      const page = q.page ? Number(q.page) : 1;
-      const perPage = q.per_page ? Number(q.per_page) : 25;
-
-      const globalExcludes = await getGlobalExcludeIds();
-      const baseInput = { favorites: "PERFORMER" as const, sort: "DATE", direction: "DESC" as const };
-      const fetchRawPage =
-        globalExcludes.length > 0
-          ? (rawPage: number, pp: number) => stashdb.queryScenesExcluding({ ...baseInput, page: rawPage, per_page: pp }, globalExcludes)
-          : (rawPage: number, pp: number) => stashdb.queryScenes({ ...baseInput, page: rawPage, per_page: pp });
-
-      const result = await fetchUnaddedPage(cfg, localStash, whisparr, fetchRawPage, page, perPage);
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

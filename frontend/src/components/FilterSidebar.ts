@@ -6,14 +6,21 @@ const LABEL_CLASS = "flex flex-col gap-1 text-xs text-muted";
 // Tag/performer/studio pickers here are simple comma-separated-id inputs backed by
 // a typeahead search — enough to exercise StashDB's INCLUDES/INCLUDES_ALL/EXCLUDES
 // modifiers without building a full multi-select widget.
-export function tagPicker(label: string, initial: string, onChange: (ids: string) => void): HTMLElement {
+function idPicker(
+  label: string,
+  placeholder: string,
+  initial: string,
+  onChange: (ids: string) => void,
+  search: (term: string) => Promise<{ id: string; name: string }[]>,
+  byIds: (ids: string[]) => Promise<{ id: string; name: string }[]>,
+): HTMLElement {
   const wrap = document.createElement("label");
   wrap.className = LABEL_CLASS;
   wrap.textContent = label;
 
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "search tag name...";
+  input.placeholder = placeholder;
 
   const chips = document.createElement("div");
   chips.className = "flex gap-2 items-center flex-wrap";
@@ -23,7 +30,7 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
     : [];
 
   if (initial) {
-    api.tagsByIds(initial.split(",")).then((resolved) => {
+    byIds(initial.split(",")).then((resolved) => {
       const byId = new Map(resolved.map((t) => [t.id, t.name]));
       selected = selected.map((t) => ({ id: t.id, name: byId.get(t.id) ?? t.name }));
       renderChips();
@@ -63,7 +70,7 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
       return;
     }
     debounce = setTimeout(async () => {
-      const matches = await api.searchTags(term);
+      const matches = await search(term);
       results.innerHTML = "";
       const list = document.createElement("div");
       list.className = "TagPicker-dropdown";
@@ -90,7 +97,12 @@ export function tagPicker(label: string, initial: string, onChange: (ids: string
   return wrap;
 }
 
-export function renderFilterSidebar(current: SceneFilter, onApply: (filter: SceneFilter) => void): HTMLElement {
+export function renderFilterSidebar(
+  current: SceneFilter,
+  onApply: (filter: SceneFilter) => void,
+  presetName: string,
+  onSave: (filter: SceneFilter, name: string) => void,
+): HTMLElement {
   const aside = document.createElement("aside");
   aside.className = "bg-surface rounded-lg p-4 flex flex-col gap-3";
 
@@ -106,9 +118,9 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   aside.appendChild(textLabel);
 
   aside.appendChild(
-    tagPicker("Tags", draft.tags ?? "", (ids) => {
+    idPicker("Tags", "search tag name...", draft.tags ?? "", (ids) => {
       draft.tags = ids || undefined;
-    }),
+    }, api.searchTags, api.tagsByIds),
   );
 
   const modifierLabel = document.createElement("label");
@@ -134,9 +146,21 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   // in one query, so this is resolved server-side (see /api/scenes handling of
   // exclude_tags) rather than faked by filtering results in the browser.
   aside.appendChild(
-    tagPicker("Exclude tags (NOT)", draft.exclude_tags ?? "", (ids) => {
+    idPicker("Exclude tags (NOT)", "search tag name...", draft.exclude_tags ?? "", (ids) => {
       draft.exclude_tags = ids || undefined;
-    }),
+    }, api.searchTags, api.tagsByIds),
+  );
+
+  aside.appendChild(
+    idPicker("Performers", "search performer name...", draft.performers ?? "", (ids) => {
+      draft.performers = ids || undefined;
+    }, api.searchPerformers, api.performersByIds),
+  );
+
+  aside.appendChild(
+    idPicker("Studios", "search studio name...", draft.studios ?? "", (ids) => {
+      draft.studios = ids || undefined;
+    }, api.searchStudios, api.studiosByIds),
   );
 
   const dateLabel = document.createElement("label");
@@ -199,6 +223,25 @@ export function renderFilterSidebar(current: SceneFilter, onApply: (filter: Scen
   apply.textContent = "Apply filters";
   apply.addEventListener("click", () => onApply({ ...draft, page: 1 }));
   aside.appendChild(apply);
+
+  const saveRow = document.createElement("div");
+  saveRow.className = "flex items-stretch gap-2 border-t border-black/20 pt-3";
+  const nameInput = document.createElement("input");
+  nameInput.placeholder = "Preset name";
+  nameInput.value = presetName;
+  nameInput.className = "flex-1 min-w-0";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "bg-secondary text-white rounded px-3 py-1.5 hover:bg-surface-hover shrink-0 whitespace-nowrap";
+  saveBtn.textContent = "Save";
+  saveBtn.title = "Save as a new preset, or overwrite the loaded one if you didn't change the name";
+  saveBtn.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    onSave({ ...draft, page: 1 }, name);
+  });
+  saveRow.appendChild(nameInput);
+  saveRow.appendChild(saveBtn);
+  aside.appendChild(saveRow);
 
   return aside;
 }

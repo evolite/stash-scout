@@ -1,20 +1,17 @@
-import { api, type Scene, type SceneFilter, type SceneStatus } from "../api.js";
+import { api, type SavedFilter, type Scene, type SceneFilter, type SceneStatus } from "../api.js";
 import { renderFilterSidebar } from "../components/FilterSidebar.js";
 import { renderSavedFiltersPanel } from "../components/SavedFiltersPanel.js";
 import { renderSceneCard } from "../components/SceneCard.js";
 import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
+import { renderPagination } from "../components/Pagination.js";
 
-const PER_PAGE = 25;
+const PER_PAGE = 32;
 
 function textState(message: string): HTMLElement {
   const p = document.createElement("p");
   p.className = "text-muted text-sm";
   p.textContent = message;
   return p;
-}
-
-function paginationBtnClass(): string {
-  return "bg-secondary text-white border-0 px-2.5 py-1.5 rounded hover:bg-surface-hover disabled:opacity-50 disabled:cursor-default";
 }
 
 export function renderBrowseView(): HTMLElement {
@@ -29,11 +26,13 @@ export function renderBrowseView(): HTMLElement {
   let filter: SceneFilter = { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
   let statuses: Record<string, SceneStatus> = {};
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let loadedFilterId: string | null = null;
+  let loadedFilterName = "";
 
   function renderSidebar() {
     sidebarCol.innerHTML = "";
-    sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter));
-    renderSavedFiltersPanel(() => filter, loadSavedFilter).then((panel) => {
+    sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter, loadedFilterName, savePreset));
+    renderSavedFiltersPanel(loadSavedFilter).then((panel) => {
       sidebarCol.appendChild(panel);
     });
   }
@@ -46,10 +45,28 @@ export function renderBrowseView(): HTMLElement {
   // Loading a preset replaces the filter outright (rather than merging onto
   // whatever's currently drafted) and re-renders the sidebar so its fields show
   // the loaded values and can be tweaked from there.
-  function loadSavedFilter(loaded: SceneFilter) {
-    filter = { per_page: PER_PAGE, sort: "DATE", direction: "DESC", ...loaded, page: 1 };
+  function loadSavedFilter(saved: SavedFilter) {
+    filter = { per_page: PER_PAGE, sort: "DATE", direction: "DESC", ...saved.filter, page: 1 };
+    loadedFilterId = saved.id;
+    loadedFilterName = saved.name;
     renderSidebar();
     load();
+  }
+
+  // Saving with a preset loaded overwrites its content and name; saving with
+  // nothing loaded creates a new preset (and that preset becomes "loaded" so a
+  // second Save click updates it rather than creating a duplicate).
+  async function savePreset(draft: SceneFilter, name: string) {
+    if (loadedFilterId) {
+      await api.overwriteFilter(loadedFilterId, draft);
+      await api.renameFilter(loadedFilterId, name);
+      loadedFilterName = name;
+    } else {
+      const saved = await api.saveFilter(name, draft);
+      loadedFilterId = saved.id;
+      loadedFilterName = saved.name;
+    }
+    renderSidebar();
   }
 
   async function refreshStatuses(scenes: Scene[]) {
@@ -74,32 +91,14 @@ export function renderBrowseView(): HTMLElement {
     }
   }
 
-  function renderPagination(count: number, approximate: boolean, sceneCountOnPage: number) {
-    const totalPages = Math.max(1, Math.ceil(count / (filter.per_page ?? PER_PAGE)));
-    const page = filter.page ?? 1;
-    const pag = document.createElement("div");
-    pag.className = "flex gap-1 my-4";
-
-    const prev = document.createElement("button");
-    prev.className = paginationBtnClass();
-    prev.textContent = "Prev";
-    prev.disabled = page <= 1;
-    prev.addEventListener("click", () => applyFilter({ page: page - 1 }));
-    pag.appendChild(prev);
-
-    const label = document.createElement("span");
-    label.className = "px-2 py-1.5";
-    label.textContent = `Page ${page}${approximate ? "" : ` / ${totalPages}`} (${approximate ? "~" : ""}${count} scenes)`;
-    pag.appendChild(label);
-
-    const next = document.createElement("button");
-    next.className = paginationBtnClass();
-    next.textContent = "Next";
-    next.disabled = approximate ? sceneCountOnPage < (filter.per_page ?? PER_PAGE) : page >= totalPages;
-    next.addEventListener("click", () => applyFilter({ page: page + 1 }));
-    pag.appendChild(next);
-
-    return pag;
+  function buildPagination(count: number, approximate: boolean): HTMLElement {
+    return renderPagination({
+      page: filter.page ?? 1,
+      perPage: filter.per_page ?? PER_PAGE,
+      count,
+      approximate,
+      onPage: (page) => applyFilter({ page }),
+    });
   }
 
   async function load() {
@@ -110,11 +109,10 @@ export function renderBrowseView(): HTMLElement {
       const { count, scenes, approximateCount } = await api.queryScenes(filter);
       statuses = {};
       contentCol.innerHTML = "";
-      contentCol.appendChild(renderPagination(count, !!approximateCount, scenes.length));
       const grid = document.createElement("div");
       grid.className = "SceneGrid grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]";
       contentCol.appendChild(grid);
-      contentCol.appendChild(renderPagination(count, !!approximateCount, scenes.length));
+      contentCol.appendChild(buildPagination(count, !!approximateCount));
       renderGrid(scenes);
       refreshStatuses(scenes);
     } catch (err) {

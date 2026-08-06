@@ -39,6 +39,7 @@ export function filtersRouter() {
     if (!entry) return void res.status(404).end();
     if (typeof req.body.watched === "boolean") entry.watched = req.body.watched;
     if (req.body.filter && typeof req.body.filter === "object") entry.filter = req.body.filter;
+    if (typeof req.body.name === "string" && req.body.name.trim()) entry.name = req.body.name.trim();
     await writeJson(FILE, filters);
     res.json(entry);
   });
