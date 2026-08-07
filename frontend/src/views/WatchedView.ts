@@ -70,18 +70,35 @@ function renderSceneSection(opts: {
 
   let page = 1;
   let statuses: Record<string, SceneStatus> = {};
+  // The single source of truth for what's currently shown — status refreshes
+  // (triggered by any card's Add/Monitor click) re-render from this, so an
+  // ignored scene needs to actually leave this list, not just its DOM node.
+  // Removing only the node let a later refreshStatuses() call (which closed
+  // over the original fetch's full array) redraw the whole grid and bring
+  // already-ignored cards right back.
+  let currentScenes: Scene[] = [];
 
-  function renderGrid(scenes: Scene[]) {
+  function renderGrid() {
     grid.innerHTML = "";
-    for (const scene of scenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(scenes), opts.ignorable ? () => card.remove() : undefined);
+    for (const scene of currentScenes) {
+      const card = renderSceneCard(
+        scene,
+        statuses[scene.id],
+        () => refreshStatuses(),
+        opts.ignorable
+          ? () => {
+              currentScenes = currentScenes.filter((s) => s.id !== scene.id);
+              card.remove();
+            }
+          : undefined,
+      );
       grid.appendChild(card);
     }
   }
 
-  async function refreshStatuses(scenes: Scene[]) {
-    statuses = await api.sceneStatuses(scenes.map((s) => s.id));
-    renderGrid(scenes);
+  async function refreshStatuses() {
+    statuses = await api.sceneStatuses(currentScenes.map((s) => s.id));
+    renderGrid();
   }
 
   function updatePagination(count: number, approximate: boolean) {
@@ -114,6 +131,7 @@ function renderSceneSection(opts: {
 
     const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
     statuses = {};
+    currentScenes = scenes;
     grid.classList.remove("opacity-40", "pointer-events-none");
 
     if (scenes.length === 0 && page === 1) {
@@ -123,8 +141,8 @@ function renderSceneSection(opts: {
       return;
     }
     updatePagination(count, !!approximateCount);
-    renderGrid(scenes);
-    refreshStatuses(scenes);
+    renderGrid();
+    refreshStatuses();
   }
 
   function reset() {
