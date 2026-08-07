@@ -127,12 +127,10 @@ function renderSfwToggle(): HTMLButtonElement {
   track.appendChild(thumb);
   btn.appendChild(track);
 
-  // Deliberately quiet even when on — a muted tinted track, not a solid
-  // accent fill, so this stays a utility control, not a headline switch.
   const apply = () => {
     const on = isSfwMode();
-    track.className = TRACK_BASE + " border" + (on ? " bg-accent/25 border-accent/50" : " bg-white/5 border-line");
-    thumb.className = THUMB_BASE + (on ? " translate-x-4 bg-accent" : " translate-x-0 bg-text-faint");
+    track.className = TRACK_BASE + " border" + (on ? " bg-accent border-accent" : " bg-white/5 border-line");
+    thumb.className = THUMB_BASE + (on ? " translate-x-4" : " translate-x-0 bg-text-faint");
     btn.setAttribute("aria-checked", String(on));
   };
   btn.addEventListener("click", () => {
