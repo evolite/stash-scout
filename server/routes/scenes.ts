@@ -4,7 +4,8 @@ import { parseStashFilter } from "../filterUtils.js";
 import type { AppConfig } from "../config.js";
 import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
-import { getGlobalExcludeIds, mergeExcludeIds, getWatchedFeed } from "../watchedFeed.js";
+import { getGlobalExcludeIds, mergeExcludeIds, getWatchedFeed, getIgnoredIds } from "../watchedFeed.js";
+import { fetchFilteredPage } from "../statusFilter.js";
 
 export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
@@ -16,10 +17,37 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     try {
       const q = req.query as Record<string, unknown>;
       const { input, excludeTagIds } = parseStashFilter(q);
-      input.page = q.page ? Number(q.page) : 1;
-      input.per_page = q.per_page ? Number(q.per_page) : 25;
+      const page = q.page ? Number(q.page) : 1;
+      const perPage = q.per_page ? Number(q.per_page) : 25;
+      input.page = page;
+      input.per_page = perPage;
       const refresh = q.refresh === "1" || q.refresh === "true";
       const allExcludes = mergeExcludeIds(excludeTagIds, getGlobalExcludeIds());
+
+      // Trending's "Not in library" / "Under 30 min" chips aren't StashDB query
+      // fields, and a Skipped scene needs to actually disappear on the next
+      // fetch — all filtered post-fetch, walking pages like the Watched feed
+      // already does, only when actually needed.
+      const unadded = q.unadded === "1";
+      const maxDuration = q.max_duration ? Number(q.max_duration) : undefined;
+      const ignoredIds = getIgnoredIds();
+      if (unadded || maxDuration || ignoredIds.size > 0) {
+        const result = await fetchFilteredPage(
+          cfg,
+          localStash,
+          whisparr,
+          (rawPage, pp) =>
+            allExcludes.length > 0
+              ? stashdb.queryScenesExcluding({ ...input, page: rawPage, per_page: pp }, allExcludes, refresh)
+              : stashdb.queryScenes({ ...input, page: rawPage, per_page: pp }, refresh),
+          page,
+          perPage,
+          { requireUnadded: unadded, maxDurationSeconds: maxDuration, excludeIds: ignoredIds },
+        );
+        res.json(result);
+        return;
+      }
+
       const result = allExcludes.length > 0
         ? await stashdb.queryScenesExcluding(input, allExcludes, refresh)
         : await stashdb.queryScenes(input, refresh);
@@ -95,7 +123,8 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const perPage = q.per_page ? Number(q.per_page) : 25;
       const window = String(q.window ?? "week");
       const refresh = q.refresh === "1" || q.refresh === "true";
-      const result = await getWatchedFeed({ stashdb, cfg, localStash, whisparr }, { window, page, perPage, refresh });
+      const source = typeof q.source === "string" ? q.source : undefined;
+      const result = await getWatchedFeed({ stashdb, cfg, localStash, whisparr }, { window, page, perPage, refresh, source });
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

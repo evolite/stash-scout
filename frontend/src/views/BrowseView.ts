@@ -85,9 +85,11 @@ export function renderBrowseView(): HTMLElement {
     if (!grid) return;
     grid.innerHTML = "";
     for (const scene of scenes) {
-      grid.appendChild(
-        renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(scenes)),
-      );
+      const card = renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(scenes), () => {
+        scenes.splice(scenes.indexOf(scene), 1);
+        card.remove();
+      });
+      grid.appendChild(card);
     }
   }
 

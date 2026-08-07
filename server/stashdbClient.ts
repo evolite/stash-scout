@@ -222,7 +222,7 @@ export class StashDBClient {
     // `reset` re-shuffles on every fresh visit to page 1 rather than only when
     // the cache naturally expires. It must come from the *client's* requested
     // page (the caller decides this once, up front) — queryMergedFeed's own
-    // `page` here is fetchUnaddedPage's internal round cursor, which always
+    // `page` here is fetchFilteredPage's internal round cursor, which always
     // restarts at 1 within a single request regardless of the page the client
     // actually asked for, so using it directly would reseed mid-pagination and
     // reshuffle/duplicate/skip scenes across what should be stable pages.

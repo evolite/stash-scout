@@ -36,51 +36,60 @@
   }
 }
 
+html.sfw .SceneCard-image {
+  filter: blur(40px) saturate(0);
+}
+
+html.sfw .SceneCard-text {
+  filter: blur(3px);
+}
+
 @layer components {
-  /* Button states ported verbatim from StashSeer (stashseer.js ~168-268) so the
-     colors/labels read as the same tool across both the userscript and this app. */
-  .SceneCard-status {
-    @apply mt-2 w-full flex items-center justify-center h-9 px-3 text-sm font-medium rounded border border-white/10 text-white transition-all duration-150 ease-out;
-    background: rgba(33, 37, 41, 0.6);
+  /* Badge colors mirror StashSeer's status button palette (stashseer.js
+     ~168-268) so this reads as the same tool: green = playable, teal =
+     monitored, amber = new/removed. */
+  .SceneCard-badge {
+    @apply absolute top-2 left-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide;
   }
-  .SceneCard-status:disabled {
-    @apply cursor-default;
+  .SceneCard-badge.badge-new {
+    background: #ffd668;
+    color: #3a2510;
   }
-  .SceneCard-status.btn-play {
-    background: rgba(25, 135, 84, 0.15);
-    border-color: rgba(25, 135, 84, 0.3);
-    color: #5cd88c;
-  }
-  .SceneCard-status.btn-monitor {
-    background: rgba(108, 117, 125, 0.15);
-    border-color: rgba(108, 117, 125, 0.3);
-    color: #adb5bd;
-  }
-  .SceneCard-status.btn-monitored {
-    background: rgba(32, 178, 170, 0.15);
-    border-color: rgba(32, 178, 170, 0.3);
+  .SceneCard-badge.badge-monitored {
+    background: #0f3a38;
     color: #5fd4c9;
   }
-  .SceneCard-status.btn-previously-added {
-    background: rgba(255, 193, 7, 0.15);
-    border-color: rgba(255, 193, 7, 0.3);
+  .SceneCard-badge.badge-in-library {
+    background: #0f3d28;
+    color: #5cd88c;
+  }
+  .SceneCard-badge.badge-removed {
+    background: #3a2f0f;
     color: #ffd668;
   }
-  .SceneCard-status.btn-loading {
-    background: rgba(13, 110, 253, 0.15);
-    border-color: rgba(13, 110, 253, 0.3);
-    color: #4d9fff;
-    @apply opacity-70;
+
+  .SceneCard-hover {
+    @apply absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition-opacity duration-150;
+    background: rgba(10, 13, 18, 0.4);
   }
-  .SceneCard-status.btn-loading.btn-checking {
-    background: rgba(108, 117, 125, 0.15);
-    border-color: rgba(108, 117, 125, 0.3);
-    color: #adb5bd;
+  .group:hover .SceneCard-hover {
+    @apply opacity-100;
   }
-  .SceneCard-status.btn-settings {
-    background: rgba(108, 117, 125, 0.15);
-    border-color: rgba(108, 117, 125, 0.3);
-    color: #adb5bd;
+  .SceneCard-hover button {
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-white;
+    background: rgba(18, 22, 31, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  .SceneCard-hover button:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+  .SceneCard-hover button.action-add:hover {
+    background: rgba(25, 135, 84, 0.35);
+    border-color: rgba(25, 135, 84, 0.7);
+  }
+  .SceneCard-hover button.action-skip:hover {
+    background: rgba(219, 55, 55, 0.35);
+    border-color: rgba(219, 55, 55, 0.7);
   }
 
   .SettingsField {

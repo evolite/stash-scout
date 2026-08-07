@@ -10,6 +10,9 @@ export interface SceneFilter {
   studios?: string;
   date?: string;
   date_modifier?: "EQUALS" | "GREATER_THAN" | "LESS_THAN";
+  favorites?: "PERFORMER" | "STUDIO" | "ALL";
+  unadded?: "1";
+  max_duration?: number;
   sort?: string;
   direction?: "ASC" | "DESC";
   page?: number;
@@ -36,9 +39,9 @@ function qs(filter: SceneFilter): string {
 export const api = {
   queryScenes: (filter: SceneFilter, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}${refresh ? "&refresh=1" : ""}`),
-  watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year", refresh = false) =>
+  watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(
-      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${refresh ? "&refresh=1" : ""}`,
+      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${source ? `&source=${encodeURIComponent(source)}` : ""}${refresh ? "&refresh=1" : ""}`,
     ),
   searchTags: (term: string) => req<{ id: string; name: string }[]>(`/api/tags/search?term=${encodeURIComponent(term)}`),
   tagsByIds: (ids: string[]) => (ids.length ? req<{ id: string; name: string }[]>(`/api/tags/byIds?ids=${ids.join(",")}`) : Promise.resolve([])),

@@ -227,7 +227,7 @@ export function renderSettingsView(): HTMLElement {
     excludeC.dot.remove();
     const excludeNote = document.createElement("p");
     excludeNote.className = "text-xs text-muted m-0";
-    excludeNote.textContent = "Applied everywhere scenes are fetched — Browse, Watched, and Favorites — instead of adding the same exclude to every filter.";
+    excludeNote.textContent = "Applied everywhere scenes are fetched — Filters, Watched, and Favorites — instead of adding the same exclude to every filter.";
     excludeC.card.appendChild(excludeNote);
 
     const excludeChips = document.createElement("div");

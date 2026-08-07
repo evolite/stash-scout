@@ -121,7 +121,7 @@ export class WhisparrClient {
       qualityProfileId: this.cfg.whisparrQualityProfileId,
       rootFolderPath: this.cfg.whisparrRootFolderPath,
       tags: [],
-      title: "added via stashdb-browser",
+      title: "added via Stash Scout",
       addOptions: { monitor: "none", searchForMovie: true },
     };
     const result = await this.request<WhisparrScene>("/movie", { method: "POST", body: JSON.stringify(body) });

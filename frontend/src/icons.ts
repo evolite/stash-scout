@@ -22,6 +22,14 @@ export function iconClose(): SVGSVGElement {
   return svg(["M4 4l8 8", "M12 4l-8 8"]);
 }
 
+export function iconPlus(): SVGSVGElement {
+  return svg(["M8 3v10", "M3 8h10"]);
+}
+
+export function iconMinus(): SVGSVGElement {
+  return svg(["M3 8h10"]);
+}
+
 export function iconPlay(): SVGSVGElement {
   const el = document.createElementNS(NS, "svg");
   el.setAttribute("viewBox", "0 0 16 16");

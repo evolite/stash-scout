@@ -45,5 +45,5 @@ app.use(express.static(frontendDist));
 app.get("*", (_req, res) => res.sendFile(path.join(frontendDist, "index.html")));
 
 app.listen(cfg.port, "0.0.0.0", () => {
-  console.log(`stashdb-browser listening on http://0.0.0.0:${cfg.port}`);
+  console.log(`Stash Scout listening on http://0.0.0.0:${cfg.port}`);
 });

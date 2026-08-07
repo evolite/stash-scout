@@ -21,7 +21,7 @@ export function renderPagination(opts: {
   const totalPages = approximate ? Math.max(knownTotalPages, page + WINDOW_SIZE - 1) : knownTotalPages;
 
   const wrap = document.createElement("div");
-  wrap.className = "flex flex-col gap-1.5 mt-3";
+  wrap.className = "flex flex-col items-end gap-1.5 mt-3";
 
   const label = document.createElement("div");
   label.className = "text-muted text-xs";

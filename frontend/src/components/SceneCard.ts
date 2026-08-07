@@ -1,5 +1,11 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
-import { iconPlay } from "../icons.js";
+import { iconPlay, iconPlus, iconMinus } from "../icons.js";
+
+function isWithinLastWeek(releaseDate: string | null): boolean {
+  if (!releaseDate) return false;
+  const days = (Date.now() - new Date(releaseDate).getTime()) / (24 * 60 * 60 * 1000);
+  return days >= 0 && days <= 7;
+}
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return "";
@@ -11,118 +17,122 @@ function formatDuration(seconds: number | null): string {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-// Labels/classes/colors mirror StashSeer's button state machine 1:1
-// (stashseer.js ~1275-1571 for labels, ~168-268 for the btn-* color classes)
-// so this reads as the same tool: btn-play (green), btn-monitor (gray, both
-// "Add Scene" and "Not in Stash" share it), btn-monitored (teal),
-// btn-previously-added (amber), btn-loading (blue), btn-settings (gray).
-function statusButton(sceneId: string, status: SceneStatus | undefined, onChange: () => void): HTMLButtonElement {
-  const btn = document.createElement("button");
-  btn.className = "SceneCard-status";
-
-  if (!status) {
-    btn.classList.add("btn-loading", "btn-checking");
-    btn.textContent = "Checking Stash...";
-    btn.disabled = true;
-    return btn;
-  }
-
-  switch (status.kind) {
-    case "not-configured":
-      btn.classList.add("btn-settings");
-      btn.textContent = "Not Configured";
-      btn.disabled = true;
-      break;
-    case "in-stash": {
-      btn.classList.add("btn-play");
-      const label = document.createElement("span");
-      label.className = "flex items-center gap-1.5";
-      label.appendChild(iconPlay());
-      label.appendChild(document.createTextNode("Play"));
-      btn.appendChild(label);
-      btn.addEventListener("click", () => window.open(status.localUrl, "_blank"));
-      break;
-    }
+function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; className: string } | undefined {
+  // Neutral dark chip: this badge means "matched saved filter", not library
+  // status, so it's deliberately distinct from the status-derived badges below.
+  if (s.sourceLabel) return { text: s.sourceLabel, className: "bg-black/70 backdrop-blur-sm text-text" };
+  switch (status?.kind) {
+    case "in-stash":
+      return { text: "In Library", className: "badge-in-library" };
     case "not-added":
-      btn.classList.add("btn-monitor");
-      btn.textContent = status.whisparrConfigured ? "Add Scene" : "Not in Stash";
-      btn.disabled = !status.whisparrConfigured;
-      if (status.whisparrConfigured) {
-        btn.addEventListener("click", async () => {
-          btn.disabled = true;
-          btn.classList.add("btn-loading");
-          btn.textContent = "Adding to Whisparr...";
-          await api.addToWhisparr(sceneId);
-          onChange();
-        });
-      }
-      break;
-    case "previously-added":
-      btn.classList.add("btn-monitor", "btn-previously-added");
-      btn.textContent = "Previously Added";
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        btn.classList.add("btn-loading");
-        btn.textContent = "Enabling monitoring...";
-        await api.setMonitored(status.movieId, true);
-        onChange();
-      });
-      break;
+      return isWithinLastWeek(s.release_date) ? { text: "New", className: "badge-new" } : undefined;
     case "monitored":
-      btn.classList.add("btn-monitor", "btn-monitored");
-      btn.textContent = "Monitored";
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        await api.setMonitored(status.movieId, false);
-        onChange();
-      });
-      break;
-    case "downloading": {
-      const { size, sizeleft, status: queueStatus } = status.queue;
-      let label = "Downloading";
-      if (typeof size === "number" && typeof sizeleft === "number" && size > 0 && sizeleft >= 0) {
-        label = `${Math.max(0, Math.min(100, Math.round(((size - sizeleft) / size) * 100)))}%`;
-      } else if (queueStatus) {
-        label = queueStatus;
-      }
-      btn.classList.add("btn-loading");
-      btn.textContent = label;
-      btn.disabled = true;
-      break;
-    }
+    case "downloading":
+      return { text: "Monitored", className: "badge-monitored" };
+    case "previously-added":
+      return { text: "Removed", className: "badge-removed" };
+    default:
+      return undefined;
   }
+}
+
+function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip" | undefined, onClick: (e: MouseEvent) => void): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.title = title;
+  if (variant) btn.classList.add(`action-${variant}`);
+  btn.appendChild(icon);
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick(e);
+  });
   return btn;
 }
 
-export function renderSceneCard(
-  s: Scene,
-  status: SceneStatus | undefined,
-  onStatusChange: () => void,
-  onIgnore?: () => void,
-): HTMLElement {
-  const card = document.createElement("div");
-  card.className = "relative bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
+// The single place scene actions live — a compact icon row that only appears
+// on hover, same for every section (Trending, New Releases): Play if it's
+// already in the local Stash, otherwise a +/- pair for whatever the current
+// status allows. Skip (-) permanently ignores the scene (api.ignoreScene) and
+// removes the card via onRemove; already-monitored scenes only get a - to
+// unmonitor, since the Monitored badge already communicates their state.
+function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement | undefined {
+  if (!status) return undefined;
+  const buttons: HTMLButtonElement[] = [];
 
-  if (s.sourceLabel) {
-    const sash = document.createElement("span");
-    sash.className =
-      "absolute top-2 left-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-full bg-black/70 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-text";
-    sash.textContent = s.sourceLabel;
-    card.appendChild(sash);
+  if (status.kind === "in-stash") {
+    buttons.push(hoverButton("Play in local Stash", iconPlay(), undefined, () => window.open(status.localUrl, "_blank")));
+  } else {
+    if (status.kind === "not-added" && status.whisparrConfigured) {
+      buttons.push(
+        hoverButton("Add Scene", iconPlus(), "add", async (e) => {
+          (e.currentTarget as HTMLButtonElement).disabled = true;
+          await api.addToWhisparr(s.id);
+          onStatusChange();
+        }),
+      );
+    } else if (status.kind === "previously-added") {
+      buttons.push(
+        hoverButton("Re-enable monitoring", iconPlus(), "add", async (e) => {
+          (e.currentTarget as HTMLButtonElement).disabled = true;
+          await api.setMonitored(status.movieId, true);
+          onStatusChange();
+        }),
+      );
+    }
+
+    if (status.kind === "monitored") {
+      buttons.push(
+        hoverButton("Unmonitor", iconMinus(), "skip", async (e) => {
+          (e.currentTarget as HTMLButtonElement).disabled = true;
+          await api.setMonitored(status.movieId, false);
+          onStatusChange();
+        }),
+      );
+    } else if (status.kind === "not-added" || status.kind === "previously-added") {
+      buttons.push(
+        hoverButton("Skip — permanently dismiss this scene", iconMinus(), "skip", async (e) => {
+          (e.currentTarget as HTMLButtonElement).disabled = true;
+          await api.ignoreScene(s.id);
+          onRemove();
+        }),
+      );
+    }
+  }
+
+  if (buttons.length === 0) return undefined;
+  const hover = document.createElement("div");
+  hover.className = "SceneCard-hover";
+  for (const b of buttons) hover.appendChild(b);
+  return hover;
+}
+
+export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "group relative bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
+
+  const badge = badgeFor(s, status);
+  if (badge) {
+    const el = document.createElement("span");
+    el.className = `SceneCard-badge ${badge.className}`;
+    el.textContent = badge.text;
+    card.appendChild(el);
   }
 
   const imageWrap = document.createElement("a");
-  imageWrap.className = "block h-[150px] bg-navbar";
+  imageWrap.className = "relative block h-[150px] bg-navbar";
   imageWrap.href = `https://stashdb.org/scenes/${s.id}`;
   imageWrap.target = "_blank";
   const image = s.images[0];
   if (image) {
     const img = document.createElement("img");
-    img.className = "w-full h-full object-cover object-top block";
+    img.className = "SceneCard-image w-full h-full object-cover object-top block";
     img.src = image.url;
     img.alt = "";
     imageWrap.appendChild(img);
   }
+  const hover = renderHoverActions(s, status, onStatusChange, onRemove);
+  if (hover) imageWrap.appendChild(hover);
   card.appendChild(imageWrap);
 
   const footer = document.createElement("div");
@@ -131,7 +141,7 @@ export function renderSceneCard(
   const titleRow = document.createElement("div");
   titleRow.className = "flex justify-between gap-2";
   const title = document.createElement("a");
-  title.className = "font-semibold whitespace-nowrap overflow-hidden text-ellipsis hover:text-link";
+  title.className = "SceneCard-text font-semibold whitespace-nowrap overflow-hidden text-ellipsis hover:text-link";
   title.textContent = s.title ?? "(untitled)";
   title.href = `https://stashdb.org/scenes/${s.id}`;
   title.target = "_blank";
@@ -145,35 +155,13 @@ export function renderSceneCard(
   const meta = document.createElement("div");
   meta.className = "text-muted flex justify-between mt-1";
   const studio = document.createElement("span");
-  studio.className = "overflow-hidden text-ellipsis whitespace-nowrap";
+  studio.className = "SceneCard-text overflow-hidden text-ellipsis whitespace-nowrap";
   studio.textContent = s.studio?.name ?? "";
   meta.appendChild(studio);
   const date = document.createElement("strong");
   date.textContent = s.release_date ?? "";
   meta.appendChild(date);
   footer.appendChild(meta);
-
-  if (onIgnore) {
-    const actionRow = document.createElement("div");
-    actionRow.className = "flex gap-1.5 mt-2";
-    const status_ = statusButton(s.id, status, onStatusChange);
-    status_.classList.add("flex-1", "mt-0");
-    actionRow.appendChild(status_);
-    const ignoreBtn = document.createElement("button");
-    ignoreBtn.className =
-      "shrink-0 h-9 px-2.5 rounded border border-danger/30 bg-danger/15 text-danger text-xs font-medium hover:bg-danger/25 transition-colors duration-150";
-    ignoreBtn.textContent = "Ignore";
-    ignoreBtn.title = "Hide this scene from Watched";
-    ignoreBtn.addEventListener("click", async () => {
-      ignoreBtn.disabled = true;
-      await api.ignoreScene(s.id);
-      onIgnore();
-    });
-    actionRow.appendChild(ignoreBtn);
-    footer.appendChild(actionRow);
-  } else {
-    footer.appendChild(statusButton(s.id, status, onStatusChange));
-  }
 
   card.appendChild(footer);
   return card;

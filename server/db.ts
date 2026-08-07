@@ -108,7 +108,7 @@ export function filterRowToSavedFilter(row: any): SavedFilter {
 // self-check for the migration logic, since it touches real user data on
 // upgrade and is easy to silently get wrong. Run with `tsx server/db.ts`.
 function demo(): void {
-  const tmp = mkdtempSync(path.join(tmpdir(), "stashdb-browser-db-test-"));
+  const tmp = mkdtempSync(path.join(tmpdir(), "stash-scout-db-test-"));
   writeFileSync(
     path.join(tmp, "filters.json"),
     JSON.stringify([{ id: "f1", name: "Test", createdAt: "2024-01-01", filter: { text: "x" }, watched: true }]),

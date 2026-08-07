@@ -21,6 +21,9 @@ export function parseStashFilter(q: Record<string, unknown>): { input: Partial<S
   if (typeof q.date === "string" && q.date) {
     input.date = { value: q.date, modifier: (q.date_modifier as any) || "EQUALS" };
   }
+  if (q.favorites === "PERFORMER" || q.favorites === "STUDIO" || q.favorites === "ALL") {
+    input.favorites = q.favorites;
+  }
   const excludeTagIds = typeof q.exclude_tags === "string" && q.exclude_tags ? q.exclude_tags.split(",") : [];
   return { input, excludeTagIds };
 }
