@@ -18,4 +18,4 @@ COPY --from=build /app/frontend/dist ./frontend/dist
 VOLUME ["/app/data"]
 
 EXPOSE 8787
-CMD ["node", "dist-server/index.js"]
+CMD ["node", "dist-server/server/index.js"]
