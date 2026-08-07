@@ -59,8 +59,7 @@ html.sfw .SceneCard-text {
     @apply bg-accent-dim text-accent border border-accent;
   }
   .SceneCard-badge.badge-in-library {
-    @apply bg-accent font-extrabold;
-    color: #101418;
+    @apply bg-success text-white font-extrabold;
   }
   .SceneCard-badge.badge-removed {
     @apply bg-surface-3 text-text-faint border border-line;
