@@ -3,10 +3,13 @@ import { existsSync, renameSync, readFileSync, mkdtempSync, writeFileSync, rmSyn
 import { strict as assert } from "node:assert";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { SavedFilter, GlobalExcludeTag, IgnoredScene } from "../shared/types.js";
 
-const REAL_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
+// process.cwd() rather than a path relative to this file's own location — see
+// the same reasoning in index.ts's frontendDist (dev's tsx-run-from-source vs
+// the compiled dist-server/server/ nesting resolve to different depths, but
+// both are always launched with cwd = project root).
+const REAL_DATA_DIR = path.join(process.cwd(), "data");
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS filters (

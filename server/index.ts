@@ -1,6 +1,5 @@
 import express from "express";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { loadInitialConfig } from "./settingsStore.js";
 import { StashDBClient } from "./stashdbClient.js";
 import { LocalStashClient } from "./localStashClient.js";
@@ -36,7 +35,12 @@ app.use("/api", globalExcludeTagsRouter());
 app.use("/api", settingsRouter(cfg, localStash, whisparr));
 app.use("/api", statsRouter(cfg, whisparr));
 
-const frontendDist = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend", "dist");
+// process.cwd() (project root) rather than counting ".." from this file's own
+// location — that depth differs between `tsx watch server/index.ts` (runs the
+// source directly, one level under root) and the compiled build
+// (dist-server/server/index.js, two levels under root), and both dev and
+// prod always launch with cwd = project root per package.json's scripts.
+const frontendDist = path.join(process.cwd(), "frontend", "dist");
 app.use(express.static(frontendDist));
 app.get("*", (_req, res) => res.sendFile(path.join(frontendDist, "index.html")));
 

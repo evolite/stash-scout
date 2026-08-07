@@ -1,9 +1,12 @@
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
+// process.cwd() rather than a path relative to this file's own location — see
+// the same reasoning in index.ts's frontendDist (dev's tsx-run-from-source vs
+// the compiled dist-server/server/ nesting resolve to different depths, but
+// both are always launched with cwd = project root).
+const DATA_DIR = path.join(process.cwd(), "data");
 const KEY_FILE = path.join(DATA_DIR, ".secret-key");
 
 // AES-256-GCM at rest. The key lives in its own 0600 file next to (not inside)
