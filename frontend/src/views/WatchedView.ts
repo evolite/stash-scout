@@ -1,6 +1,7 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
 import { renderSceneCard } from "../components/SceneCard.js";
 import { renderPagination } from "../components/Pagination.js";
+import { iconCheckCircle } from "../icons.js";
 
 const SECTION_PER_PAGE = 16;
 
@@ -29,10 +30,11 @@ function renderChip(label: string, active: boolean, onClick: () => void): HTMLBu
 }
 
 function textState(message: string): HTMLElement {
-  const p = document.createElement("p");
-  p.className = "text-muted text-sm";
-  p.textContent = message;
-  return p;
+  const wrap = document.createElement("div");
+  wrap.className = "col-span-full flex items-center justify-center py-12 text-text-faint";
+  wrap.title = message;
+  wrap.appendChild(iconCheckCircle());
+  return wrap;
 }
 
 function renderRefreshButton(onClick: () => Promise<void>): HTMLElement {
@@ -245,7 +247,7 @@ export function renderWatchedView(): HTMLElement {
       const result = await api.watchedFeed(page, SECTION_PER_PAGE, window, selectedSource, refresh);
       return { ...result, count: Math.min(result.count, FEED_LIMIT), approximateCount: false };
     },
-    emptyMessage: "Nothing here yet — watch a saved filter in Filters, or favorite performers on StashDB, to populate this feed.",
+    emptyMessage: "Nothing new right now.",
     onCount: (count) => {
       pendingBadge.hidden = count === 0;
       pendingBadge.textContent = `${count} pending`;
