@@ -2,17 +2,7 @@ import type { AppConfig } from "./config.js";
 import { isLocalStashConfigured, isWhisparrConfigured } from "./config.js";
 import { LocalStashClient } from "./localStashClient.js";
 import { WhisparrClient } from "./whisparrClient.js";
-
-// Ported from StashSeer's checkIfAvailable/handleDownloadFlow state machine
-// (stashseer.js ~1292-1600), collapsed into one server-side status lookup.
-export type SceneStatus =
-  | { kind: "not-configured" }
-  | { kind: "in-stash"; localSceneId: string; localUrl: string }
-  | { kind: "not-added"; whisparrConfigured: true }
-  | { kind: "not-added"; whisparrConfigured: false }
-  | { kind: "previously-added"; movieId: number }
-  | { kind: "monitored"; movieId: number }
-  | { kind: "downloading"; movieId: number; queue: { size?: number; sizeleft?: number; status?: string } };
+import type { SceneStatus } from "../shared/types.js";
 
 export async function getSceneStatus(
   cfg: AppConfig,

@@ -1,22 +1,14 @@
 import { Router } from "express";
-import { readJson, writeJson } from "../store.js";
-
-export interface IgnoredScene {
-  id: string;
-  ignoredAt: string;
-}
-
-const FILE = "ignored-scenes.json";
+import { db } from "../db.js";
 
 export function ignoredScenesRouter() {
   const router = Router();
 
-  router.post("/ignored-scenes", async (req, res) => {
-    const ignored = await readJson<IgnoredScene[]>(FILE, []);
+  router.post("/ignored-scenes", (req, res) => {
     const id = String(req.body.id);
-    if (!ignored.some((s) => s.id === id)) {
-      ignored.push({ id, ignoredAt: new Date().toISOString() });
-      await writeJson(FILE, ignored);
+    const exists = db.prepare("SELECT 1 FROM ignored_scenes WHERE id = ?").get(id);
+    if (!exists) {
+      db.prepare("INSERT INTO ignored_scenes (id, ignored_at) VALUES (?, ?)").run(id, new Date().toISOString());
     }
     res.status(204).end();
   });

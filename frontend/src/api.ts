@@ -1,14 +1,5 @@
-export interface Scene {
-  id: string;
-  title: string | null;
-  release_date: string | null;
-  duration: number | null;
-  studio: { id: string; name: string } | null;
-  tags: { id: string; name: string }[];
-  images: { id: string; url: string; width: number; height: number }[];
-  performers: { performer: { id: string; name: string }; as: string | null }[];
-  sourceLabel?: string;
-}
+import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, SavedFilter as BaseSavedFilter } from "../../shared/types.js";
+export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary };
 
 export interface SceneFilter {
   text?: string;
@@ -25,27 +16,7 @@ export interface SceneFilter {
   per_page?: number;
 }
 
-export type SceneStatus =
-  | { kind: "not-configured" }
-  | { kind: "in-stash"; localSceneId: string; localUrl: string }
-  | { kind: "not-added"; whisparrConfigured: boolean }
-  | { kind: "previously-added"; movieId: number }
-  | { kind: "monitored"; movieId: number }
-  | { kind: "downloading"; movieId: number; queue: { size?: number; sizeleft?: number; status?: string } };
-
-export interface SavedFilter {
-  id: string;
-  name: string;
-  createdAt: string;
-  filter: SceneFilter;
-  watched: boolean;
-}
-
-export interface GlobalExcludeTag {
-  id: string;
-  name: string;
-  addedAt: string;
-}
+export type SavedFilter = BaseSavedFilter<SceneFilter>;
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -145,6 +116,7 @@ export const api = {
     }),
   whisparrOptions: () =>
     req<{ rootFolders: { id: number; path: string }[]; qualityProfiles: { id: number; name: string }[] }>(`/api/whisparr/options`),
+  stats: () => req<StatsSummary>(`/api/stats`),
   listGlobalExcludeTags: () => req<GlobalExcludeTag[]>(`/api/global-exclude-tags`),
   addGlobalExcludeTag: (id: string, name: string) =>
     req<GlobalExcludeTag[]>(`/api/global-exclude-tags`, {

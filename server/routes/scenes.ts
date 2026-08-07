@@ -1,17 +1,14 @@
 import { Router } from "express";
 import type { StashDBClient } from "../stashdbClient.js";
 import { parseStashFilter } from "../filterUtils.js";
-import { readJson } from "../store.js";
-import type { SavedFilter } from "./filters.js";
-import type { IgnoredScene } from "./ignoredScenes.js";
-import type { GlobalExcludeTag } from "./globalExcludeTags.js";
+import { db, filterRowToSavedFilter } from "../db.js";
 import type { AppConfig } from "../config.js";
 import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
 import { fetchUnaddedPage } from "../statusFilter.js";
 
-async function getGlobalExcludeIds(): Promise<string[]> {
-  return (await readJson<GlobalExcludeTag[]>("global-exclude-tags.json", [])).map((t) => t.id);
+function getGlobalExcludeIds(): string[] {
+  return (db.prepare("SELECT id FROM global_exclude_tags").all() as { id: string }[]).map((t) => t.id);
 }
 
 function mergeExcludeIds(a: string[], b: string[]): string[] {
@@ -31,7 +28,7 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       input.page = q.page ? Number(q.page) : 1;
       input.per_page = q.per_page ? Number(q.per_page) : 25;
       const refresh = q.refresh === "1" || q.refresh === "true";
-      const allExcludes = mergeExcludeIds(excludeTagIds, await getGlobalExcludeIds());
+      const allExcludes = mergeExcludeIds(excludeTagIds, getGlobalExcludeIds());
       const result = allExcludes.length > 0
         ? await stashdb.queryScenesExcluding(input, allExcludes, refresh)
         : await stashdb.queryScenes(input, refresh);
@@ -112,8 +109,8 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       // instead, reshuffling on every fresh page-1 visit (see queryMergedFeed).
       const randomize = window === "month" || window === "year";
 
-      const watchedFilters = (await readJson<SavedFilter[]>("filters.json", [])).filter((f) => f.watched);
-      const globalExcludes = await getGlobalExcludeIds();
+      const watchedFilters = (db.prepare("SELECT * FROM filters WHERE watched = 1").all() as any[]).map(filterRowToSavedFilter);
+      const globalExcludes = getGlobalExcludeIds();
       const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const sources = [
         ...watchedFilters.map((f) => {
@@ -131,7 +128,7 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       // key so the window rolls forward and a Settings change is picked up
       // immediately instead of serving a stale cached merge.
       const cacheKey = JSON.stringify({ cutoff, globalExcludes, filters: watchedFilters.map((f) => ({ id: f.id, filter: f.filter })) });
-      const ignoredIds = new Set((await readJson<IgnoredScene[]>("ignored-scenes.json", [])).map((s) => s.id));
+      const ignoredIds = new Set((db.prepare("SELECT id FROM ignored_scenes").all() as { id: string }[]).map((s) => s.id));
 
       // Only the *first* internal round of this request should trigger a reseed —
       // fetchUnaddedPage may call queryMergedFeed several times per request as it

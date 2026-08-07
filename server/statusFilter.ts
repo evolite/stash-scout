@@ -1,7 +1,7 @@
 import type { AppConfig } from "./config.js";
 import type { LocalStashClient } from "./localStashClient.js";
 import type { WhisparrClient } from "./whisparrClient.js";
-import type { Scene } from "./stashdbClient.js";
+import type { Scene } from "../shared/types.js";
 import { getSceneStatus } from "./stateMachine.js";
 
 // Shared by Watched and Favorites: both are "what's new to act on" feeds where

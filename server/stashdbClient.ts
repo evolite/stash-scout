@@ -1,4 +1,5 @@
 import type { AppConfig } from "./config.js";
+import type { Scene } from "../shared/types.js";
 
 // StashDB's schema only has one `tags` filter (no separate exclude_tags field) — an
 // EXCLUDES modifier query and an INCLUDES/INCLUDES_ALL query are mutually exclusive,
@@ -16,20 +17,6 @@ export interface SceneQueryInput {
   per_page: number;
   sort: string;
   direction: string;
-}
-
-export interface Scene {
-  id: string;
-  title: string | null;
-  release_date: string | null;
-  duration: number | null;
-  studio: { id: string; name: string } | null;
-  tags: { id: string; name: string }[];
-  images: { id: string; url: string; width: number; height: number }[];
-  performers: { performer: { id: string; name: string }; as: string | null }[];
-  // Set only by queryMergedFeed — which saved filter (or "Favorites") first
-  // surfaced this scene, shown as a sash on the scene card in the Watched feed.
-  sourceLabel?: string;
 }
 
 const SCENE_FIELDS = `

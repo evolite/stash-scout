@@ -1,26 +1,17 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
-import { readJson, writeJson } from "../store.js";
-
-export interface SavedFilter {
-  id: string;
-  name: string;
-  createdAt: string;
-  filter: Record<string, unknown>;
-  watched: boolean;
-}
-
-const FILE = "filters.json";
+import { db, filterRowToSavedFilter as rowToFilter } from "../db.js";
+import type { SavedFilter } from "../../shared/types.js";
 
 export function filtersRouter() {
   const router = Router();
 
-  router.get("/filters", async (_req, res) => {
-    res.json(await readJson<SavedFilter[]>(FILE, []));
+  router.get("/filters", (_req, res) => {
+    const rows = db.prepare("SELECT * FROM filters ORDER BY created_at").all();
+    res.json(rows.map(rowToFilter));
   });
 
-  router.post("/filters", async (req, res) => {
-    const filters = await readJson<SavedFilter[]>(FILE, []);
+  router.post("/filters", (req, res) => {
     const entry: SavedFilter = {
       id: randomUUID(),
       name: String(req.body.name ?? "Untitled"),
@@ -28,25 +19,34 @@ export function filtersRouter() {
       filter: req.body.filter ?? {},
       watched: false,
     };
-    filters.push(entry);
-    await writeJson(FILE, filters);
+    db.prepare("INSERT INTO filters (id, name, created_at, filter, watched) VALUES (?, ?, ?, ?, ?)").run(
+      entry.id,
+      entry.name,
+      entry.createdAt,
+      JSON.stringify(entry.filter),
+      0,
+    );
     res.status(201).json(entry);
   });
 
-  router.patch("/filters/:id", async (req, res) => {
-    const filters = await readJson<SavedFilter[]>(FILE, []);
-    const entry = filters.find((f) => f.id === req.params.id);
-    if (!entry) return void res.status(404).end();
+  router.patch("/filters/:id", (req, res) => {
+    const row = db.prepare("SELECT * FROM filters WHERE id = ?").get(req.params.id);
+    if (!row) return void res.status(404).end();
+    const entry = rowToFilter(row);
     if (typeof req.body.watched === "boolean") entry.watched = req.body.watched;
     if (req.body.filter && typeof req.body.filter === "object") entry.filter = req.body.filter;
     if (typeof req.body.name === "string" && req.body.name.trim()) entry.name = req.body.name.trim();
-    await writeJson(FILE, filters);
+    db.prepare("UPDATE filters SET name = ?, filter = ?, watched = ? WHERE id = ?").run(
+      entry.name,
+      JSON.stringify(entry.filter),
+      entry.watched ? 1 : 0,
+      entry.id,
+    );
     res.json(entry);
   });
 
-  router.delete("/filters/:id", async (req, res) => {
-    const filters = await readJson<SavedFilter[]>(FILE, []);
-    await writeJson(FILE, filters.filter((f) => f.id !== req.params.id));
+  router.delete("/filters/:id", (req, res) => {
+    db.prepare("DELETE FROM filters WHERE id = ?").run(req.params.id);
     res.status(204).end();
   });
 
