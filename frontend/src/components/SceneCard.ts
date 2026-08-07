@@ -17,10 +17,20 @@ function formatDuration(seconds: number | null): string {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+// A few close, flat dark neutrals — picked per scene id (not random) so a given
+// card's placeholder color is stable across re-renders, purely for variety
+// when there's no thumbnail image. No gradients.
+const PLACEHOLDER_SHADES = ["#2A2D33", "#26292E", "#2E3138"];
+function placeholderShade(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return PLACEHOLDER_SHADES[Math.abs(hash) % PLACEHOLDER_SHADES.length];
+}
+
 function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; className: string } | undefined {
   // Neutral dark chip: this badge means "matched saved filter", not library
   // status, so it's deliberately distinct from the status-derived badges below.
-  if (s.sourceLabel) return { text: s.sourceLabel, className: "bg-black/70 backdrop-blur-sm text-text" };
+  if (s.sourceLabel) return { text: s.sourceLabel, className: "bg-black/75 text-text border border-white/[.12] font-semibold" };
   switch (status?.kind) {
     case "in-stash":
       return { text: "In Library", className: "badge-in-library" };
@@ -120,7 +130,7 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   }
 
   const imageWrap = document.createElement("a");
-  imageWrap.className = "relative block h-[150px] bg-navbar";
+  imageWrap.className = "relative block aspect-video bg-navbar";
   imageWrap.href = `https://stashdb.org/scenes/${s.id}`;
   imageWrap.target = "_blank";
   const image = s.images[0];
@@ -130,6 +140,14 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
     img.src = image.url;
     img.alt = "";
     imageWrap.appendChild(img);
+  } else {
+    imageWrap.style.background = placeholderShade(s.id);
+  }
+  if (s.duration) {
+    const duration = document.createElement("span");
+    duration.className = "SceneCard-duration";
+    duration.textContent = formatDuration(s.duration);
+    imageWrap.appendChild(duration);
   }
   const hover = renderHoverActions(s, status, onStatusChange, onRemove);
   if (hover) imageWrap.appendChild(hover);
@@ -138,19 +156,12 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   const footer = document.createElement("div");
   footer.className = "p-3 text-xs";
 
-  const titleRow = document.createElement("div");
-  titleRow.className = "flex justify-between gap-2";
   const title = document.createElement("a");
-  title.className = "SceneCard-text font-semibold whitespace-nowrap overflow-hidden text-ellipsis hover:text-link";
+  title.className = "SceneCard-text block font-semibold whitespace-nowrap overflow-hidden text-ellipsis hover:text-link";
   title.textContent = s.title ?? "(untitled)";
   title.href = `https://stashdb.org/scenes/${s.id}`;
   title.target = "_blank";
-  titleRow.appendChild(title);
-  const duration = document.createElement("span");
-  duration.className = "text-muted shrink-0";
-  duration.textContent = formatDuration(s.duration);
-  titleRow.appendChild(duration);
-  footer.appendChild(titleRow);
+  footer.appendChild(title);
 
   const meta = document.createElement("div");
   meta.className = "text-muted flex justify-between mt-1";

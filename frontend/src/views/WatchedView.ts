@@ -15,9 +15,9 @@ const SUBTAB_BASE = "px-3 py-1.5 border-b-2";
 const SUBTAB_ACTIVE = SUBTAB_BASE + " border-link text-link font-bold";
 const SUBTAB_INACTIVE = SUBTAB_BASE + " border-transparent text-text hover:border-white";
 
-const CHIP_BASE = "px-3 py-1.5 rounded-full border text-xs cursor-pointer transition-colors duration-150";
-const CHIP_ACTIVE = CHIP_BASE + " border-link bg-link/15 text-text";
-const CHIP_INACTIVE = CHIP_BASE + " border-white/10 text-muted hover:text-text";
+const CHIP_BASE = "px-3 py-1.5 rounded border text-xs cursor-pointer transition-colors duration-150";
+const CHIP_ACTIVE = CHIP_BASE + " border-accent bg-accent-dim text-text";
+const CHIP_INACTIVE = CHIP_BASE + " border-line bg-surface text-muted hover:text-text";
 
 function renderChip(label: string, active: boolean, onClick: () => void): HTMLButtonElement {
   const chip = document.createElement("button");
@@ -181,7 +181,7 @@ export function renderWatchedView(): HTMLElement {
   feedHeading.textContent = "New Releases";
   feedHeadingRow.appendChild(feedHeading);
   const pendingBadge = document.createElement("span");
-  pendingBadge.className = "rounded-full bg-link/20 text-link text-[11px] font-bold px-2 py-0.5";
+  pendingBadge.className = "rounded bg-accent-dim text-accent text-[11px] font-bold px-2 py-0.5";
   pendingBadge.hidden = true;
   feedHeadingRow.appendChild(pendingBadge);
   feedWrap.appendChild(feedHeadingRow);

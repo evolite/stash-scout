@@ -41,7 +41,7 @@ function idPicker(
     chips.innerHTML = "";
     for (const t of selected) {
       const chip = document.createElement("span");
-      chip.className = "bg-secondary rounded-full px-3 py-1 flex items-center gap-1.5";
+      chip.className = "bg-surface border border-line rounded px-3 py-1 flex items-center gap-1.5";
       chip.textContent = t.name;
       const remove = document.createElement("button");
       remove.className = "bg-transparent border-0 text-muted p-0 hover:text-text";

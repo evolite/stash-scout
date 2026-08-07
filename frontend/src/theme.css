@@ -45,43 +45,44 @@ html.sfw .SceneCard-text {
 }
 
 @layer components {
-  /* Badge colors mirror StashSeer's status button palette (stashseer.js
-     ~168-268) so this reads as the same tool: green = playable, teal =
-     monitored, amber = new/removed. */
+  /* Status badge hierarchy is deliberate: In Library is the only *resolved*
+     state, so it's the only one that gets a solid fill. New/Monitored are
+     still pending a decision, so they stay quiet outlines — never the same
+     weight as In Library. */
   .SceneCard-badge {
     @apply absolute top-2 left-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide;
   }
   .SceneCard-badge.badge-new {
-    background: #ffd668;
-    color: #3a2510;
+    @apply bg-surface-3 text-amber border border-amber/40;
   }
   .SceneCard-badge.badge-monitored {
-    background: #0f3a38;
-    color: #5fd4c9;
+    @apply bg-accent-dim text-accent border border-accent;
   }
   .SceneCard-badge.badge-in-library {
-    background: #0f3d28;
-    color: #5cd88c;
+    @apply bg-accent font-extrabold;
+    color: #101418;
   }
   .SceneCard-badge.badge-removed {
-    background: #3a2f0f;
-    color: #ffd668;
+    @apply bg-surface-3 text-text-faint border border-line;
+  }
+
+  .SceneCard-duration {
+    @apply absolute bottom-2 left-2 z-10 rounded bg-black/55 text-white text-[11px] px-1.5 py-0.5;
   }
 
   .SceneCard-hover {
-    @apply absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition-opacity duration-150;
-    background: rgba(10, 13, 18, 0.4);
+    @apply absolute bottom-2 right-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity duration-150;
   }
   .group:hover .SceneCard-hover {
     @apply opacity-100;
   }
   .SceneCard-hover button {
-    @apply w-8 h-8 rounded-full flex items-center justify-center text-white;
-    background: rgba(18, 22, 31, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    @apply w-7 h-7 rounded flex items-center justify-center text-white;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
   }
   .SceneCard-hover button:hover {
-    border-color: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.5);
   }
   .SceneCard-hover button.action-add:hover {
     background: rgba(25, 135, 84, 0.35);

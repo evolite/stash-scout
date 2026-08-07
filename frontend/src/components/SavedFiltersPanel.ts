@@ -62,7 +62,7 @@ export async function renderSavedFiltersPanel(onLoad: (saved: SavedFilter) => vo
     row.appendChild(watchCol);
 
     const del = document.createElement("button");
-    del.className = "bg-transparent text-text hover:bg-white/10 rounded-full w-[22px] h-[22px] p-0 shrink-0 flex items-center justify-center";
+    del.className = "bg-transparent text-text hover:bg-white/10 rounded w-[22px] h-[22px] p-0 shrink-0 flex items-center justify-center";
     del.setAttribute("aria-label", "Delete saved filter");
     del.appendChild(iconClose());
     del.addEventListener("click", async () => {
