@@ -4,8 +4,13 @@ import { renderSavedFiltersPanel } from "../components/SavedFiltersPanel.js";
 import { renderSceneCard } from "../components/SceneCard.js";
 import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
+import { renderExcludeTagsPanel } from "../components/ExcludeTagsPanel.js";
 
 const PER_PAGE = 32;
+
+const SUBTAB_BASE = "px-3 py-1.5 border-b-2";
+const SUBTAB_ACTIVE = SUBTAB_BASE + " border-link text-link font-bold";
+const SUBTAB_INACTIVE = SUBTAB_BASE + " border-transparent text-text hover:border-white";
 
 function textState(message: string): HTMLElement {
   const p = document.createElement("p");
@@ -14,14 +19,54 @@ function textState(message: string): HTMLElement {
   return p;
 }
 
+type SubTab = "browse" | "excludes";
+
 export function renderBrowseView(): HTMLElement {
   const container = document.createElement("div");
-  container.className = "grid gap-6 items-start grid-cols-[260px_1fr]";
+  container.className = "flex flex-col gap-3";
+
+  const subTabs = document.createElement("div");
+  subTabs.className = "flex gap-1 mb-1";
+  container.appendChild(subTabs);
+
+  const browsePane = document.createElement("div");
+  browsePane.className = "grid gap-6 items-start grid-cols-[260px_1fr]";
+  const excludesPane = document.createElement("div");
+  excludesPane.style.display = "none";
+  container.appendChild(browsePane);
+  container.appendChild(excludesPane);
+
+  let subTab: SubTab = "browse";
+  const SUBTABS: { id: SubTab; label: string }[] = [
+    { id: "browse", label: "Browse" },
+    { id: "excludes", label: "Exclude Tags" },
+  ];
+  for (const t of SUBTABS) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = t.id === subTab ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+    el.setAttribute("aria-current", t.id === subTab ? "page" : "false");
+    el.textContent = t.label;
+    el.addEventListener("click", () => {
+      if (subTab === t.id) return;
+      subTab = t.id;
+      for (const other of Array.from(subTabs.children)) {
+        other.className = other === el ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+        other.setAttribute("aria-current", other === el ? "page" : "false");
+      }
+      browsePane.style.display = subTab === "browse" ? "" : "none";
+      excludesPane.style.display = subTab === "excludes" ? "" : "none";
+      if (subTab === "excludes" && excludesPane.children.length === 0) {
+        renderExcludeTagsPanel().then((panel) => excludesPane.appendChild(panel));
+      }
+    });
+    subTabs.appendChild(el);
+  }
 
   const sidebarCol = document.createElement("div");
   const contentCol = document.createElement("div");
-  container.appendChild(sidebarCol);
-  container.appendChild(contentCol);
+  browsePane.appendChild(sidebarCol);
+  browsePane.appendChild(contentCol);
 
   let filter: SceneFilter = { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
   let statuses: Record<string, SceneStatus> = {};

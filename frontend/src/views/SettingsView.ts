@@ -1,5 +1,4 @@
 import { api } from "../api.js";
-import { iconClose } from "../icons.js";
 
 const DOT_BASE = "inline-block w-[9px] h-[9px] rounded-full shrink-0";
 const DOT_OK = DOT_BASE + " bg-success";
@@ -221,79 +220,6 @@ export function renderSettingsView(): HTMLElement {
       stashF.note.textContent = s.localStashConfigured ? "" : "not configured";
       whisparrF.note.textContent = !s.whisparrConfigured ? "not configured" : !s.whisparrFullyConfigured ? "missing root folder / quality profile" : "";
     }
-
-    // --- Global exclude tags ---
-    const excludeC = card("Global Exclude Tags", true);
-    excludeC.dot.remove();
-    const excludeNote = document.createElement("p");
-    excludeNote.className = "text-xs text-muted m-0";
-    excludeNote.textContent = "Applied everywhere scenes are fetched — Filters, Watched, and Favorites — instead of adding the same exclude to every filter.";
-    excludeC.card.appendChild(excludeNote);
-
-    const excludeChips = document.createElement("div");
-    excludeChips.className = "flex gap-2 items-center mb-6 flex-wrap";
-    excludeC.card.appendChild(excludeChips);
-
-    const excludeSearch = document.createElement("input");
-    excludeSearch.placeholder = "search tag to exclude...";
-    const excludeResults = document.createElement("div");
-    excludeResults.className = "relative";
-
-    async function renderExcludeChips() {
-      const tags = await api.listGlobalExcludeTags();
-      excludeChips.innerHTML = "";
-      for (const t of tags) {
-        const chip = document.createElement("span");
-        chip.className = "bg-surface border border-line rounded px-3 py-1 flex items-center gap-1.5";
-        chip.textContent = t.name;
-        const remove = document.createElement("button");
-        remove.className = "bg-transparent border-0 text-muted p-0 hover:text-text";
-        remove.setAttribute("aria-label", "Remove excluded tag");
-        remove.appendChild(iconClose());
-        remove.addEventListener("click", async () => {
-          await api.removeGlobalExcludeTag(t.id);
-          await renderExcludeChips();
-        });
-        chip.appendChild(remove);
-        excludeChips.appendChild(chip);
-      }
-      const searchWrap = document.createElement("div");
-      searchWrap.appendChild(excludeSearch);
-      searchWrap.appendChild(excludeResults);
-      excludeChips.appendChild(searchWrap);
-    }
-
-    let excludeDebounce: ReturnType<typeof setTimeout>;
-    excludeSearch.addEventListener("input", () => {
-      clearTimeout(excludeDebounce);
-      const term = excludeSearch.value.trim();
-      if (!term) {
-        excludeResults.innerHTML = "";
-        return;
-      }
-      excludeDebounce = setTimeout(async () => {
-        const matches = await api.searchTags(term);
-        excludeResults.innerHTML = "";
-        const list = document.createElement("div");
-        list.className = "TagPicker-dropdown min-w-[200px]";
-        for (const m of matches) {
-          const item = document.createElement("div");
-          item.textContent = m.name;
-          item.className = "TagPicker-dropdown-item";
-          item.addEventListener("click", async () => {
-            await api.addGlobalExcludeTag(m.id, m.name);
-            excludeSearch.value = "";
-            excludeResults.innerHTML = "";
-            await renderExcludeChips();
-          });
-          list.appendChild(item);
-        }
-        excludeResults.appendChild(list);
-      }, 250);
-    });
-
-    await renderExcludeChips();
-    grid.appendChild(excludeC.card);
 
     const secretsNote = document.createElement("p");
     secretsNote.className = "text-xs text-muted mt-4";
