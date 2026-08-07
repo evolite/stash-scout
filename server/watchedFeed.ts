@@ -7,7 +7,7 @@ import { db, filterRowToSavedFilter } from "./db.js";
 import { parseStashFilter } from "./filterUtils.js";
 import { fetchUnaddedPage } from "./statusFilter.js";
 
-export const WATCHED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
+const WATCHED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
 
 export function getGlobalExcludeIds(): string[] {
   return (db.prepare("SELECT id FROM global_exclude_tags").all() as { id: string }[]).map((t) => t.id);

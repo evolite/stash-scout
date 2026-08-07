@@ -86,8 +86,8 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
   // The Watched feed merges every saved filter marked `watched: true` plus your
   // favorited StashDB performers (treated as just another source), restricted to
   // scenes released within a window (week/month/year) — this is meant to be a
-  // "what's new" feed, not a full archive browse of the same filters. Shared
-  // with the RSS feed route (routes/feed.ts) via watchedFeed.ts.
+  // "what's new" feed, not a full archive browse of the same filters. Merge
+  // logic lives in watchedFeed.ts.
   router.get("/watched-feed", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;

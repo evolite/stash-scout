@@ -13,7 +13,6 @@ import { ignoredScenesRouter } from "./routes/ignoredScenes.js";
 import { globalExcludeTagsRouter } from "./routes/globalExcludeTags.js";
 import { settingsRouter } from "./routes/settings.js";
 import { statsRouter } from "./routes/stats.js";
-import { feedRouter } from "./routes/feed.js";
 
 const cfg = await loadInitialConfig();
 
@@ -36,7 +35,6 @@ app.use("/api", ignoredScenesRouter());
 app.use("/api", globalExcludeTagsRouter());
 app.use("/api", settingsRouter(cfg, localStash, whisparr));
 app.use("/api", statsRouter(cfg, whisparr));
-app.use("/api", feedRouter(stashdb, cfg, localStash, whisparr));
 
 const frontendDist = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend", "dist");
 app.use(express.static(frontendDist));
