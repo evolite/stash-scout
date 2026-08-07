@@ -53,5 +53,5 @@ export interface StatsSummary {
   ignoredCount: number;
   savedFiltersCount: number;
   watchedFiltersCount: number;
-  recentlyAdded: { id: number; title: string; addedAt: string }[];
+  timeline: { date: string; count: number }[];
 }
