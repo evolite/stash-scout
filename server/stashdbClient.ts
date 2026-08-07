@@ -71,13 +71,13 @@ function throttle(): Promise<void> {
 const CACHE_TTL_MS = 20_000;
 const responseCache = new Map<string, { at: number; data: unknown }>();
 
-async function gql<T>(url: string, apiKey: string | undefined, query: string, variables: unknown): Promise<T> {
+async function gql<T>(url: string, apiKey: string | undefined, query: string, variables: unknown, bypassCache = false): Promise<T> {
   if (!apiKey) {
     throw new Error("StashDB is not configured — add an API key in Settings.");
   }
   const cacheKey = query + JSON.stringify(variables);
   const cached = responseCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+  if (!bypassCache && cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return cached.data as T;
   }
 
@@ -137,10 +137,18 @@ interface MergedFeedEntry {
 }
 const mergedFeedCache = new Map<string, MergedFeedEntry>();
 
+// Fisher-Yates, in place.
+function shuffle<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 export class StashDBClient {
   constructor(private cfg: AppConfig) {}
 
-  async queryScenes(input: Partial<SceneQueryInput>): Promise<{ count: number; scenes: Scene[] }> {
+  async queryScenes(input: Partial<SceneQueryInput>, bypassCache = false): Promise<{ count: number; scenes: Scene[] }> {
     const variables = {
       input: {
         ...input,
@@ -160,6 +168,7 @@ export class StashDBClient {
         }
       }`,
       variables,
+      bypassCache,
     );
     return data.queryScenes;
   }
@@ -175,12 +184,14 @@ export class StashDBClient {
   async queryScenesExcluding(
     input: Partial<SceneQueryInput>,
     excludeTagIds: string[],
+    bypassCache = false,
   ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
     const perPage = Math.min(input.per_page ?? 25, MAX_PER_PAGE);
     const page = input.page ?? 1;
     const skip = (page - 1) * perPage;
 
     const key = JSON.stringify({ ...input, page: undefined, per_page: undefined, excludeTagIds: [...excludeTagIds].sort() });
+    if (bypassCache) excludeCache.delete(key);
     let entry = excludeCache.get(key);
     if (!entry || Date.now() - entry.at > EXCLUDE_CACHE_TTL_MS) {
       entry = { scenes: [], totalCount: 0, exhausted: false, internalPage: 1, at: Date.now() };
@@ -189,7 +200,7 @@ export class StashDBClient {
     const excludeSet = new Set(excludeTagIds);
 
     while (entry.scenes.length < skip + perPage && !entry.exhausted && entry.scenes.length < MAX_CACHED_SCENES) {
-      const { count, scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE });
+      const { count, scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache);
       entry.totalCount = count;
       for (const scene of scenes) {
         if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
@@ -218,8 +229,17 @@ export class StashDBClient {
     perPage: number,
     cacheKey: string,
     ignoredIds: Set<string> = new Set(),
+    opts: { randomize?: boolean; reset?: boolean; bypassCache?: boolean } = {},
   ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
     const skip = (page - 1) * perPage;
+    // `reset` re-shuffles on every fresh visit to page 1 rather than only when
+    // the cache naturally expires. It must come from the *client's* requested
+    // page (the caller decides this once, up front) — queryMergedFeed's own
+    // `page` here is fetchUnaddedPage's internal round cursor, which always
+    // restarts at 1 within a single request regardless of the page the client
+    // actually asked for, so using it directly would reseed mid-pagination and
+    // reshuffle/duplicate/skip scenes across what should be stable pages.
+    if (opts.reset || opts.bypassCache) mergedFeedCache.delete(cacheKey);
     let entry = mergedFeedCache.get(cacheKey);
     if (!entry || Date.now() - entry.at > MERGED_FEED_TTL_MS) {
       entry = {
@@ -242,14 +262,22 @@ export class StashDBClient {
         const cursor = entry.cursors[i];
         if (cursor.exhausted) continue;
         const src = sources[i];
-        const { scenes } = await this.queryScenes({ ...src.input, page: cursor.internalPage, per_page: MAX_PER_PAGE });
+        // Always fetch in fast, indexed DATE order — StashDB's random sort is a
+        // slow full-table shuffle at this scale. For `randomize`, shuffle each
+        // freshly-fetched batch before appending instead: already-appended scenes
+        // keep their position (so pages already served stay stable), but new
+        // arrivals land in a randomized spot rather than strict date order.
+        const { scenes } = await this.queryScenes({ ...src.input, page: cursor.internalPage, per_page: MAX_PER_PAGE }, opts.bypassCache);
         const excludeSet = new Set(src.excludeTagIds);
+        const fresh: Scene[] = [];
         for (const scene of scenes) {
           if (entry.seen.has(scene.id) || scene.tags.some((t) => excludeSet.has(t.id))) continue;
           entry.seen.add(scene.id);
           scene.sourceLabel = src.label;
-          entry.merged.push(scene);
+          fresh.push(scene);
         }
+        if (opts.randomize) shuffle(fresh);
+        entry.merged.push(...fresh);
         if (scenes.length < MAX_PER_PAGE) cursor.exhausted = true;
         else cursor.internalPage++;
       }

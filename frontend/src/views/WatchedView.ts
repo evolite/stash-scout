@@ -23,14 +23,24 @@ function textState(message: string): HTMLElement {
   return p;
 }
 
+function renderRefreshButton(onClick: () => void): HTMLElement {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "text-muted hover:text-link text-sm";
+  btn.title = "Refresh";
+  btn.textContent = "↻";
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
 // A self-contained paginated scene grid — used for both the Feed and Trending
 // halves of this view, each with their own page cursor and status polling.
 function renderSceneSection(opts: {
   perPage: number;
-  fetchPage: (page: number) => Promise<{ count: number; scenes: Scene[]; approximateCount?: boolean }>;
+  fetchPage: (page: number, refresh?: boolean) => Promise<{ count: number; scenes: Scene[]; approximateCount?: boolean }>;
   ignorable?: boolean;
   emptyMessage: string;
-}): { element: HTMLElement; reset: () => void } {
+}): { element: HTMLElement; reset: () => void; refresh: () => void } {
   const element = document.createElement("div");
   const grid = document.createElement("div");
   grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]";
@@ -90,8 +100,24 @@ function renderSceneSection(opts: {
     load();
   }
 
+  // Re-fetches the current page in place, without the skeleton flash or
+  // resetting to page 1 — for the header refresh button.
+  async function refresh() {
+    const { count, scenes, approximateCount } = await opts.fetchPage(page, true);
+    statuses = {};
+    if (scenes.length === 0 && page === 1) {
+      grid.innerHTML = "";
+      grid.appendChild(textState(opts.emptyMessage));
+      paginationEl.innerHTML = "";
+      return;
+    }
+    updatePagination(count, !!approximateCount);
+    renderGrid(scenes);
+    refreshStatuses(scenes);
+  }
+
   load();
-  return { element, reset };
+  return { element, reset, refresh };
 }
 
 export function renderWatchedView(): HTMLElement {
@@ -101,10 +127,13 @@ export function renderWatchedView(): HTMLElement {
   let window: Window = "week";
 
   const feedWrap = document.createElement("div");
+  const feedHeadingRow = document.createElement("div");
+  feedHeadingRow.className = "flex items-center gap-2 mb-1.5";
   const feedHeading = document.createElement("h3");
-  feedHeading.className = "text-base font-semibold mb-1.5";
+  feedHeading.className = "text-base font-semibold";
   feedHeading.textContent = "Watched";
-  feedWrap.appendChild(feedHeading);
+  feedHeadingRow.appendChild(feedHeading);
+  feedWrap.appendChild(feedHeadingRow);
   const subTabs = document.createElement("div");
   subTabs.className = "flex gap-1 mb-2";
   for (const w of WINDOWS) {
@@ -126,28 +155,43 @@ export function renderWatchedView(): HTMLElement {
   }
   feedWrap.appendChild(subTabs);
 
+  const FEED_LIMIT = 100;
+
   const feedSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
-    fetchPage: (page) => api.watchedFeed(page, SECTION_PER_PAGE, window),
+    fetchPage: async (page, refresh) => {
+      const result = await api.watchedFeed(page, SECTION_PER_PAGE, window, refresh);
+      return { ...result, count: Math.min(result.count, FEED_LIMIT), approximateCount: false };
+    },
     ignorable: true,
     emptyMessage: "Nothing here yet — watch a saved filter in Browse, or favorite performers on StashDB, to populate this feed.",
   });
+  feedHeadingRow.appendChild(renderRefreshButton(() => feedSection.refresh()));
   feedWrap.appendChild(feedSection.element);
 
   const divider = document.createElement("hr");
   divider.className = "border-t border-black/20";
 
   const trendingWrap = document.createElement("div");
+  const trendingHeadingRow = document.createElement("div");
+  trendingHeadingRow.className = "flex items-center gap-2 mb-2";
   const trendingHeading = document.createElement("h3");
-  trendingHeading.className = "text-base font-semibold mb-2";
+  trendingHeading.className = "text-base font-semibold";
   trendingHeading.textContent = "Trending";
-  trendingWrap.appendChild(trendingHeading);
+  trendingHeadingRow.appendChild(trendingHeading);
+  trendingWrap.appendChild(trendingHeadingRow);
+
+  const TRENDING_LIMIT = 100;
 
   const trendingSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
-    fetchPage: (page) => api.queryScenes({ sort: "TRENDING", direction: "DESC", page, per_page: SECTION_PER_PAGE }),
+    fetchPage: async (page, refresh) => {
+      const result = await api.queryScenes({ sort: "TRENDING", direction: "DESC", page, per_page: SECTION_PER_PAGE }, refresh);
+      return { ...result, count: Math.min(result.count, TRENDING_LIMIT), approximateCount: false };
+    },
     emptyMessage: "Nothing trending on StashDB right now.",
   });
+  trendingHeadingRow.appendChild(renderRefreshButton(() => trendingSection.refresh()));
   trendingWrap.appendChild(trendingSection.element);
 
   container.appendChild(feedWrap);

@@ -30,8 +30,11 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const { input, excludeTagIds } = parseStashFilter(q);
       input.page = q.page ? Number(q.page) : 1;
       input.per_page = q.per_page ? Number(q.per_page) : 25;
+      const refresh = q.refresh === "1" || q.refresh === "true";
       const allExcludes = mergeExcludeIds(excludeTagIds, await getGlobalExcludeIds());
-      const result = allExcludes.length > 0 ? await stashdb.queryScenesExcluding(input, allExcludes) : await stashdb.queryScenes(input);
+      const result = allExcludes.length > 0
+        ? await stashdb.queryScenesExcluding(input, allExcludes, refresh)
+        : await stashdb.queryScenes(input, refresh);
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
@@ -102,7 +105,12 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const q = req.query as Record<string, unknown>;
       const page = q.page ? Number(q.page) : 1;
       const perPage = q.per_page ? Number(q.per_page) : 25;
-      const windowDays = WATCHED_WINDOW_DAYS[String(q.window ?? "week")] ?? WATCHED_WINDOW_DAYS.week;
+      const window = String(q.window ?? "week");
+      const windowDays = WATCHED_WINDOW_DAYS[window] ?? WATCHED_WINDOW_DAYS.week;
+      const refresh = q.refresh === "1" || q.refresh === "true";
+      // Month/year are long enough spans that date order goes stale fast — randomize
+      // instead, reshuffling on every fresh page-1 visit (see queryMergedFeed).
+      const randomize = window === "month" || window === "year";
 
       const watchedFilters = (await readJson<SavedFilter[]>("filters.json", [])).filter((f) => f.watched);
       const globalExcludes = await getGlobalExcludeIds();
@@ -125,11 +133,20 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const cacheKey = JSON.stringify({ cutoff, globalExcludes, filters: watchedFilters.map((f) => ({ id: f.id, filter: f.filter })) });
       const ignoredIds = new Set((await readJson<IgnoredScene[]>("ignored-scenes.json", [])).map((s) => s.id));
 
+      // Only the *first* internal round of this request should trigger a reseed —
+      // fetchUnaddedPage may call queryMergedFeed several times per request as it
+      // pages through raw results, and re-deleting the cache on every one of those
+      // internal calls would wipe out progress made by the previous call.
+      let pendingReset = (randomize && page === 1) || refresh;
       const result = await fetchUnaddedPage(
         cfg,
         localStash,
         whisparr,
-        (rawPage, pp) => stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, ignoredIds),
+        (rawPage, pp) => {
+          const reset = pendingReset;
+          pendingReset = false;
+          return stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, ignoredIds, { randomize, reset, bypassCache: refresh });
+        },
         page,
         perPage,
       );
