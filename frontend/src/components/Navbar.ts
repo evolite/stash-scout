@@ -1,8 +1,9 @@
-export type Tab = "browse" | "watched" | "settings";
+export type Tab = "browse" | "watched" | "stats" | "settings";
 
 const LEFT_TABS: { id: Tab; label: string }[] = [
   { id: "watched", label: "Feed" },
   { id: "browse", label: "Browse" },
+  { id: "stats", label: "Stats" },
 ];
 const RIGHT_TABS: { id: Tab; label: string }[] = [{ id: "settings", label: "Settings" }];
 

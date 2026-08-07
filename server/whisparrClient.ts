@@ -6,6 +6,8 @@ export interface WhisparrScene {
   foreignId?: string;
   monitored: boolean;
   hasFile: boolean;
+  title?: string;
+  added?: string;
 }
 
 export interface WhisparrQueueItem {
@@ -86,6 +88,14 @@ export class WhisparrClient {
   async getQueueForMovie(movieId: number): Promise<WhisparrQueueItem | null> {
     const queue = await this.getQueue();
     return queue.find((q) => q.movieId === movieId) ?? null;
+  }
+
+  // For the stats dashboard's bulk classification — reuses the same cached
+  // movie list / queue every per-scene status check already fetches, instead
+  // of adding new Whisparr calls.
+  async getBulkStatusSource(): Promise<{ movies: WhisparrScene[]; queue: WhisparrQueueItem[] }> {
+    const [movies, queue] = await Promise.all([this.getMovieList(), this.getQueue()]);
+    return { movies, queue };
   }
 
   async setMonitored(movieId: number, monitored: boolean): Promise<WhisparrScene> {
