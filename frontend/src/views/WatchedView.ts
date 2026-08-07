@@ -81,7 +81,7 @@ function renderSceneSection(opts: {
   }
 
   async function load() {
-    grid.replaceChildren(...Array.from(renderSkeletonGrid(opts.perPage).children));
+    grid.replaceChildren(...Array.from(renderSkeletonGrid().children));
     const { count, scenes, approximateCount } = await opts.fetchPage(page);
     statuses = {};
     if (scenes.length === 0 && page === 1) {
