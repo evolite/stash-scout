@@ -1,6 +1,5 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
 import { renderSceneCard } from "../components/SceneCard.js";
-import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
 
 const SECTION_PER_PAGE = 16;
@@ -23,14 +22,35 @@ function textState(message: string): HTMLElement {
   return p;
 }
 
-function renderRefreshButton(onClick: () => void): HTMLElement {
+function renderRefreshButton(onClick: () => Promise<void>): HTMLElement {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "text-muted hover:text-link text-sm";
+  btn.className = "text-muted hover:text-link text-sm disabled:opacity-50";
   btn.title = "Refresh";
   btn.textContent = "↻";
-  btn.addEventListener("click", onClick);
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.classList.add("animate-spin");
+    try {
+      await onClick();
+    } finally {
+      btn.classList.remove("animate-spin");
+      btn.disabled = false;
+    }
+  });
   return btn;
+}
+
+// Only shown on a section's very first load, when there's no prior content to
+// keep on screen — a small centered spinner instead of placeholder cards that
+// just get thrown away once real data lands.
+function renderSpinner(): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "col-span-full flex items-center justify-center py-12";
+  const spinner = document.createElement("div");
+  spinner.className = "w-6 h-6 rounded-full border-2 border-muted/30 border-t-accent animate-spin";
+  wrap.appendChild(spinner);
+  return wrap;
 }
 
 // A self-contained paginated scene grid — used for both the Feed and Trending
@@ -40,10 +60,10 @@ function renderSceneSection(opts: {
   fetchPage: (page: number, refresh?: boolean) => Promise<{ count: number; scenes: Scene[]; approximateCount?: boolean }>;
   ignorable?: boolean;
   emptyMessage: string;
-}): { element: HTMLElement; reset: () => void; refresh: () => void } {
+}): { element: HTMLElement; reset: () => void; refresh: () => Promise<void> } {
   const element = document.createElement("div");
   const grid = document.createElement("div");
-  grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]";
+  grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] transition-opacity duration-150";
   const paginationEl = document.createElement("div");
   element.appendChild(grid);
   element.appendChild(paginationEl);
@@ -80,10 +100,22 @@ function renderSceneSection(opts: {
     );
   }
 
-  async function load() {
-    grid.replaceChildren(...Array.from(renderSkeletonGrid().children));
-    const { count, scenes, approximateCount } = await opts.fetchPage(page);
+  // First load has nothing on screen yet, so show a spinner. Every later load
+  // (pagination, window switch, refresh) keeps the current cards visible,
+  // just dimmed, instead of tearing them out for placeholders that would only
+  // get thrown away a moment later once the real results land.
+  async function load(bypassCache = false) {
+    const isFirstLoad = grid.children.length === 0;
+    if (isFirstLoad) {
+      grid.replaceChildren(renderSpinner());
+    } else {
+      grid.classList.add("opacity-40", "pointer-events-none");
+    }
+
+    const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
     statuses = {};
+    grid.classList.remove("opacity-40", "pointer-events-none");
+
     if (scenes.length === 0 && page === 1) {
       grid.innerHTML = "";
       grid.appendChild(textState(opts.emptyMessage));
@@ -100,20 +132,8 @@ function renderSceneSection(opts: {
     load();
   }
 
-  // Re-fetches the current page in place, without the skeleton flash or
-  // resetting to page 1 — for the header refresh button.
   async function refresh() {
-    const { count, scenes, approximateCount } = await opts.fetchPage(page, true);
-    statuses = {};
-    if (scenes.length === 0 && page === 1) {
-      grid.innerHTML = "";
-      grid.appendChild(textState(opts.emptyMessage));
-      paginationEl.innerHTML = "";
-      return;
-    }
-    updatePagination(count, !!approximateCount);
-    renderGrid(scenes);
-    refreshStatuses(scenes);
+    await load(true);
   }
 
   load();
