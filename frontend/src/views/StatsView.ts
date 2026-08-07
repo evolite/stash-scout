@@ -28,7 +28,9 @@ function renderRefreshButton(onClick: () => void): HTMLElement {
   return btn;
 }
 
-const CHART_HEIGHT_PX = 96;
+const CHART_HEIGHT_PX = 120;
+const Y_AXIS_WIDTH_PX = 28;
+const X_LABEL_INTERVAL = 5;
 
 function formatShortDate(isoDate: string): string {
   return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
@@ -38,13 +40,10 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "bg-surface rounded-lg p-3.5 flex flex-col gap-2";
 
-  const header = document.createElement("div");
-  header.className = "flex items-baseline justify-between";
   const h = document.createElement("h4");
   h.className = "m-0 text-sm";
   h.textContent = "Added to Whisparr — Last 30 Days";
-  header.appendChild(h);
-  wrap.appendChild(header);
+  wrap.appendChild(h);
 
   if (timeline.length === 0) {
     const p = document.createElement("p");
@@ -55,36 +54,70 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
   }
 
   const maxCount = Math.max(1, ...timeline.map((d) => d.count));
-  const maxLabel = document.createElement("span");
-  maxLabel.className = "text-xs text-muted";
-  maxLabel.textContent = `peak: ${maxCount}/day`;
-  header.appendChild(maxLabel);
+  const midCount = Math.round(maxCount / 2);
 
-  const chart = document.createElement("div");
-  chart.className = "flex items-end gap-[2px]";
-  chart.style.height = `${CHART_HEIGHT_PX}px`;
+  // Y axis: tick labels for 0 / mid / max, right-aligned against the chart.
+  const yAxis = document.createElement("div");
+  yAxis.className = "shrink-0 flex flex-col justify-between text-right text-[10px] text-muted";
+  yAxis.style.height = `${CHART_HEIGHT_PX}px`;
+  yAxis.style.width = `${Y_AXIS_WIDTH_PX}px`;
+  for (const v of [maxCount, midCount, 0]) {
+    const tick = document.createElement("span");
+    tick.textContent = String(v);
+    yAxis.appendChild(tick);
+  }
+
+  // Chart area: gridlines at the same 0/mid/max levels, bars absolutely
+  // positioned to fill the area so bottom-anchoring doesn't depend on
+  // flexbox stretch behavior of nested percentage heights.
+  const chartArea = document.createElement("div");
+  chartArea.className = "relative flex-1";
+  chartArea.style.height = `${CHART_HEIGHT_PX}px`;
+
+  for (const frac of [0, 0.5, 1]) {
+    const gridline = document.createElement("div");
+    gridline.className = "absolute left-0 right-0 border-t border-white/10";
+    gridline.style.top = `${frac * 100}%`;
+    chartArea.appendChild(gridline);
+  }
+
+  const bars = document.createElement("div");
+  bars.className = "absolute inset-0 flex items-end gap-[2px]";
   for (const day of timeline) {
-    const barWrap = document.createElement("div");
-    barWrap.className = "flex-1 h-full flex items-end";
     const bar = document.createElement("div");
-    bar.className = "w-full bg-accent rounded-t-sm hover:brightness-125";
+    bar.className = "flex-1 bg-accent rounded-t-sm hover:brightness-125";
     const heightPx = Math.max(2, Math.round((day.count / maxCount) * CHART_HEIGHT_PX));
     bar.style.height = `${heightPx}px`;
     bar.title = `${formatShortDate(day.date)}: ${day.count} scene${day.count === 1 ? "" : "s"}`;
-    barWrap.appendChild(bar);
-    chart.appendChild(barWrap);
+    bars.appendChild(bar);
   }
-  wrap.appendChild(chart);
+  chartArea.appendChild(bars);
 
-  const axis = document.createElement("div");
-  axis.className = "flex justify-between text-xs text-muted";
-  const start = document.createElement("span");
-  start.textContent = formatShortDate(timeline[0].date);
-  const end = document.createElement("span");
-  end.textContent = formatShortDate(timeline[timeline.length - 1].date);
-  axis.appendChild(start);
-  axis.appendChild(end);
-  wrap.appendChild(axis);
+  const chartRow = document.createElement("div");
+  chartRow.className = "flex gap-2";
+  chartRow.appendChild(yAxis);
+  chartRow.appendChild(chartArea);
+  wrap.appendChild(chartRow);
+
+  // X axis: one flex-1 slot per day (same gap as the bars) so labels line up
+  // under their bar exactly; only every X_LABEL_INTERVAL-th (plus the last)
+  // actually shows text, to avoid 30 crowded labels.
+  const xAxisRow = document.createElement("div");
+  xAxisRow.className = "flex gap-2";
+  const xAxisSpacer = document.createElement("div");
+  xAxisSpacer.className = "shrink-0";
+  xAxisSpacer.style.width = `${Y_AXIS_WIDTH_PX}px`;
+  const xAxis = document.createElement("div");
+  xAxis.className = "flex-1 flex gap-[2px] text-[10px] text-muted";
+  timeline.forEach((day, i) => {
+    const label = document.createElement("span");
+    label.className = "flex-1 text-center overflow-hidden text-ellipsis whitespace-nowrap";
+    if (i % X_LABEL_INTERVAL === 0 || i === timeline.length - 1) label.textContent = formatShortDate(day.date);
+    xAxis.appendChild(label);
+  });
+  xAxisRow.appendChild(xAxisSpacer);
+  xAxisRow.appendChild(xAxis);
+  wrap.appendChild(xAxisRow);
 
   return wrap;
 }
