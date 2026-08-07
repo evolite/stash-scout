@@ -1,4 +1,4 @@
-import { readJson, writeJson } from "./store.js";
+import { db } from "./db.js";
 import { encrypt, decrypt } from "./secretStore.js";
 import type { AppConfig } from "./config.js";
 
@@ -16,7 +16,16 @@ interface StoredSettings {
   cfAccessClientSecret?: string; // encrypted
 }
 
-const FILE = "settings.json";
+function readSettings(): StoredSettings | null {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'config'").get() as { value: string } | undefined;
+  return row ? JSON.parse(row.value) : null;
+}
+
+function writeSettings(settings: StoredSettings): void {
+  db.prepare("INSERT INTO settings (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(
+    JSON.stringify(settings),
+  );
+}
 
 function envFallback(name: string): string | undefined {
   const v = process.env[name];
@@ -37,14 +46,14 @@ async function persist(cfg: AppConfig): Promise<void> {
   if (cfg.localStashApiKey) toStore.localStashApiKey = await encrypt(cfg.localStashApiKey);
   if (cfg.whisparrApiKey) toStore.whisparrApiKey = await encrypt(cfg.whisparrApiKey);
   if (cfg.cfAccessClientSecret) toStore.cfAccessClientSecret = await encrypt(cfg.cfAccessClientSecret);
-  await writeJson(FILE, toStore);
+  writeSettings(toStore);
 }
 
 // PORT stays an env var (infra concern, not something you'd edit via the app UI
 // while the app is already listening on it) — everything else configurable and
 // testable moves here.
 export async function loadInitialConfig(): Promise<AppConfig> {
-  const stored = await readJson<StoredSettings | null>(FILE, null);
+  const stored = readSettings();
   const isFirstBoot = stored === null;
   const s = stored ?? {};
 

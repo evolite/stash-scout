@@ -9,14 +9,14 @@
     "build:frontend": "vite build frontend --config frontend/vite.config.ts",
     "build:server": "tsc -p tsconfig.server.json",
     "build": "npm run build:frontend && npm run build:server",
-    "start": "node dist-server/index.js"
+    "start": "node dist-server/server/index.js"
   },
   "dependencies": {
     "express": "^4.19.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/node": "^20.14.0",
+    "@types/node": "^22.20.1",
     "autoprefixer": "^10.5.4",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",
