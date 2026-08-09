@@ -136,7 +136,7 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
   if (status.kind === "in-stash") {
     buttons.push(
       hoverButton("Play in local Stash", iconPlay(), undefined, () => {
-        window.open(status.localUrl, "_blank");
+        window.open(status.localUrl, "_blank", "noopener");
       }),
     );
   } else {

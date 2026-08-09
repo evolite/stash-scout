@@ -1,5 +1,6 @@
 import type { AppConfig } from "./config.js";
 import type { Scene } from "../shared/types.js";
+import { capMap } from "./cacheUtil.js";
 
 // StashDB's schema only has one `tags` filter (no separate exclude_tags field) — an
 // EXCLUDES modifier query and an INCLUDES/INCLUDES_ALL query are mutually exclusive,
@@ -31,6 +32,7 @@ const SCENE_FIELDS = `
 `;
 
 const MAX_PER_PAGE = 40;
+const MAX_LOOKUP_IDS = 100;
 
 // Hard backstop against StashDB's rate limit: no more than STASHDB_MAX_RPM requests
 // leave this process in any rolling 60s window, queued (not dropped) beyond that.
@@ -56,6 +58,7 @@ function throttle(): Promise<void> {
 // Short-lived cache so repeated identical queries (page revisits, the exclude-tags
 // scan below, a re-render firing the same fetch twice) don't cost a fresh call.
 const CACHE_TTL_MS = 20_000;
+const RESPONSE_CACHE_MAX_ENTRIES = 1000;
 const responseCache = new Map<string, { at: number; data: unknown }>();
 
 async function gql<T>(url: string, apiKey: string | undefined, query: string, variables: unknown, bypassCache = false): Promise<T> {
@@ -82,6 +85,7 @@ async function gql<T>(url: string, apiKey: string | undefined, query: string, va
     throw new Error(`StashDB GraphQL error: ${json.errors.map((e) => e.message).join("; ")}`);
   }
   responseCache.set(cacheKey, { at: Date.now(), data: json.data });
+  capMap(responseCache, RESPONSE_CACHE_MAX_ENTRIES);
   return json.data as T;
 }
 
@@ -97,7 +101,24 @@ interface ExcludeCacheEntry {
   internalPage: number;
   at: number;
 }
+const FILTER_CACHE_MAX_ENTRIES = 200;
 const excludeCache = new Map<string, ExcludeCacheEntry>();
+
+// "Random" charts mode — see queryScenesRandomWindow below. Bounded to
+// 2010-01-01 onward: StashDB's pre-2010 catalog is thin enough that a
+// uniform pick further back mostly lands on a near-empty window.
+const RANDOM_WINDOW_DAYS = 61; // ~2 months
+const RANDOM_WINDOW_RANGE_START = new Date("2010-01-01T00:00:00Z").getTime();
+const RANDOM_WINDOW_TTL_MS = 5 * 60_000;
+interface RandomWindowEntry {
+  scenes: Scene[];
+  exhausted: boolean;
+  internalPage: number;
+  at: number;
+  start: string;
+  end: string;
+}
+const randomWindowCache = new Map<string, RandomWindowEntry>();
 
 // Merged "watched filters" feed — same idea as excludeCache but fanning out to
 // several source filters, deduping by scene id, and keeping each source's own
@@ -183,6 +204,7 @@ export class StashDBClient {
     if (!entry || Date.now() - entry.at > EXCLUDE_CACHE_TTL_MS) {
       entry = { scenes: [], totalCount: 0, exhausted: false, internalPage: 1, at: Date.now() };
       excludeCache.set(key, entry);
+      capMap(excludeCache, FILTER_CACHE_MAX_ENTRIES);
     }
     const excludeSet = new Set(excludeTagIds);
 
@@ -201,6 +223,89 @@ export class StashDBClient {
 
     return {
       count: entry.exhausted ? entry.scenes.length : entry.totalCount,
+      scenes: entry.scenes.slice(skip, skip + perPage),
+      approximateCount: !entry.exhausted,
+    };
+  }
+
+  // Picks a random ~2-month slice of StashDB's history and pages through it —
+  // "Random" charts mode. StashDB's DateCriterionInput has no BETWEEN/value2
+  // (confirmed by introspection), just a single value+modifier, so a genuine
+  // date *range* means the same trick as queryScenesExcluding above: fetch
+  // ascending from a random start (GREATER_THAN, cheap and indexed) and drop
+  // anything past the window's end client-side, accumulating into a cache
+  // keyed on the filter (not the page) so paging forward reuses what's
+  // already been fetched. The window itself is part of that cache entry, so
+  // it stays fixed while you page through it and only rerolls on a fresh
+  // cache miss (TTL expiry or an explicit reset/refresh).
+  //
+  // Popularity-within-this-window was considered and dropped: StashDB
+  // exposes no popularity field to sort client-side (confirmed by
+  // introspection), and its own `sort: POPULARITY` can't be combined with a
+  // date *range* (only a one-sided filter) — ranking by it here would mean
+  // paging through popularity order with no chronological cutoff to stop at,
+  // either capped-and-approximate or an unbounded scan. Staying with date
+  // order, which is exact and cheap.
+  private randomWindow(): { start: string; end: string } {
+    const latestStart = Date.now() - RANDOM_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const startMs = RANDOM_WINDOW_RANGE_START + Math.random() * Math.max(0, latestStart - RANDOM_WINDOW_RANGE_START);
+    const start = new Date(startMs).toISOString().slice(0, 10);
+    const end = new Date(startMs + RANDOM_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return { start, end };
+  }
+
+  async queryScenesRandomWindow(
+    input: Partial<SceneQueryInput>,
+    excludeTagIds: string[],
+    opts: { reset?: boolean; bypassCache?: boolean } = {},
+  ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
+    const perPage = Math.min(input.per_page ?? 25, MAX_PER_PAGE);
+    const page = input.page ?? 1;
+    const skip = (page - 1) * perPage;
+
+    // date/sort/direction are ours to set — a saved filter's own date
+    // criterion (if any) would defeat the point of a random window.
+    const { date: _date, sort: _sort, direction: _direction, page: _page, per_page: _perPage, ...baseInput } = input;
+    const key = JSON.stringify({ ...baseInput, excludeTagIds: [...excludeTagIds].sort() });
+    if (opts.reset || opts.bypassCache) randomWindowCache.delete(key);
+    let entry = randomWindowCache.get(key);
+    if (!entry || Date.now() - entry.at > RANDOM_WINDOW_TTL_MS) {
+      const { start, end } = this.randomWindow();
+      entry = { scenes: [], exhausted: false, internalPage: 1, at: Date.now(), start, end };
+      randomWindowCache.set(key, entry);
+      capMap(randomWindowCache, FILTER_CACHE_MAX_ENTRIES);
+    }
+    const excludeSet = new Set(excludeTagIds);
+
+    while (entry.scenes.length < skip + perPage && !entry.exhausted && entry.scenes.length < MAX_CACHED_SCENES) {
+      const { scenes } = await this.queryScenes(
+        {
+          ...baseInput,
+          date: { value: entry.start, modifier: "GREATER_THAN" },
+          sort: "DATE",
+          direction: "ASC",
+          page: entry.internalPage,
+          per_page: MAX_PER_PAGE,
+        },
+        opts.bypassCache,
+      );
+      let pastEnd = false;
+      for (const scene of scenes) {
+        if (scene.release_date && scene.release_date > entry.end) {
+          pastEnd = true;
+          break;
+        }
+        if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
+      }
+      if (pastEnd || scenes.length < MAX_PER_PAGE) {
+        entry.exhausted = true;
+      } else {
+        entry.internalPage++;
+      }
+    }
+
+    return {
+      count: entry.exhausted ? entry.scenes.length : entry.scenes.length + 1,
       scenes: entry.scenes.slice(skip, skip + perPage),
       approximateCount: !entry.exhausted,
     };
@@ -237,6 +342,7 @@ export class StashDBClient {
         at: Date.now(),
       };
       mergedFeedCache.set(cacheKey, entry);
+      capMap(mergedFeedCache, FILTER_CACHE_MAX_ENTRIES);
     }
     // Visible = the merged list minus whatever's been ignored since — filtered
     // here (not just skipped on insert) so a scene ignored after being cached
@@ -293,17 +399,20 @@ export class StashDBClient {
   }
 
   // Resolves ids back to names (e.g. re-populating a saved filter's chips) in one
-  // request via aliases, rather than one lookup call per id.
+  // request via aliases, rather than one lookup call per id. Capped — the id
+  // list comes straight from a query string, and one aliased field per id
+  // would otherwise let an arbitrarily long list balloon the GraphQL query.
   private async findByIds(queryName: string, ids: string[]): Promise<{ id: string; name: string }[]> {
     if (ids.length === 0) return [];
+    const capped = ids.slice(0, MAX_LOOKUP_IDS);
     const variables: Record<string, string> = {};
-    const fields = ids
+    const fields = capped
       .map((id, i) => {
         variables[`id${i}`] = id;
         return `t${i}: ${queryName}(id: $id${i}) { id name }`;
       })
       .join("\n");
-    const argsDecl = ids.map((_, i) => `$id${i}: ID!`).join(", ");
+    const argsDecl = capped.map((_, i) => `$id${i}: ID!`).join(", ");
     const data = await gql<Record<string, { id: string; name: string } | null>>(
       this.cfg.stashdbUrl,
       this.cfg.stashdbApiKey,

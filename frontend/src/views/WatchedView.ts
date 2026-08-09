@@ -292,13 +292,19 @@ export function renderWatchedView(): HTMLElement {
   trendingWrap.appendChild(trendingHeadingRow);
 
   // "Trending" is StashDB's own recency-weighted activity score; "Popularity"
-  // is a plain all-time favorites/o-counter ranking — same section and chip
-  // bar below, just a different sort on the same query.
-  type TrendingSort = "TRENDING" | "POPULARITY";
+  // is a plain all-time favorites/o-counter ranking; "Random" picks a random
+  // ~2-month slice of StashDB's history (server-side — see
+  // queryScenesRandomWindow) instead of sorting by either. Same section and
+  // chip bar below either way, just a different query.
+  type TrendingSort = "TRENDING" | "POPULARITY" | "RANDOM";
   let trendingSort: TrendingSort = "TRENDING";
   const sortToggle = document.createElement("div");
   sortToggle.className = "flex gap-1 mb-2";
-  for (const s of [{ id: "TRENDING" as const, label: "Trending" }, { id: "POPULARITY" as const, label: "Popularity" }]) {
+  for (const s of [
+    { id: "TRENDING" as const, label: "Trending" },
+    { id: "POPULARITY" as const, label: "Popularity" },
+    { id: "RANDOM" as const, label: "Random" },
+  ]) {
     const el = document.createElement("button");
     el.type = "button";
     el.className = s.id === trendingSort ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
@@ -361,22 +367,21 @@ export function renderWatchedView(): HTMLElement {
     fetchPage: async (page, refresh) => {
       const chosen = watchedFilters.find((f) => f.name === selectedTrendingSource);
       const cf = chosen?.filter as Record<string, unknown> | undefined;
-      const result = await api.queryScenes(
-        {
-          sort: trendingSort,
-          direction: "DESC",
-          page,
-          per_page: SECTION_PER_PAGE,
-          favorites: selectedTrendingSource === "Favorites" ? "PERFORMER" : undefined,
-          unadded: isInLibraryMode() ? undefined : "1",
-          tags: cf?.tags as string | undefined,
-          tags_modifier: cf?.tags_modifier as "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" | undefined,
-          exclude_tags: cf?.exclude_tags as string | undefined,
-          performers: cf?.performers as string | undefined,
-          studios: cf?.studios as string | undefined,
-        },
-        refresh,
-      );
+      const filter = {
+        page,
+        per_page: SECTION_PER_PAGE,
+        favorites: selectedTrendingSource === "Favorites" ? ("PERFORMER" as const) : undefined,
+        unadded: isInLibraryMode() ? undefined : ("1" as const),
+        tags: cf?.tags as string | undefined,
+        tags_modifier: cf?.tags_modifier as "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" | undefined,
+        exclude_tags: cf?.exclude_tags as string | undefined,
+        performers: cf?.performers as string | undefined,
+        studios: cf?.studios as string | undefined,
+      };
+      const result =
+        trendingSort === "RANDOM"
+          ? await api.randomScenes(filter, refresh)
+          : await api.queryScenes({ ...filter, sort: trendingSort, direction: "DESC" }, refresh);
       return { ...result, count: Math.min(result.count, TRENDING_LIMIT), approximateCount: false };
     },
     emptyMessage: "Nothing to show right now.",

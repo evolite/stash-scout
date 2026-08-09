@@ -57,6 +57,39 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     }
   });
 
+  // "Random" charts mode: a random ~2-month slice of StashDB's history,
+  // otherwise respecting the same tags/performers/studios/exclude filter,
+  // global excludes, ignored scenes, and unadded-only behavior as /scenes.
+  // The window itself is picked and cached server-side (see
+  // queryScenesRandomWindow) so paging forward stays inside the same slice;
+  // `refresh=1` (the section's Refresh button) rerolls a new one.
+  router.get("/scenes/random", async (req, res) => {
+    try {
+      const q = req.query as Record<string, unknown>;
+      const { input, excludeTagIds } = parseStashFilter(q);
+      const page = q.page ? Number(q.page) : 1;
+      const perPage = q.per_page ? Number(q.per_page) : 25;
+      const refresh = q.refresh === "1" || q.refresh === "true";
+      const allExcludes = mergeExcludeIds(excludeTagIds, getGlobalExcludeIds());
+      const unadded = q.unadded === "1";
+      const ignoredIds = getIgnoredIds();
+
+      const result = await fetchFilteredPage(
+        cfg,
+        localStash,
+        whisparr,
+        (rawPage, pp) =>
+          stashdb.queryScenesRandomWindow({ ...input, page: rawPage, per_page: pp }, allExcludes, { reset: refresh, bypassCache: refresh }),
+        page,
+        perPage,
+        { requireUnadded: unadded, excludeIds: ignoredIds },
+      );
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.get("/tags/search", async (req, res) => {
     try {
       const term = String(req.query.term ?? "");

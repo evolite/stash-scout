@@ -1,4 +1,5 @@
 import type { AppConfig } from "./config.js";
+import { capMap } from "./cacheUtil.js";
 
 async function gql<T>(url: string, apiKey: string, query: string, variables: unknown, cfg: AppConfig): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ApiKey: apiKey };
@@ -36,6 +37,7 @@ async function gql<T>(url: string, apiKey: string, query: string, variables: unk
 // costs nothing in the common case. Matches stashdbClient's own 5-minute
 // caches (EXCLUDE_CACHE_TTL_MS / MERGED_FEED_TTL_MS) for consistency.
 const SCENE_ID_CACHE_TTL_MS = 5 * 60_000;
+const SCENE_ID_CACHE_MAX_ENTRIES = 2000;
 const sceneIdCache = new Map<string, { at: number; promise: Promise<string | null> }>();
 
 // Ported from StashSeer's getLocalStashSceneIdByStashId: try URL match first,
@@ -53,6 +55,7 @@ export class LocalStashClient {
       throw err;
     });
     sceneIdCache.set(stashId, { at: Date.now(), promise });
+    capMap(sceneIdCache, SCENE_ID_CACHE_MAX_ENTRIES);
     return promise;
   }
 

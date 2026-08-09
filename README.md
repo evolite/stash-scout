@@ -20,7 +20,7 @@ A web app for browsing [StashDB](https://stashdb.org) with actual filtering, and
 docker run -d -p 8787:8787 -v stash-scout-data:/app/data ghcr.io/evolite/stash-scout:latest
 ```
 
-Then open `http://localhost:8787` and configure everything (StashDB API key, Stash, Whisparr) from the **Settings** tab — no env vars or config files to hand-edit. Secrets are encrypted at rest.
+Then open `http://localhost:8787`. First load prompts for an app secret — check `docker logs` for the line printed on first boot (or set `APP_SECRET` yourself, see `.env.example`). Every `/api` request needs it, so exposing the port isn't the same as exposing your StashDB/Stash/Whisparr keys. Configure everything else (StashDB API key, Stash, Whisparr) from the **Settings** tab — no env vars or config files to hand-edit. Secrets are encrypted at rest.
 
 ### From source
 
