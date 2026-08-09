@@ -1,19 +1,25 @@
 import { api } from "../api.js";
 
-const DOT_BASE = "inline-block w-[9px] h-[9px] rounded-full shrink-0";
-const DOT_OK = DOT_BASE + " bg-success";
-const DOT_BAD = DOT_BASE + " bg-danger";
-const DOT_UNKNOWN = DOT_BASE + " bg-secondary";
-
-function statusDot(ok: boolean | null): HTMLElement {
+function statusPill(ok: boolean | null): HTMLElement {
+  const pill = document.createElement("span");
+  pill.className = "flex items-center gap-1.5 text-xs font-medium shrink-0";
   const dot = document.createElement("span");
-  dot.className = ok === null ? DOT_UNKNOWN : ok ? DOT_OK : DOT_BAD;
-  return dot;
+  const label = document.createElement("span");
+  pill.appendChild(dot);
+  pill.appendChild(label);
+  setStatusPill(pill, ok);
+  return pill;
 }
 
-function setStatusDot(dot: HTMLElement, ok: boolean): void {
-  dot.className = ok ? DOT_OK : DOT_BAD;
+function setStatusPill(pill: HTMLElement, ok: boolean | null): void {
+  const dot = pill.children[0] as HTMLElement;
+  const label = pill.children[1] as HTMLElement;
+  dot.className = "inline-block w-[7px] h-[7px] rounded-full shrink-0 " + (ok === null ? "bg-text-faint" : ok ? "bg-success" : "bg-danger");
+  label.className = ok === null ? "text-text-faint" : ok ? "text-success" : "text-danger";
+  label.textContent = ok === null ? "Unknown" : ok ? "Connected" : "Offline";
 }
+
+const SECRET_HINT = "Encrypted at rest and never sent back to the browser. Leave blank to keep the current value.";
 
 function fieldRow(label: string, opts: { type?: string; value?: string; placeholder?: string } = {}): { row: HTMLElement; input: HTMLInputElement } {
   const row = document.createElement("label");
@@ -24,44 +30,45 @@ function fieldRow(label: string, opts: { type?: string; value?: string; placehol
   input.type = opts.type ?? "text";
   input.value = opts.value ?? "";
   if (opts.placeholder) input.placeholder = opts.placeholder;
+  if (opts.type === "password") input.title = SECRET_HINT;
   row.appendChild(span);
   row.appendChild(input);
   return { row, input };
 }
 
-const CARD_BASE = "bg-surface rounded-lg p-3.5 flex flex-col gap-2";
-const CARD_WIDE = CARD_BASE + " col-span-full";
-
-function card(title: string, wide = false): { card: HTMLElement; header: HTMLElement; dot: HTMLElement } {
-  const el = document.createElement("div");
-  el.className = wide ? CARD_WIDE : CARD_BASE;
+function section(title: string, subtitle: string): { section: HTMLElement; body: HTMLElement; pill: HTMLElement; note: HTMLElement } {
+  const el = document.createElement("section");
+  el.className = "p-5 flex flex-col gap-3";
   const header = document.createElement("div");
-  header.className = "flex items-center justify-between";
-  const h = document.createElement("h4");
-  h.className = "m-0 text-sm";
+  header.className = "flex items-start justify-between gap-3";
+  const titleBlock = document.createElement("div");
+  const h = document.createElement("h3");
+  h.className = "m-0 text-sm font-semibold";
   h.textContent = title;
-  const dot = statusDot(null);
-  header.appendChild(h);
-  header.appendChild(dot);
-  el.appendChild(header);
-  return { card: el, header, dot };
-}
-
-function footer(saveLabel = "Save"): { row: HTMLElement; save: HTMLButtonElement; note: HTMLElement } {
-  const row = document.createElement("div");
-  row.className = "flex items-center justify-between gap-2 mt-auto pt-1";
+  const sub = document.createElement("p");
+  sub.className = "m-0 mt-0.5 text-xs text-muted";
+  sub.textContent = subtitle;
+  titleBlock.appendChild(h);
+  titleBlock.appendChild(sub);
+  const statusBlock = document.createElement("div");
+  statusBlock.className = "flex flex-col items-end gap-1";
+  const pill = statusPill(null);
   const note = document.createElement("span");
-  note.className = "text-xs text-muted";
-  const save = document.createElement("button");
-  save.className = "bg-accent text-white rounded px-2.5 py-1 text-xs hover:brightness-110 shrink-0";
-  save.textContent = saveLabel;
-  row.appendChild(note);
-  row.appendChild(save);
-  return { row, save, note };
+  note.className = "text-xs text-amber";
+  statusBlock.appendChild(pill);
+  statusBlock.appendChild(note);
+  header.appendChild(titleBlock);
+  header.appendChild(statusBlock);
+  const body = document.createElement("div");
+  body.className = "flex flex-col gap-2";
+  el.appendChild(header);
+  el.appendChild(body);
+  return { section: el, body, pill, note };
 }
 
 export function renderSettingsView(): HTMLElement {
   const container = document.createElement("div");
+  container.className = "max-w-2xl";
   const loading = document.createElement("p");
   loading.className = "text-muted text-sm";
   loading.textContent = "Loading…";
@@ -71,56 +78,50 @@ export function renderSettingsView(): HTMLElement {
     const [cfg, settings, test] = await Promise.all([api.getConfig(), api.settings(), api.testSettings()]);
     container.innerHTML = "";
 
-    const grid = document.createElement("div");
-    grid.className = "grid gap-4 items-start grid-cols-[repeat(auto-fit,minmax(280px,1fr))]";
-    container.appendChild(grid);
+    const panel = document.createElement("div");
+    panel.className = "bg-surface border border-line rounded-lg divide-y divide-line";
+    container.appendChild(panel);
+
+    let dirty = false;
+    function markDirty() {
+      if (dirty) return;
+      dirty = true;
+      saveBtn.disabled = false;
+      bottomNote.textContent = "Unsaved changes";
+    }
 
     // --- StashDB ---
-    const stashdbC = card("StashDB");
-    setStatusDot(stashdbC.dot, test.stashdb);
+    const stashdbS = section("StashDB", "Metadata for scenes, performers, and studios.");
+    setStatusPill(stashdbS.pill, test.stashdb);
     const stashdbUrl = fieldRow("URL", { value: cfg.stashdbUrl });
     const stashdbKey = fieldRow("API Key", { type: "password", placeholder: cfg.stashdbApiKeySet ? "(unchanged)" : "not set" });
-    stashdbC.card.appendChild(stashdbUrl.row);
-    stashdbC.card.appendChild(stashdbKey.row);
-    const stashdbF = footer();
-    stashdbF.save.addEventListener("click", async () => {
-      await api.updateConfig({ stashdbUrl: stashdbUrl.input.value, stashdbApiKey: stashdbKey.input.value });
-      stashdbKey.input.value = "";
-      await retest();
-    });
-    stashdbC.card.appendChild(stashdbF.row);
-    grid.appendChild(stashdbC.card);
+    stashdbS.body.appendChild(stashdbUrl.row);
+    stashdbS.body.appendChild(stashdbKey.row);
+    panel.appendChild(stashdbS.section);
 
     // --- Local Stash ---
-    const stashC = card("Local Stash");
-    setStatusDot(stashC.dot, test.localStash);
+    const stashS = section("Local Stash", "Checks what's already in your library.");
+    setStatusPill(stashS.pill, test.localStash);
+    if (!settings.localStashConfigured) stashS.note.textContent = "not configured";
     const stashGqlUrl = fieldRow("GraphQL URL", { value: cfg.localStashUrl, placeholder: "http://localhost:9999/graphql" });
-    const stashRootUrl = fieldRow("Root URL", { value: cfg.localStashRootUrl, placeholder: "http://localhost:9999" });
+    stashGqlUrl.input.title = "Used to connect and query your library — can be a remote/tunneled address.";
+    const stashRootUrl = fieldRow("Playback URL", { value: cfg.localStashRootUrl, placeholder: "http://localhost:9999" });
+    stashRootUrl.input.title = "Used to open scenes in your browser. Can differ from the GraphQL URL — e.g. localhost:9999 for playback even if you connect through a remote host.";
     const stashKey = fieldRow("API Key", { type: "password", placeholder: cfg.localStashApiKeySet ? "(unchanged)" : "not set" });
-    stashC.card.appendChild(stashGqlUrl.row);
-    stashC.card.appendChild(stashRootUrl.row);
-    stashC.card.appendChild(stashKey.row);
-    const stashF = footer();
-    if (!settings.localStashConfigured) stashF.note.textContent = "not configured";
-    stashF.save.addEventListener("click", async () => {
-      await api.updateConfig({
-        localStashUrl: stashGqlUrl.input.value,
-        localStashRootUrl: stashRootUrl.input.value,
-        localStashApiKey: stashKey.input.value,
-      });
-      stashKey.input.value = "";
-      await retest();
-    });
-    stashC.card.appendChild(stashF.row);
-    grid.appendChild(stashC.card);
+    stashS.body.appendChild(stashGqlUrl.row);
+    stashS.body.appendChild(stashRootUrl.row);
+    stashS.body.appendChild(stashKey.row);
+    panel.appendChild(stashS.section);
 
     // --- Whisparr ---
-    const whisparrC = card("Whisparr");
-    setStatusDot(whisparrC.dot, test.whisparr);
+    const whisparrS = section("Whisparr", "Downloads monitored scenes automatically.");
+    setStatusPill(whisparrS.pill, test.whisparr);
+    if (!settings.whisparrConfigured) whisparrS.note.textContent = "not configured";
+    else if (!settings.whisparrFullyConfigured) whisparrS.note.textContent = "missing root folder / quality profile";
     const whisparrUrl = fieldRow("Base URL", { value: cfg.whisparrBaseUrl, placeholder: "http://localhost:6969" });
     const whisparrKey = fieldRow("API Key", { type: "password", placeholder: cfg.whisparrApiKeySet ? "(unchanged)" : "not set" });
-    whisparrC.card.appendChild(whisparrUrl.row);
-    whisparrC.card.appendChild(whisparrKey.row);
+    whisparrS.body.appendChild(whisparrUrl.row);
+    whisparrS.body.appendChild(whisparrKey.row);
 
     const rootFolderRow = document.createElement("label");
     rootFolderRow.className = "SettingsField";
@@ -132,7 +133,7 @@ export function renderSettingsView(): HTMLElement {
     rootFolderManual.placeholder = "/data";
     rootFolderRow.appendChild(rootFolderSpan);
     rootFolderRow.appendChild(rootFolderManual);
-    whisparrC.card.appendChild(rootFolderRow);
+    whisparrS.body.appendChild(rootFolderRow);
 
     const qualityRow = document.createElement("label");
     qualityRow.className = "SettingsField";
@@ -144,10 +145,11 @@ export function renderSettingsView(): HTMLElement {
     qualityManual.placeholder = "1";
     qualityRow.appendChild(qualitySpan);
     qualityRow.appendChild(qualityManual);
-    whisparrC.card.appendChild(qualityRow);
+    whisparrS.body.appendChild(qualityRow);
 
     const loadOptionsBtn = document.createElement("button");
-    loadOptionsBtn.className = "bg-transparent text-text hover:bg-white/10 rounded px-2 py-1 text-xs self-start";
+    loadOptionsBtn.type = "button";
+    loadOptionsBtn.className = "bg-black/20 text-text hover:bg-white/10 rounded px-2.5 py-1.5 text-xs self-start transition";
     loadOptionsBtn.textContent = "Load from Whisparr…";
     loadOptionsBtn.addEventListener("click", async () => {
       try {
@@ -170,61 +172,76 @@ export function renderSettingsView(): HTMLElement {
           qualitySelect.appendChild(opt);
         }
         qualityRow.replaceChild(qualitySelect, qualityManual);
+        rootFolderSelect.addEventListener("change", markDirty);
+        qualitySelect.addEventListener("change", markDirty);
+        markDirty();
       } catch (err) {
         alert(`Couldn't load Whisparr options: ${(err as Error).message}. Save the base URL/API key first.`);
       }
     });
-    whisparrC.card.appendChild(loadOptionsBtn);
+    whisparrS.body.appendChild(loadOptionsBtn);
+    panel.appendChild(whisparrS.section);
 
-    const whisparrF = footer();
-    if (!settings.whisparrConfigured) whisparrF.note.textContent = "not configured";
-    else if (!settings.whisparrFullyConfigured) whisparrF.note.textContent = "missing root folder / quality profile";
-    whisparrF.save.addEventListener("click", async () => {
+    // --- Cloudflare Access ---
+    const cfS = section("Cloudflare Access", "Only needed if Stash or Whisparr sit behind Access.");
+    cfS.pill.remove(); // no independent connection test — shared by Stash/Whisparr's own status
+    const cfId = fieldRow("Client ID", { value: cfg.cfAccessClientId });
+    const cfSecret = fieldRow("Client Secret", { type: "password", placeholder: cfg.cfAccessClientSecretSet ? "(unchanged)" : "not set" });
+    cfS.body.appendChild(cfId.row);
+    cfS.body.appendChild(cfSecret.row);
+    panel.appendChild(cfS.section);
+
+    panel.querySelectorAll("input, select").forEach((input) => {
+      input.addEventListener("input", markDirty);
+      input.addEventListener("change", markDirty);
+    });
+
+    // --- Save bar ---
+    const saveBar = document.createElement("div");
+    saveBar.className = "flex items-center justify-between gap-2 mt-4";
+    const bottomNote = document.createElement("span");
+    bottomNote.className = "text-xs text-muted";
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "bg-accent text-white rounded px-4 py-2 text-sm font-medium hover:brightness-110 shrink-0 transition disabled:opacity-40 disabled:cursor-default disabled:hover:brightness-100";
+    saveBtn.textContent = "Save changes";
+    saveBtn.disabled = true;
+    saveBar.appendChild(bottomNote);
+    saveBar.appendChild(saveBtn);
+    container.appendChild(saveBar);
+
+    saveBtn.addEventListener("click", async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
       const rootFolderPath = (rootFolderRow.querySelector("select, input") as HTMLSelectElement | HTMLInputElement).value;
       const qualityProfileId = (qualityRow.querySelector("select, input") as HTMLSelectElement | HTMLInputElement).value;
       await api.updateConfig({
+        stashdbUrl: stashdbUrl.input.value,
+        stashdbApiKey: stashdbKey.input.value,
+        localStashUrl: stashGqlUrl.input.value,
+        localStashRootUrl: stashRootUrl.input.value,
+        localStashApiKey: stashKey.input.value,
         whisparrBaseUrl: whisparrUrl.input.value,
         whisparrApiKey: whisparrKey.input.value,
         whisparrRootFolderPath: rootFolderPath,
         whisparrQualityProfileId: qualityProfileId ? Number(qualityProfileId) : null,
+        cfAccessClientId: cfId.input.value,
+        cfAccessClientSecret: cfSecret.input.value,
       });
+      stashdbKey.input.value = "";
+      stashKey.input.value = "";
       whisparrKey.input.value = "";
-      await retest();
-    });
-    whisparrC.card.appendChild(whisparrF.row);
-    grid.appendChild(whisparrC.card);
-
-    // --- Cloudflare Access ---
-    const cfC = card("Cloudflare Access");
-    cfC.dot.remove(); // no independent connection test — shared by Stash/Whisparr's own status
-    const cfId = fieldRow("Client ID", { value: cfg.cfAccessClientId });
-    const cfSecret = fieldRow("Client Secret", { type: "password", placeholder: cfg.cfAccessClientSecretSet ? "(unchanged)" : "not set" });
-    cfC.card.appendChild(cfId.row);
-    cfC.card.appendChild(cfSecret.row);
-    const cfF = footer();
-    cfF.note.textContent = "optional — only needed if Stash/Whisparr sit behind Access";
-    cfF.save.addEventListener("click", async () => {
-      await api.updateConfig({ cfAccessClientId: cfId.input.value, cfAccessClientSecret: cfSecret.input.value });
       cfSecret.input.value = "";
-      await retest();
-    });
-    cfC.card.appendChild(cfF.row);
-    grid.appendChild(cfC.card);
+      dirty = false;
+      saveBtn.textContent = "Save changes";
+      bottomNote.textContent = "Saved ✓";
 
-    async function retest() {
       const [s, t] = await Promise.all([api.settings(), api.testSettings()]);
-      setStatusDot(stashdbC.dot, t.stashdb);
-      setStatusDot(stashC.dot, t.localStash);
-      setStatusDot(whisparrC.dot, t.whisparr);
-      stashF.note.textContent = "";
-      stashF.note.textContent = s.localStashConfigured ? "" : "not configured";
-      whisparrF.note.textContent = !s.whisparrConfigured ? "not configured" : !s.whisparrFullyConfigured ? "missing root folder / quality profile" : "";
-    }
-
-    const secretsNote = document.createElement("p");
-    secretsNote.className = "text-xs text-muted mt-4";
-    secretsNote.textContent = "Secrets are encrypted at rest and never sent back to the browser. Leave a key field blank to keep its current value.";
-    container.appendChild(secretsNote);
+      setStatusPill(stashdbS.pill, t.stashdb);
+      setStatusPill(stashS.pill, t.localStash);
+      setStatusPill(whisparrS.pill, t.whisparr);
+      stashS.note.textContent = s.localStashConfigured ? "" : "not configured";
+      whisparrS.note.textContent = !s.whisparrConfigured ? "not configured" : !s.whisparrFullyConfigured ? "missing root folder / quality profile" : "";
+    });
   }
 
   render();

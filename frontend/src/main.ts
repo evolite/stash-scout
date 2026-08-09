@@ -5,11 +5,13 @@ import { renderStatsView } from "./views/StatsView.js";
 import { renderSettingsView } from "./views/SettingsView.js";
 
 const root = document.getElementById("root")!;
-let activeTab: Tab = "watched";
+const TABS: Tab[] = ["browse", "watched", "stats", "settings"];
+const savedTab = localStorage.getItem("activeTab");
+let activeTab: Tab = TABS.includes(savedTab as Tab) ? (savedTab as Tab) : "watched";
 
 function render() {
   root.innerHTML = "";
-  root.appendChild(renderNavbar(activeTab, setTab));
+  root.appendChild(renderNavbar(activeTab, setTab, render));
 
   const content = document.createElement("main");
   content.className = "px-6 py-8";
@@ -23,6 +25,7 @@ function render() {
 
 function setTab(tab: Tab) {
   activeTab = tab;
+  localStorage.setItem("activeTab", tab);
   render();
 }
 

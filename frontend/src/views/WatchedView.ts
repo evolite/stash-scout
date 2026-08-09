@@ -1,7 +1,8 @@
-import { api, type Scene, type SceneStatus } from "../api.js";
+import { api, type Scene, type SceneStatus, type SavedFilter } from "../api.js";
 import { renderSceneCard } from "../components/SceneCard.js";
 import { renderPagination } from "../components/Pagination.js";
-import { iconCheckCircle } from "../icons.js";
+import { isInLibraryMode } from "../components/Navbar.js";
+import { iconCheckCircle, iconRefresh } from "../icons.js";
 
 const SECTION_PER_PAGE = 16;
 
@@ -40,16 +41,17 @@ function textState(message: string): HTMLElement {
 function renderRefreshButton(onClick: () => Promise<void>): HTMLElement {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "text-muted hover:text-link text-sm disabled:opacity-50";
+  btn.className = "flex items-center justify-center text-muted hover:text-link disabled:opacity-50";
   btn.title = "Refresh";
-  btn.textContent = "↻";
+  const icon = iconRefresh();
+  btn.appendChild(icon);
   btn.addEventListener("click", async () => {
     btn.disabled = true;
-    btn.classList.add("animate-spin");
+    icon.classList.add("animate-spin");
     try {
       await onClick();
     } finally {
-      btn.classList.remove("animate-spin");
+      icon.classList.remove("animate-spin");
       btn.disabled = false;
     }
   });
@@ -59,12 +61,16 @@ function renderRefreshButton(onClick: () => Promise<void>): HTMLElement {
 // Only shown on a section's very first load, when there's no prior content to
 // keep on screen — a small centered spinner instead of placeholder cards that
 // just get thrown away once real data lands.
+function renderSpinnerIcon(): HTMLElement {
+  const spinner = document.createElement("div");
+  spinner.className = "w-6 h-6 rounded-full border-2 border-muted/30 border-t-accent animate-spin";
+  return spinner;
+}
+
 function renderSpinner(): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "col-span-full flex items-center justify-center py-12";
-  const spinner = document.createElement("div");
-  spinner.className = "w-6 h-6 rounded-full border-2 border-muted/30 border-t-accent animate-spin";
-  wrap.appendChild(spinner);
+  wrap.appendChild(renderSpinnerIcon());
   return wrap;
 }
 
@@ -78,7 +84,7 @@ function renderSceneSection(opts: {
 }): { element: HTMLElement; reset: () => void; refresh: () => Promise<void> } {
   const element = document.createElement("div");
   const grid = document.createElement("div");
-  grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] transition-opacity duration-150";
+  grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]";
   const paginationEl = document.createElement("div");
   element.appendChild(grid);
   element.appendChild(paginationEl);
@@ -96,12 +102,23 @@ function renderSceneSection(opts: {
   function renderGrid() {
     grid.innerHTML = "";
     for (const scene of currentScenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(), () => {
+      const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id), () => {
         currentScenes = currentScenes.filter((s) => s.id !== scene.id);
         card.remove();
       });
       grid.appendChild(card);
     }
+  }
+
+  // A card action (Add/Monitor/Unmonitor) only needs its own scene's status
+  // re-checked, not a full re-fetch of every visible card's status — that
+  // full-page-wide `sceneStatuses` call fans out to up to 2 sequential local
+  // Stash lookups per scene, and re-running it on every single click was what
+  // made "adding something" feel slow (16 cards' worth of lookups per click).
+  async function refreshOneStatus(id: string) {
+    const result = await api.sceneStatuses([id]);
+    statuses = { ...statuses, ...result };
+    renderGrid();
   }
 
   async function refreshStatuses() {
@@ -128,31 +145,37 @@ function renderSceneSection(opts: {
 
   // First load has nothing on screen yet, so show a spinner. Every later load
   // (pagination, window switch, refresh) keeps the current cards visible,
-  // just dimmed, instead of tearing them out for placeholders that would only
-  // get thrown away a moment later once the real results land.
+  // just breathing (a slow pulse), instead of tearing them out for
+  // placeholders that would only get thrown away a moment later once the
+  // real results land. The try/finally is load-bearing — without it, a
+  // failed fetch (a transient StashDB error, say) leaves the grid pulsing
+  // forever with no way to clear it.
   async function load(bypassCache = false) {
     const isFirstLoad = grid.children.length === 0;
     if (isFirstLoad) {
       grid.replaceChildren(renderSpinner());
     } else {
-      grid.classList.add("opacity-40", "pointer-events-none");
+      grid.classList.add("animate-breathe", "pointer-events-none");
     }
 
-    const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
-    statuses = {};
-    currentScenes = scenes;
-    grid.classList.remove("opacity-40", "pointer-events-none");
+    try {
+      const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
+      statuses = {};
+      currentScenes = scenes;
 
-    if (scenes.length === 0 && page === 1) {
-      grid.innerHTML = "";
-      grid.appendChild(textState(opts.emptyMessage));
-      paginationEl.innerHTML = "";
-      opts.onCount?.(0);
-      return;
+      if (scenes.length === 0 && page === 1) {
+        grid.innerHTML = "";
+        grid.appendChild(textState(opts.emptyMessage));
+        paginationEl.innerHTML = "";
+        opts.onCount?.(0);
+        return;
+      }
+      updatePagination(count, !!approximateCount);
+      renderGrid();
+      refreshStatuses();
+    } finally {
+      grid.classList.remove("animate-breathe", "pointer-events-none");
     }
-    updatePagination(count, !!approximateCount);
-    renderGrid();
-    refreshStatuses();
   }
 
   function reset() {
@@ -244,7 +267,7 @@ export function renderWatchedView(): HTMLElement {
   const feedSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
     fetchPage: async (page, refresh) => {
-      const result = await api.watchedFeed(page, SECTION_PER_PAGE, window, selectedSource, refresh);
+      const result = await api.watchedFeed(page, SECTION_PER_PAGE, window, selectedSource, isInLibraryMode(), refresh);
       return { ...result, count: Math.min(result.count, FEED_LIMIT), approximateCount: false };
     },
     emptyMessage: "Nothing new right now.",
@@ -256,35 +279,49 @@ export function renderWatchedView(): HTMLElement {
   feedHeadingRow.appendChild(renderRefreshButton(() => feedSection.refresh()));
   feedWrap.appendChild(feedSection.element);
 
-  api.listFilters().then((filters) => {
-    const names = filters.filter((f) => f.watched).map((f) => f.name);
-    names.push("Favorites");
-    renderSourceChips(names);
-  });
-
   const divider = document.createElement("hr");
   divider.className = "border-t border-black/20";
 
   const trendingWrap = document.createElement("div");
   const trendingHeadingRow = document.createElement("div");
-  trendingHeadingRow.className = "flex items-center gap-2 mb-2";
+  trendingHeadingRow.className = "flex items-center gap-2 mb-1.5";
   const trendingHeading = document.createElement("h3");
   trendingHeading.className = "text-base font-semibold";
-  trendingHeading.textContent = "Trending";
+  trendingHeading.textContent = "Charts";
   trendingHeadingRow.appendChild(trendingHeading);
   trendingWrap.appendChild(trendingHeadingRow);
 
-  // Trending filter chips: multi-select except "All Matches", which is the
-  // baseline — picking any other chip clears it, and it re-activates on its
-  // own once nothing else is selected, so there's always exactly one state.
-  type TrendingFilter = "new" | "favorited" | "short" | "unadded";
-  const TRENDING_CHIPS: { id: TrendingFilter; label: string }[] = [
-    { id: "new", label: "New" },
-    { id: "favorited", label: "Favorited performers" },
-    { id: "short", label: "Under 30 min" },
-    { id: "unadded", label: "Not in library" },
-  ];
-  const activeTrendingFilters = new Set<TrendingFilter>();
+  // "Trending" is StashDB's own recency-weighted activity score; "Popularity"
+  // is a plain all-time favorites/o-counter ranking — same section and chip
+  // bar below, just a different sort on the same query.
+  type TrendingSort = "TRENDING" | "POPULARITY";
+  let trendingSort: TrendingSort = "TRENDING";
+  const sortToggle = document.createElement("div");
+  sortToggle.className = "flex gap-1 mb-2";
+  for (const s of [{ id: "TRENDING" as const, label: "Trending" }, { id: "POPULARITY" as const, label: "Popularity" }]) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = s.id === trendingSort ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+    el.textContent = s.label;
+    el.addEventListener("click", () => {
+      if (trendingSort === s.id) return;
+      trendingSort = s.id;
+      for (const other of Array.from(sortToggle.children)) {
+        other.className = other === el ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+      }
+      trendingSection.reset();
+    });
+    sortToggle.appendChild(el);
+  }
+  trendingWrap.appendChild(sortToggle);
+
+  // Same exclusive saved-filter chip bar as New Releases above — "All matches"
+  // (the default) is plain unfiltered trending, exactly like before; picking a
+  // specific saved filter (or "Favorites") narrows Trending's own
+  // TRENDING-sorted query by that filter's tags/performers/studios/exclude_tags
+  // instead of switching to the windowed watched feed New Releases uses.
+  let selectedTrendingSource: string | undefined; // undefined = "All matches"
+  let watchedFilters: SavedFilter[] = [];
   const trendingChipBar = document.createElement("div");
   trendingChipBar.className = "flex gap-1.5 flex-wrap mb-3";
   trendingWrap.appendChild(trendingChipBar);
@@ -292,58 +329,79 @@ export function renderWatchedView(): HTMLElement {
   function renderTrendingChips() {
     trendingChipBar.innerHTML = "";
     trendingChipBar.appendChild(
-      renderChip("All Matches", activeTrendingFilters.size === 0, () => {
-        activeTrendingFilters.clear();
+      renderChip("All", selectedTrendingSource === undefined, () => {
+        selectedTrendingSource = undefined;
         renderTrendingChips();
         trendingSection.reset();
       }),
     );
-    for (const c of TRENDING_CHIPS) {
+    for (const f of watchedFilters) {
       trendingChipBar.appendChild(
-        renderChip(c.label, activeTrendingFilters.has(c.id), () => {
-          if (activeTrendingFilters.has(c.id)) activeTrendingFilters.delete(c.id);
-          else activeTrendingFilters.add(c.id);
+        renderChip(f.name, selectedTrendingSource === f.name, () => {
+          selectedTrendingSource = f.name;
           renderTrendingChips();
           trendingSection.reset();
         }),
       );
     }
+    trendingChipBar.appendChild(
+      renderChip("Favorites", selectedTrendingSource === "Favorites", () => {
+        selectedTrendingSource = "Favorites";
+        renderTrendingChips();
+        trendingSection.reset();
+      }),
+    );
   }
   renderTrendingChips();
 
   const TRENDING_LIMIT = 100;
-  const SHORT_MAX_SECONDS = 30 * 60;
 
   const trendingSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
     fetchPage: async (page, refresh) => {
-      const isNew = activeTrendingFilters.has("new");
+      const chosen = watchedFilters.find((f) => f.name === selectedTrendingSource);
+      const cf = chosen?.filter as Record<string, unknown> | undefined;
       const result = await api.queryScenes(
         {
-          sort: "TRENDING",
+          sort: trendingSort,
           direction: "DESC",
           page,
           per_page: SECTION_PER_PAGE,
-          favorites: activeTrendingFilters.has("favorited") ? "PERFORMER" : undefined,
-          max_duration: activeTrendingFilters.has("short") ? SHORT_MAX_SECONDS : undefined,
-          unadded: activeTrendingFilters.has("unadded") || isNew ? "1" : undefined,
-          // Same definition as the card's "New" badge: not yet in the library,
-          // released in the last 7 days.
-          date: isNew ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) : undefined,
-          date_modifier: isNew ? "GREATER_THAN" : undefined,
+          favorites: selectedTrendingSource === "Favorites" ? "PERFORMER" : undefined,
+          unadded: isInLibraryMode() ? undefined : "1",
+          tags: cf?.tags as string | undefined,
+          tags_modifier: cf?.tags_modifier as "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" | undefined,
+          exclude_tags: cf?.exclude_tags as string | undefined,
+          performers: cf?.performers as string | undefined,
+          studios: cf?.studios as string | undefined,
         },
         refresh,
       );
       return { ...result, count: Math.min(result.count, TRENDING_LIMIT), approximateCount: false };
     },
-    emptyMessage: "Nothing trending on StashDB right now.",
+    emptyMessage: "Nothing to show right now.",
   });
   trendingHeadingRow.appendChild(renderRefreshButton(() => trendingSection.refresh()));
   trendingWrap.appendChild(trendingSection.element);
 
-  container.appendChild(feedWrap);
-  container.appendChild(divider);
+  // Shared by both chip bars — one saved-filters lookup drives New Releases'
+  // exclusive source picker and Trending's, keyed the same way (watched-flagged
+  // filters + a synthetic "Favorites"/"Favorites" entry). No reload here: the
+  // default "All" selection's query never depends on watchedFilters (only a
+  // named-filter chip click does, and those chips don't exist to click until
+  // this resolves anyway) — reloading on arrival was a guaranteed-redundant
+  // re-fetch of what trendingSection's own initial load() already got.
+  api.listFilters().then((filters) => {
+    watchedFilters = filters.filter((f) => f.watched);
+    const names = watchedFilters.map((f) => f.name);
+    names.push("Favorites");
+    renderSourceChips(names);
+    renderTrendingChips();
+  });
+
   container.appendChild(trendingWrap);
+  container.appendChild(divider);
+  container.appendChild(feedWrap);
 
   return container;
 }
