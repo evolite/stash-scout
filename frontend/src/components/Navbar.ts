@@ -109,18 +109,30 @@ function setSfwMode(on: boolean): void {
 
 setSfwMode(isSfwMode());
 
+// Off by default — Feed/Trending hide scenes already in the library unless
+// this is switched on. Read by WatchedView.ts when building its queries.
+const IN_LIBRARY_KEY = "inLibraryMode";
+
+export function isInLibraryMode(): boolean {
+  return localStorage.getItem(IN_LIBRARY_KEY) === "1";
+}
+
+function setInLibraryMode(on: boolean): void {
+  localStorage.setItem(IN_LIBRARY_KEY, on ? "1" : "0");
+}
+
 const TRACK_BASE = "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-150";
 const THUMB_BASE = "inline-block h-4 w-4 rounded-full bg-white transition-transform duration-150";
 
-function renderSfwToggle(): HTMLButtonElement {
+function renderToggle(label: string, isOn: () => boolean, setOn: (on: boolean) => void, onChange?: () => void): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.setAttribute("role", "switch");
   btn.className = "flex items-center gap-2 text-xs text-text-faint hover:text-muted transition-colors duration-150";
 
-  const label = document.createElement("span");
-  label.textContent = "SFW Mode";
-  btn.appendChild(label);
+  const labelEl = document.createElement("span");
+  labelEl.textContent = label;
+  btn.appendChild(labelEl);
 
   const track = document.createElement("span");
   const thumb = document.createElement("span");
@@ -128,20 +140,25 @@ function renderSfwToggle(): HTMLButtonElement {
   btn.appendChild(track);
 
   const apply = () => {
-    const on = isSfwMode();
+    const on = isOn();
     track.className = TRACK_BASE + " border" + (on ? " bg-accent border-accent" : " bg-white/5 border-line");
     thumb.className = THUMB_BASE + (on ? " translate-x-4" : " translate-x-0 bg-text-faint");
     btn.setAttribute("aria-checked", String(on));
   };
   btn.addEventListener("click", () => {
-    setSfwMode(!isSfwMode());
+    setOn(!isOn());
     apply();
+    onChange?.();
   });
   apply();
   return btn;
 }
 
-export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void): HTMLElement {
+// onLibraryToggle: the app's simple full-rerender-on-change model (see
+// main.ts's setTab) doesn't otherwise reach the "In Library" state into
+// WatchedView's already-mounted sections — clicking the toggle re-renders the
+// whole app so Feed/Trending re-fetch with the new setting immediately.
+export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibraryToggle: () => void): HTMLElement {
   const nav = document.createElement("nav");
   nav.className = "flex items-center justify-between bg-navbar px-6 h-14";
 
@@ -159,7 +176,8 @@ export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void): HTMLEle
 
   const right = document.createElement("div");
   right.className = "flex items-center gap-4 h-full";
-  right.appendChild(renderSfwToggle());
+  right.appendChild(renderToggle("In Library", isInLibraryMode, setInLibraryMode, onLibraryToggle));
+  right.appendChild(renderToggle("SFW Mode", isSfwMode, setSfwMode));
   right.appendChild(renderSettingsTab(active, onSelect));
   nav.appendChild(right);
 

@@ -124,7 +124,8 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const window = String(q.window ?? "week");
       const refresh = q.refresh === "1" || q.refresh === "true";
       const source = typeof q.source === "string" ? q.source : undefined;
-      const result = await getWatchedFeed({ stashdb, cfg, localStash, whisparr }, { window, page, perPage, refresh, source });
+      const unadded = q.unadded !== "0";
+      const result = await getWatchedFeed({ stashdb, cfg, localStash, whisparr }, { window, page, perPage, refresh, source, unadded });
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

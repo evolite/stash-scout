@@ -1,4 +1,5 @@
 import { api, type StatsSummary } from "../api.js";
+import { iconRefresh } from "../icons.js";
 
 const TILE = "bg-surface rounded-lg p-3.5 flex flex-col gap-1";
 const TILE_VALUE = "text-2xl font-bold";
@@ -21,9 +22,9 @@ function tile(label: string, value: number): HTMLElement {
 function renderRefreshButton(onClick: () => void): HTMLElement {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "text-muted hover:text-link text-sm";
+  btn.className = "flex items-center justify-center text-muted hover:text-link";
   btn.title = "Refresh";
-  btn.textContent = "↻";
+  btn.appendChild(iconRefresh());
   btn.addEventListener("click", onClick);
   return btn;
 }

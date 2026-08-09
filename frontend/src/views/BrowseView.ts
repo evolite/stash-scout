@@ -1,7 +1,7 @@
 import { api, type SavedFilter, type Scene, type SceneFilter, type SceneStatus } from "../api.js";
 import { renderFilterSidebar } from "../components/FilterSidebar.js";
 import { renderSavedFiltersPanel } from "../components/SavedFiltersPanel.js";
-import { renderSceneCard } from "../components/SceneCard.js";
+import { renderSceneCard, hidePreview } from "../components/SceneCard.js";
 import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
 import { renderExcludeTagsPanel } from "../components/ExcludeTagsPanel.js";
@@ -114,10 +114,7 @@ export function renderBrowseView(): HTMLElement {
     renderSidebar();
   }
 
-  async function refreshStatuses(scenes: Scene[]) {
-    statuses = await api.sceneStatuses(scenes.map((s) => s.id));
-    renderGrid(scenes);
-
+  function schedulePollingIfDownloading(scenes: Scene[]) {
     clearInterval(pollTimer);
     const anyDownloading = Object.values(statuses).some((s) => s.kind === "downloading");
     if (anyDownloading) {
@@ -125,13 +122,31 @@ export function renderBrowseView(): HTMLElement {
     }
   }
 
+  async function refreshStatuses(scenes: Scene[]) {
+    statuses = await api.sceneStatuses(scenes.map((s) => s.id));
+    renderGrid(scenes);
+    schedulePollingIfDownloading(scenes);
+  }
+
+  // A card action only needs its own scene's status re-checked, not every
+  // visible card's — re-running the full batch on every click was fanning out
+  // to up to 2 sequential local Stash lookups per scene on the whole page.
+  async function refreshOneStatus(id: string, scenes: Scene[]) {
+    const result = await api.sceneStatuses([id]);
+    statuses = { ...statuses, ...result };
+    renderGrid(scenes);
+    schedulePollingIfDownloading(scenes);
+  }
+
   function renderGrid(scenes: Scene[]) {
     const grid = contentCol.querySelector(".SceneGrid");
     if (!grid) return;
+    hidePreview();
     grid.innerHTML = "";
     for (const scene of scenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshStatuses(scenes), () => {
+      const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id, scenes), () => {
         scenes.splice(scenes.indexOf(scene), 1);
+        hidePreview();
         card.remove();
       });
       grid.appendChild(card);
@@ -150,6 +165,7 @@ export function renderBrowseView(): HTMLElement {
 
   async function load() {
     clearInterval(pollTimer);
+    hidePreview();
     contentCol.innerHTML = "";
     contentCol.appendChild(renderSkeletonGrid());
     try {

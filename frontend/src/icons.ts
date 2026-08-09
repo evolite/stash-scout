@@ -34,6 +34,10 @@ export function iconCheckCircle(): SVGSVGElement {
   return svg(["M6 10l2.5 2.5L14 7", "M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"], "0 0 20 20", 32);
 }
 
+export function iconRefresh(): SVGSVGElement {
+  return svg(["M23 4v6h-6", "M20.49 15a9 9 0 1 1-2.12-9.36L23 10"], "0 0 24 24", 12);
+}
+
 export function iconPlay(): SVGSVGElement {
   const el = document.createElementNS(NS, "svg");
   el.setAttribute("viewBox", "0 0 16 16");

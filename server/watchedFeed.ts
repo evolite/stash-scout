@@ -27,7 +27,7 @@ export function getIgnoredIds(): Set<string> {
 // deduped, unadded-only" result, just rendered differently.
 export async function getWatchedFeed(
   deps: { stashdb: StashDBClient; cfg: AppConfig; localStash: LocalStashClient; whisparr: WhisparrClient },
-  opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string },
+  opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean },
 ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
   const { stashdb, cfg, localStash, whisparr } = deps;
   const { page, perPage, refresh = false } = opts;
@@ -83,6 +83,6 @@ export async function getWatchedFeed(
     },
     page,
     perPage,
-    { requireUnadded: true },
+    { requireUnadded: opts.unadded !== false },
   );
 }

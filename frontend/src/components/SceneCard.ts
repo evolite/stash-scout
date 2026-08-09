@@ -46,16 +46,79 @@ function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; cl
   }
 }
 
-function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip" | undefined, onClick: (e: MouseEvent) => void): HTMLButtonElement {
+// One shared floating preview (not one per card) — only ever one hover at a
+// time, and appending to <body> lets it escape the grid's overflow/stacking
+// instead of getting clipped by each card. Large and centered — a proper
+// look at the image, not a small thumbnail-sized peek — with a dimmed
+// backdrop so it reads clearly over whatever grid is behind it.
+const PREVIEW_DELAY_MS = 1000;
+let previewEl: HTMLDivElement | null = null;
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Exported so callers can clear a stray floating preview before an action
+// tears down the card that's showing it — the mouse never leaves in that case
+// (the node is just removed/replaced from under the cursor), so mouseleave
+// never fires and the preview would otherwise stay stuck on screen until the
+// next unrelated hover or scroll.
+export function hidePreview(): void {
+  clearTimeout(previewTimer);
+  previewEl?.remove();
+  previewEl = null;
+  window.removeEventListener("scroll", hidePreview, true);
+}
+
+function showPreview(url: string): void {
+  const el = document.createElement("div");
+  el.className = "fixed inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/60";
+  const img = document.createElement("img");
+  img.src = url;
+  img.className = "block rounded shadow-card object-contain";
+  img.style.maxWidth = "90vw";
+  img.style.maxHeight = "90vh";
+  el.appendChild(img);
+  document.body.appendChild(el);
+  previewEl = el;
+
+  window.addEventListener("scroll", hidePreview, true);
+}
+
+// excludeEl (the hover-actions button row, when present) sits inside
+// imageWrap, so moving onto it doesn't fire imageWrap's own mouseleave —
+// without this, hovering the Add/Skip buttons still counted as hovering the
+// image and the preview would pop up (or stay showing) right over them.
+function attachHoverPreview(imageWrap: HTMLElement, url: string, excludeEl?: HTMLElement): void {
+  function arm() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => showPreview(url), PREVIEW_DELAY_MS);
+  }
+  imageWrap.addEventListener("mouseenter", arm);
+  imageWrap.addEventListener("mouseleave", hidePreview);
+  if (excludeEl) {
+    excludeEl.addEventListener("mouseenter", () => {
+      clearTimeout(previewTimer);
+      hidePreview();
+    });
+    excludeEl.addEventListener("mouseleave", arm);
+  }
+}
+
+// Disables the button and spins its icon for the duration of onClick — the
+// button (and its spinner) normally gets torn down almost immediately anyway
+// once onStatusChange/onRemove re-renders the card, but this is what's
+// actually visible while an Add/Monitor click is in flight instead of nothing.
+function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip" | undefined, onClick: () => void | Promise<void>): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.title = title;
   if (variant) btn.classList.add(`action-${variant}`);
   btn.appendChild(icon);
-  btn.addEventListener("click", (e) => {
+  btn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    onClick(e);
+    hidePreview();
+    btn.disabled = true;
+    icon.classList.add("animate-spin");
+    await onClick();
   });
   return btn;
 }
@@ -71,20 +134,22 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
   const buttons: HTMLButtonElement[] = [];
 
   if (status.kind === "in-stash") {
-    buttons.push(hoverButton("Play in local Stash", iconPlay(), undefined, () => window.open(status.localUrl, "_blank")));
+    buttons.push(
+      hoverButton("Play in local Stash", iconPlay(), undefined, () => {
+        window.open(status.localUrl, "_blank");
+      }),
+    );
   } else {
     if (status.kind === "not-added" && status.whisparrConfigured) {
       buttons.push(
-        hoverButton("Add Scene", iconPlus(), "add", async (e) => {
-          (e.currentTarget as HTMLButtonElement).disabled = true;
+        hoverButton("Add Scene", iconPlus(), "add", async () => {
           await api.addToWhisparr(s.id);
           onStatusChange();
         }),
       );
     } else if (status.kind === "previously-added") {
       buttons.push(
-        hoverButton("Re-enable monitoring", iconPlus(), "add", async (e) => {
-          (e.currentTarget as HTMLButtonElement).disabled = true;
+        hoverButton("Re-enable monitoring", iconPlus(), "add", async () => {
           await api.setMonitored(status.movieId, true);
           onStatusChange();
         }),
@@ -93,16 +158,14 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
 
     if (status.kind === "monitored") {
       buttons.push(
-        hoverButton("Unmonitor", iconMinus(), "skip", async (e) => {
-          (e.currentTarget as HTMLButtonElement).disabled = true;
+        hoverButton("Unmonitor", iconMinus(), "skip", async () => {
           await api.setMonitored(status.movieId, false);
           onStatusChange();
         }),
       );
     } else if (status.kind === "not-added" || status.kind === "previously-added") {
       buttons.push(
-        hoverButton("Skip — permanently dismiss this scene", iconMinus(), "skip", async (e) => {
-          (e.currentTarget as HTMLButtonElement).disabled = true;
+        hoverButton("Skip — permanently dismiss this scene", iconMinus(), "skip", async () => {
           await api.ignoreScene(s.id);
           onRemove();
         }),
@@ -133,6 +196,7 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   imageWrap.className = "relative block aspect-video bg-navbar";
   imageWrap.href = `https://stashdb.org/scenes/${s.id}`;
   imageWrap.target = "_blank";
+  const hover = renderHoverActions(s, status, onStatusChange, onRemove);
   const image = s.images[0];
   if (image) {
     const img = document.createElement("img");
@@ -140,6 +204,7 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
     img.src = image.url;
     img.alt = "";
     imageWrap.appendChild(img);
+    attachHoverPreview(imageWrap, image.url, hover);
   } else {
     imageWrap.style.background = placeholderShade(s.id);
   }
@@ -149,7 +214,6 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
     duration.textContent = formatDuration(s.duration);
     imageWrap.appendChild(duration);
   }
-  const hover = renderHoverActions(s, status, onStatusChange, onRemove);
   if (hover) imageWrap.appendChild(hover);
   card.appendChild(imageWrap);
 
