@@ -23,7 +23,7 @@ function formatDuration(seconds: number | null): string {
 const PLACEHOLDER_SHADES = ["#2A2D33", "#26292E", "#2E3138"];
 function placeholderShade(id: string): string {
   let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  for (let i = 0; i < id.length; i++) hash = Math.trunc(hash * 31 + id.codePointAt(i)!);
   return PLACEHOLDER_SHADES[Math.abs(hash) % PLACEHOLDER_SHADES.length];
 }
 

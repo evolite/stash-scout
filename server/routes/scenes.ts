@@ -154,7 +154,7 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const q = req.query as Record<string, unknown>;
       const page = q.page ? Number(q.page) : 1;
       const perPage = q.per_page ? Number(q.per_page) : 25;
-      const window = String(q.window ?? "week");
+      const window = typeof q.window === "string" ? q.window : "week";
       const refresh = q.refresh === "1" || q.refresh === "true";
       const source = typeof q.source === "string" ? q.source : undefined;
       const unadded = q.unadded !== "0";

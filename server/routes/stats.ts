@@ -23,6 +23,20 @@ function classifyMovies(movies: WhisparrScene[], queue: WhisparrQueueItem[]) {
   return { monitored, downloading, previouslyAdded };
 }
 
+// Bytes-weighted so a mostly-done large file counts more than a barely-started
+// small one; null when Whisparr hasn't reported sizes yet (item just queued).
+function aggregateDownloadProgress(queue: WhisparrQueueItem[]): number | null {
+  let totalSize = 0;
+  let totalRemaining = 0;
+  for (const q of queue) {
+    if (!q.size) continue;
+    totalSize += q.size;
+    totalRemaining += q.sizeleft ?? 0;
+  }
+  if (totalSize === 0) return null;
+  return Math.round(((totalSize - totalRemaining) / totalSize) * 100);
+}
+
 // Dense day-by-day series (zero-filled) over the trailing TIMELINE_DAYS window,
 // so the chart shows gaps instead of only the days something was added.
 function buildTimeline(movies: WhisparrScene[]): StatsSummary["timeline"] {
@@ -50,11 +64,13 @@ export function statsRouter(cfg: AppConfig, whisparr: WhisparrClient) {
     try {
       let counts = { monitored: 0, downloading: 0, previouslyAdded: 0 };
       let timeline: StatsSummary["timeline"] = [];
+      let downloadProgress: number | null = null;
 
       if (isWhisparrConfigured(cfg)) {
         const { movies, queue } = await whisparr.getBulkStatusSource();
         counts = classifyMovies(movies, queue);
         timeline = buildTimeline(movies);
+        downloadProgress = aggregateDownloadProgress(queue);
       }
 
       const ignoredCount = (db.prepare("SELECT COUNT(*) as c FROM ignored_scenes").get() as { c: number }).c;
@@ -65,6 +81,7 @@ export function statsRouter(cfg: AppConfig, whisparr: WhisparrClient) {
 
       const summary: StatsSummary = {
         ...counts,
+        downloadProgress,
         ignoredCount,
         savedFiltersCount: filterCounts.total,
         watchedFiltersCount: filterCounts.watched ?? 0,

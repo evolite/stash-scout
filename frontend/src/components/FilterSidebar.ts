@@ -233,7 +233,7 @@ export function renderFilterSidebar(
   const saveBtn = document.createElement("button");
   saveBtn.className = "bg-secondary text-white rounded px-3 py-1.5 hover:bg-surface-hover shrink-0 whitespace-nowrap";
   saveBtn.textContent = "Save";
-  saveBtn.title = "Save as a new preset, or overwrite the loaded one if you didn't change the name";
+  saveBtn.title = "Saves as a new preset, unless a preset with this exact name already exists — then it's overwritten";
   saveBtn.addEventListener("click", () => {
     const name = nameInput.value.trim();
     if (!name) return;

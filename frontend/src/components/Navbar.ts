@@ -1,3 +1,5 @@
+import { api } from "../api.js";
+
 export type Tab = "browse" | "watched" | "stats" | "settings";
 
 const LEFT_TABS: { id: Tab; label: string }[] = [
@@ -121,6 +123,66 @@ function setInLibraryMode(on: boolean): void {
   localStorage.setItem(IN_LIBRARY_KEY, on ? "1" : "0");
 }
 
+// Only shown once we know there's something to report — a "0" badge on
+// every page is noise; the full breakdown already lives in StatsView.
+const DOWNLOADING_BADGE_CLASS = "js-downloading-badge";
+const DOWNLOADING_POLL_MS = 20_000;
+
+async function refreshDownloadingBadges(): Promise<void> {
+  const badges = document.querySelectorAll<HTMLElement>(`.${DOWNLOADING_BADGE_CLASS}`);
+  if (badges.length === 0) return;
+  try {
+    const stats = await api.stats();
+    for (const badge of badges) {
+      const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
+      const fill = badge.querySelector<HTMLElement>(".js-dl-fill")!;
+      if (stats.downloading > 0) {
+        label.textContent = `${stats.downloading} downloading`;
+        fill.style.width = `${stats.downloadProgress ?? 0}%`;
+        badge.classList.remove("hidden");
+        badge.classList.add("flex");
+      } else {
+        badge.classList.add("hidden");
+        badge.classList.remove("flex");
+      }
+    }
+  } catch {
+    // leave badges as-is on a failed refresh
+  }
+}
+
+// main.ts fully re-renders the navbar (root.innerHTML = "") on every tab
+// switch, so this interval is started once at module load — rather than per
+// render — and drives whichever badge element is currently mounted via the
+// shared class selector above, instead of leaking a new timer per switch.
+setInterval(refreshDownloadingBadges, DOWNLOADING_POLL_MS);
+
+function renderDownloadingBadge(): HTMLElement {
+  const badge = document.createElement("span");
+  badge.className = `hidden ${DOWNLOADING_BADGE_CLASS} flex-col justify-center gap-1 h-8 px-3 rounded text-xs font-medium bg-surface-2 text-text-faint`;
+
+  const row = document.createElement("span");
+  row.className = "flex items-center gap-1.5";
+  const dot = document.createElement("span");
+  dot.className = "h-1.5 w-1.5 rounded-full bg-accent animate-pulse";
+  const label = document.createElement("span");
+  label.className = "js-dl-label";
+  row.appendChild(dot);
+  row.appendChild(label);
+  badge.appendChild(row);
+
+  const track = document.createElement("span");
+  track.className = "block h-1 w-full rounded-full bg-white/10 overflow-hidden";
+  const fill = document.createElement("span");
+  fill.className = "js-dl-fill block h-full rounded-full bg-accent transition-[width] duration-500";
+  fill.style.width = "0%";
+  track.appendChild(fill);
+  badge.appendChild(track);
+
+  refreshDownloadingBadges();
+  return badge;
+}
+
 const TRACK_BASE = "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-150";
 const THUMB_BASE = "inline-block h-4 w-4 rounded-full bg-white transition-transform duration-150";
 
@@ -176,6 +238,7 @@ export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibrar
 
   const right = document.createElement("div");
   right.className = "flex items-center gap-4 h-full";
+  right.appendChild(renderDownloadingBadge());
   right.appendChild(renderToggle("In Library", isInLibraryMode, setInLibraryMode, onLibraryToggle));
   right.appendChild(renderToggle("SFW Mode", isSfwMode, setSfwMode));
   right.appendChild(renderSettingsTab(active, onSelect));

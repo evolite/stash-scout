@@ -11,12 +11,21 @@ function statusPill(ok: boolean | null): HTMLElement {
   return pill;
 }
 
+function statusKind(ok: boolean | null): "unknown" | "connected" | "offline" {
+  if (ok === null) return "unknown";
+  return ok ? "connected" : "offline";
+}
+
 function setStatusPill(pill: HTMLElement, ok: boolean | null): void {
   const dot = pill.children[0] as HTMLElement;
   const label = pill.children[1] as HTMLElement;
-  dot.className = "inline-block w-[7px] h-[7px] rounded-full shrink-0 " + (ok === null ? "bg-text-faint" : ok ? "bg-success" : "bg-danger");
-  label.className = ok === null ? "text-text-faint" : ok ? "text-success" : "text-danger";
-  label.textContent = ok === null ? "Unknown" : ok ? "Connected" : "Offline";
+  const kind = statusKind(ok);
+  const dotColor = { unknown: "bg-text-faint", connected: "bg-success", offline: "bg-danger" }[kind];
+  const textColor = { unknown: "text-text-faint", connected: "text-success", offline: "text-danger" }[kind];
+  const text = { unknown: "Unknown", connected: "Connected", offline: "Offline" }[kind];
+  dot.className = `inline-block w-[7px] h-[7px] rounded-full shrink-0 ${dotColor}`;
+  label.className = textColor;
+  label.textContent = text;
 }
 
 const SECRET_HINT = "Encrypted at rest and never sent back to the browser. Leave blank to keep the current value.";
@@ -154,7 +163,7 @@ export function renderSettingsView(): HTMLElement {
     loadOptionsBtn.addEventListener("click", async () => {
       try {
         const options = await api.whisparrOptions();
-        rootFolderRow.replaceChild(rootFolderSelect, rootFolderManual);
+        rootFolderManual.replaceWith(rootFolderSelect);
         rootFolderSelect.innerHTML = "";
         for (const rf of options.rootFolders) {
           const opt = document.createElement("option");
@@ -171,7 +180,7 @@ export function renderSettingsView(): HTMLElement {
           if (qp.id === cfg.whisparrQualityProfileId) opt.selected = true;
           qualitySelect.appendChild(opt);
         }
-        qualityRow.replaceChild(qualitySelect, qualityManual);
+        qualityManual.replaceWith(qualitySelect);
         rootFolderSelect.addEventListener("change", markDirty);
         qualitySelect.addEventListener("change", markDirty);
         markDirty();
@@ -240,7 +249,10 @@ export function renderSettingsView(): HTMLElement {
       setStatusPill(stashS.pill, t.localStash);
       setStatusPill(whisparrS.pill, t.whisparr);
       stashS.note.textContent = s.localStashConfigured ? "" : "not configured";
-      whisparrS.note.textContent = !s.whisparrConfigured ? "not configured" : !s.whisparrFullyConfigured ? "missing root folder / quality profile" : "";
+      let whisparrNote = "";
+      if (!s.whisparrConfigured) whisparrNote = "not configured";
+      else if (!s.whisparrFullyConfigured) whisparrNote = "missing root folder / quality profile";
+      whisparrS.note.textContent = whisparrNote;
     });
   }
 

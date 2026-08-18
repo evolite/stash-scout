@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import type { AppConfig } from "./config.js";
 import type { Scene } from "../shared/types.js";
 import { capMap } from "./cacheUtil.js";
@@ -7,11 +8,13 @@ import { capMap } from "./cacheUtil.js";
 // so "include these AND exclude those" needs two requests intersected client-side.
 // v1 exposes a single tags criterion (one modifier at a time) to match what the API
 // actually supports in one call; combined include+exclude is a documented v2 gap.
+type SetModifier = "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES";
+
 export interface SceneQueryInput {
   text?: string;
-  tags?: { value: string[]; modifier: "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" };
-  performers?: { value: string[]; modifier: "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" };
-  studios?: { value: string[]; modifier: "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" };
+  tags?: { value: string[]; modifier: SetModifier };
+  performers?: { value: string[]; modifier: SetModifier };
+  studios?: { value: string[]; modifier: SetModifier };
   date?: { value: string; modifier: "EQUALS" | "GREATER_THAN" | "LESS_THAN" };
   favorites?: "PERFORMER" | "STUDIO" | "ALL";
   page: number;
@@ -148,13 +151,13 @@ const mergedFeedCache = new Map<string, MergedFeedEntry>();
 // Fisher-Yates, in place.
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(0, i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
 }
 
 export class StashDBClient {
-  constructor(private cfg: AppConfig) {}
+  constructor(private readonly cfg: AppConfig) {}
 
   async queryScenes(input: Partial<SceneQueryInput>, bypassCache = false): Promise<{ count: number; scenes: Scene[] }> {
     const variables = {
@@ -198,7 +201,7 @@ export class StashDBClient {
     const page = input.page ?? 1;
     const skip = (page - 1) * perPage;
 
-    const key = JSON.stringify({ ...input, page: undefined, per_page: undefined, excludeTagIds: [...excludeTagIds].sort() });
+    const key = JSON.stringify({ ...input, page: undefined, per_page: undefined, excludeTagIds: [...excludeTagIds].sort((a, b) => a.localeCompare(b)) });
     if (bypassCache) excludeCache.delete(key);
     let entry = excludeCache.get(key);
     if (!entry || Date.now() - entry.at > EXCLUDE_CACHE_TTL_MS) {
@@ -248,7 +251,8 @@ export class StashDBClient {
   // order, which is exact and cheap.
   private randomWindow(): { start: string; end: string } {
     const latestStart = Date.now() - RANDOM_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    const startMs = RANDOM_WINDOW_RANGE_START + Math.random() * Math.max(0, latestStart - RANDOM_WINDOW_RANGE_START);
+    const span = Math.max(0, latestStart - RANDOM_WINDOW_RANGE_START);
+    const startMs = RANDOM_WINDOW_RANGE_START + (span > 0 ? randomInt(0, span) : 0);
     const start = new Date(startMs).toISOString().slice(0, 10);
     const end = new Date(startMs + RANDOM_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     return { start, end };
@@ -266,7 +270,7 @@ export class StashDBClient {
     // date/sort/direction are ours to set — a saved filter's own date
     // criterion (if any) would defeat the point of a random window.
     const { date: _date, sort: _sort, direction: _direction, page: _page, per_page: _perPage, ...baseInput } = input;
-    const key = JSON.stringify({ ...baseInput, excludeTagIds: [...excludeTagIds].sort() });
+    const key = JSON.stringify({ ...baseInput, excludeTagIds: [...excludeTagIds].sort((a, b) => a.localeCompare(b)) });
     if (opts.reset || opts.bypassCache) randomWindowCache.delete(key);
     let entry = randomWindowCache.get(key);
     if (!entry || Date.now() - entry.at > RANDOM_WINDOW_TTL_MS) {
@@ -278,30 +282,7 @@ export class StashDBClient {
     const excludeSet = new Set(excludeTagIds);
 
     while (entry.scenes.length < skip + perPage && !entry.exhausted && entry.scenes.length < MAX_CACHED_SCENES) {
-      const { scenes } = await this.queryScenes(
-        {
-          ...baseInput,
-          date: { value: entry.start, modifier: "GREATER_THAN" },
-          sort: "DATE",
-          direction: "ASC",
-          page: entry.internalPage,
-          per_page: MAX_PER_PAGE,
-        },
-        opts.bypassCache,
-      );
-      let pastEnd = false;
-      for (const scene of scenes) {
-        if (scene.release_date && scene.release_date > entry.end) {
-          pastEnd = true;
-          break;
-        }
-        if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
-      }
-      if (pastEnd || scenes.length < MAX_PER_PAGE) {
-        entry.exhausted = true;
-      } else {
-        entry.internalPage++;
-      }
+      await this.advanceRandomWindowEntry(entry, baseInput, excludeSet, opts.bypassCache);
     }
 
     return {
@@ -309,6 +290,35 @@ export class StashDBClient {
       scenes: entry.scenes.slice(skip, skip + perPage),
       approximateCount: !entry.exhausted,
     };
+  }
+
+  private async advanceRandomWindowEntry(
+    entry: RandomWindowEntry,
+    baseInput: Partial<SceneQueryInput>,
+    excludeSet: Set<string>,
+    bypassCache?: boolean,
+  ): Promise<void> {
+    const { scenes } = await this.queryScenes(
+      {
+        ...baseInput,
+        date: { value: entry.start, modifier: "GREATER_THAN" },
+        sort: "DATE",
+        direction: "ASC",
+        page: entry.internalPage,
+        per_page: MAX_PER_PAGE,
+      },
+      bypassCache,
+    );
+    let pastEnd = false;
+    for (const scene of scenes) {
+      if (scene.release_date && scene.release_date > entry.end) {
+        pastEnd = true;
+        break;
+      }
+      if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
+    }
+    entry.exhausted = pastEnd || scenes.length < MAX_PER_PAGE;
+    if (!entry.exhausted) entry.internalPage++;
   }
 
   // Merges several saved filters (the Watched feed) into one paginated, deduped
@@ -352,27 +362,7 @@ export class StashDBClient {
     let round = 0;
     while (visible().length < skip + perPage && !entry.exhaustedAll && entry.merged.length < MAX_CACHED_SCENES && round < MAX_MERGE_ROUNDS) {
       for (let i = 0; i < sources.length; i++) {
-        const cursor = entry.cursors[i];
-        if (cursor.exhausted) continue;
-        const src = sources[i];
-        // Always fetch in fast, indexed DATE order — StashDB's random sort is a
-        // slow full-table shuffle at this scale. For `randomize`, shuffle each
-        // freshly-fetched batch before appending instead: already-appended scenes
-        // keep their position (so pages already served stay stable), but new
-        // arrivals land in a randomized spot rather than strict date order.
-        const { scenes } = await this.queryScenes({ ...src.input, page: cursor.internalPage, per_page: MAX_PER_PAGE }, opts.bypassCache);
-        const excludeSet = new Set(src.excludeTagIds);
-        const fresh: Scene[] = [];
-        for (const scene of scenes) {
-          if (entry.seen.has(scene.id) || scene.tags.some((t) => excludeSet.has(t.id))) continue;
-          entry.seen.add(scene.id);
-          scene.sourceLabel = src.label;
-          fresh.push(scene);
-        }
-        if (opts.randomize) shuffle(fresh);
-        entry.merged.push(...fresh);
-        if (scenes.length < MAX_PER_PAGE) cursor.exhausted = true;
-        else cursor.internalPage++;
+        await this.advanceMergedFeedSource(entry, sources[i], entry.cursors[i], opts);
       }
       entry.exhaustedAll = entry.cursors.every((c) => c.exhausted);
       round++;
@@ -384,6 +374,33 @@ export class StashDBClient {
       scenes: visibleScenes.slice(skip, skip + perPage),
       approximateCount: !entry.exhaustedAll,
     };
+  }
+
+  // Always fetches in fast, indexed DATE order — StashDB's random sort is a
+  // slow full-table shuffle at this scale. For `randomize`, shuffles each
+  // freshly-fetched batch before appending instead: already-appended scenes
+  // keep their position (so pages already served stay stable), but new
+  // arrivals land in a randomized spot rather than strict date order.
+  private async advanceMergedFeedSource(
+    entry: MergedFeedEntry,
+    src: { input: Partial<SceneQueryInput>; excludeTagIds: string[]; label: string },
+    cursor: { internalPage: number; exhausted: boolean },
+    opts: { randomize?: boolean; bypassCache?: boolean },
+  ): Promise<void> {
+    if (cursor.exhausted) return;
+    const { scenes } = await this.queryScenes({ ...src.input, page: cursor.internalPage, per_page: MAX_PER_PAGE }, opts.bypassCache);
+    const excludeSet = new Set(src.excludeTagIds);
+    const fresh: Scene[] = [];
+    for (const scene of scenes) {
+      if (entry.seen.has(scene.id) || scene.tags.some((t) => excludeSet.has(t.id))) continue;
+      entry.seen.add(scene.id);
+      scene.sourceLabel = src.label;
+      fresh.push(scene);
+    }
+    if (opts.randomize) shuffle(fresh);
+    entry.merged.push(...fresh);
+    if (scenes.length < MAX_PER_PAGE) cursor.exhausted = true;
+    else cursor.internalPage++;
   }
 
   private async search(queryName: string, text: string): Promise<{ id: string; name: string }[]> {

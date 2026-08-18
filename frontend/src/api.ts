@@ -21,33 +21,8 @@ export interface SceneFilter {
 
 export type SavedFilter = BaseSavedFilter<SceneFilter>;
 
-const SECRET_STORAGE_KEY = "stashScoutSecret";
-
-// Concurrent 401s (a page load fires several requests at once) share one
-// prompt instead of stacking a browser dialog per request.
-let pendingPrompt: Promise<string | null> | null = null;
-function promptForSecret(): Promise<string | null> {
-  if (!pendingPrompt) {
-    pendingPrompt = Promise.resolve(window.prompt("Stash Scout app secret (see server startup log):")).finally(() => {
-      pendingPrompt = null;
-    });
-  }
-  return pendingPrompt;
-}
-
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
-  const stored = localStorage.getItem(SECRET_STORAGE_KEY);
-  if (stored) headers.set("x-app-secret", stored);
-
-  let res = await fetch(path, { ...init, headers });
-  if (res.status === 401) {
-    const entered = await promptForSecret();
-    if (!entered) throw new Error(`${path} failed: HTTP 401`);
-    localStorage.setItem(SECRET_STORAGE_KEY, entered);
-    headers.set("x-app-secret", entered);
-    res = await fetch(path, { ...init, headers });
-  }
+  const res = await fetch(path, init);
   if (!res.ok) throw new Error(`${path} failed: HTTP ${res.status}`);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -68,10 +43,12 @@ export const api = {
   // always picks its own random ~2-month window.
   randomScenes: (filter: SceneFilter, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes/random?${qs(filter)}${refresh ? "&refresh=1" : ""}`),
-  watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, showInLibrary = false, refresh = false) =>
-    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(
-      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${source ? `&source=${encodeURIComponent(source)}` : ""}${showInLibrary ? "&unadded=0" : ""}${refresh ? "&refresh=1" : ""}`,
-    ),
+  watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, showInLibrary = false, refresh = false) => {
+    const sourceParam = source ? `&source=${encodeURIComponent(source)}` : "";
+    return req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(
+      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${sourceParam}${showInLibrary ? "&unadded=0" : ""}${refresh ? "&refresh=1" : ""}`,
+    );
+  },
   searchTags: (term: string) => req<{ id: string; name: string }[]>(`/api/tags/search?term=${encodeURIComponent(term)}`),
   tagsByIds: (ids: string[]) => (ids.length ? req<{ id: string; name: string }[]>(`/api/tags/byIds?ids=${ids.join(",")}`) : Promise.resolve([])),
   searchPerformers: (term: string) => req<{ id: string; name: string }[]>(`/api/performers/search?term=${encodeURIComponent(term)}`),
@@ -102,12 +79,6 @@ export const api = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ watched }),
-    }),
-  renameFilter: (id: string, name: string) =>
-    req<SavedFilter>(`/api/filters/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
     }),
   overwriteFilter: (id: string, filter: SceneFilter) =>
     req<SavedFilter>(`/api/filters/${id}`, {

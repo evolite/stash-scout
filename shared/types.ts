@@ -49,6 +49,9 @@ export interface IgnoredScene {
 export interface StatsSummary {
   monitored: number;
   downloading: number;
+  // Aggregate percent complete (0-100) across all queued items, by bytes;
+  // null when nothing is downloading or Whisparr didn't report sizes.
+  downloadProgress: number | null;
   previouslyAdded: number;
   ignoredCount: number;
   savedFiltersCount: number;

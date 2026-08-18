@@ -43,7 +43,7 @@ const sceneIdCache = new Map<string, { at: number; promise: Promise<string | nul
 // Ported from StashSeer's getLocalStashSceneIdByStashId: try URL match first,
 // then fall back to the stash_id_endpoint filter (StashSeer, stashseer.js ~1710-1786).
 export class LocalStashClient {
-  constructor(private cfg: AppConfig) {}
+  constructor(private readonly cfg: AppConfig) {}
 
   findSceneIdByStashId(stashId: string): Promise<string | null> {
     const cached = sceneIdCache.get(stashId);

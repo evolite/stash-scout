@@ -5,12 +5,12 @@ const TILE = "bg-surface rounded-lg p-3.5 flex flex-col gap-1";
 const TILE_VALUE = "text-2xl font-bold";
 const TILE_LABEL = "text-xs text-muted";
 
-function tile(label: string, value: number): HTMLElement {
+function tile(label: string, value: number, suffix?: string): HTMLElement {
   const el = document.createElement("div");
   el.className = TILE;
   const v = document.createElement("div");
   v.className = TILE_VALUE;
-  v.textContent = String(value);
+  v.textContent = suffix ? `${value} (${suffix})` : String(value);
   const l = document.createElement("div");
   l.className = TILE_LABEL;
   l.textContent = label;
@@ -150,7 +150,9 @@ export function renderStatsView(): HTMLElement {
     const grid = document.createElement("div");
     grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]";
     grid.appendChild(tile("Monitored", stats.monitored));
-    grid.appendChild(tile("Downloading", stats.downloading));
+    grid.appendChild(
+      tile("Downloading", stats.downloading, stats.downloadProgress != null ? `${stats.downloadProgress}%` : undefined),
+    );
     grid.appendChild(tile("Previously Added", stats.previouslyAdded));
     grid.appendChild(tile("Ignored", stats.ignoredCount));
     grid.appendChild(tile("Saved Filters", stats.savedFiltersCount));

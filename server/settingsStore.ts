@@ -29,7 +29,7 @@ function writeSettings(settings: StoredSettings): void {
 
 function envFallback(name: string): string | undefined {
   const v = process.env[name];
-  return v && v.trim() ? v.trim() : undefined;
+  return v?.trim() || undefined;
 }
 
 async function persist(cfg: AppConfig): Promise<void> {

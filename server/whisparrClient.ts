@@ -27,10 +27,12 @@ export class WhisparrClient {
   private movieListCache?: { fetchedAt: number; promise: Promise<WhisparrScene[]> };
   private queueCache?: { fetchedAt: number; promise: Promise<WhisparrQueueItem[]> };
 
-  constructor(private cfg: AppConfig) {}
+  constructor(private readonly cfg: AppConfig) {}
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const url = `${this.cfg.whisparrBaseUrl!.replace(/\/+$/, "")}/api/v3${path}`;
+    let base = this.cfg.whisparrBaseUrl!;
+    while (base.endsWith("/")) base = base.slice(0, -1);
+    const url = `${base}/api/v3${path}`;
     const headers = new Headers(init.headers);
     headers.set("X-Api-Key", this.cfg.whisparrApiKey!);
     if (this.cfg.cfAccessClientId && this.cfg.cfAccessClientSecret) {

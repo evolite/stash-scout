@@ -98,14 +98,18 @@ export function renderBrowseView(): HTMLElement {
     load();
   }
 
-  // Saving with a preset loaded overwrites its content and name; saving with
-  // nothing loaded creates a new preset (and that preset becomes "loaded" so a
-  // second Save click updates it rather than creating a duplicate).
+  // Matched by name, not by what's currently loaded — saving under a name
+  // that already exists overwrites that preset's content; any other name
+  // creates a new one. So editing a loaded preset and changing its name
+  // before saving forks it into a new preset instead of renaming the
+  // original, and saving under an existing name overwrites it even if
+  // nothing was loaded first.
   async function savePreset(draft: SceneFilter, name: string) {
-    if (loadedFilterId) {
-      await api.overwriteFilter(loadedFilterId, draft);
-      await api.renameFilter(loadedFilterId, name);
-      loadedFilterName = name;
+    const existing = (await api.listFilters()).find((f) => f.name === name);
+    if (existing) {
+      await api.overwriteFilter(existing.id, draft);
+      loadedFilterId = existing.id;
+      loadedFilterName = existing.name;
     } else {
       const saved = await api.saveFilter(name, draft);
       loadedFilterId = saved.id;
