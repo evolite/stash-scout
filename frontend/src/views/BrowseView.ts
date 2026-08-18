@@ -71,7 +71,6 @@ export function renderBrowseView(): HTMLElement {
   let filter: SceneFilter = { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
   let statuses: Record<string, SceneStatus> = {};
   let pollTimer: ReturnType<typeof setInterval> | undefined;
-  let loadedFilterId: string | null = null;
   let loadedFilterName = "";
 
   function renderSidebar() {
@@ -92,7 +91,6 @@ export function renderBrowseView(): HTMLElement {
   // the loaded values and can be tweaked from there.
   function loadSavedFilter(saved: SavedFilter) {
     filter = { per_page: PER_PAGE, sort: "DATE", direction: "DESC", ...saved.filter, page: 1 };
-    loadedFilterId = saved.id;
     loadedFilterName = saved.name;
     renderSidebar();
     load();
@@ -108,11 +106,9 @@ export function renderBrowseView(): HTMLElement {
     const existing = (await api.listFilters()).find((f) => f.name === name);
     if (existing) {
       await api.overwriteFilter(existing.id, draft);
-      loadedFilterId = existing.id;
       loadedFilterName = existing.name;
     } else {
       const saved = await api.saveFilter(name, draft);
-      loadedFilterId = saved.id;
       loadedFilterName = saved.name;
     }
     renderSidebar();
