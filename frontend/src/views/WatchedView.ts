@@ -1,5 +1,5 @@
 import { api, type Scene, type SceneStatus, type SavedFilter } from "../api.js";
-import { renderSceneCard } from "../components/SceneCard.js";
+import { renderSceneCard, hidePreview } from "../components/SceneCard.js";
 import { renderPagination } from "../components/Pagination.js";
 import { isInLibraryMode } from "../components/Navbar.js";
 import { iconCheckCircle, iconRefresh } from "../icons.js";
@@ -100,6 +100,7 @@ function renderSceneSection(opts: {
   let currentScenes: Scene[] = [];
 
   function renderGrid() {
+    hidePreview();
     grid.innerHTML = "";
     for (const scene of currentScenes) {
       const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id), () => {
