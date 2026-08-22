@@ -1,4 +1,5 @@
 import { api } from "../api.js";
+import { GENDERS, getShownGenders, setGenderShown } from "../genderPrefs.js";
 
 function statusPill(ok: boolean | null): HTMLElement {
   const pill = document.createElement("span");
@@ -204,6 +205,39 @@ export function renderSettingsView(): HTMLElement {
       input.addEventListener("input", markDirty);
       input.addEventListener("change", markDirty);
     });
+
+    // --- Performer genders shown on scene cards ---
+    // A browsing preference, not a server-synced connection setting — applies
+    // instantly (localStorage, see genderPrefs.ts), so it's kept outside
+    // `panel`/the dirty-tracking Save flow above on purpose.
+    const gendersPanel = document.createElement("div");
+    gendersPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3 mt-4";
+    const gendersTitle = document.createElement("h3");
+    gendersTitle.className = "m-0 text-sm font-semibold";
+    gendersTitle.textContent = "Performers shown on scene cards";
+    const gendersSub = document.createElement("p");
+    gendersSub.className = "m-0 text-xs text-muted";
+    gendersSub.textContent = "A performer with no gender recorded on StashDB always shows, regardless of these.";
+    gendersPanel.appendChild(gendersTitle);
+    gendersPanel.appendChild(gendersSub);
+    const gendersGrid = document.createElement("div");
+    gendersGrid.className = "grid grid-cols-2 gap-2";
+    const shown = getShownGenders();
+    for (const g of GENDERS) {
+      const row = document.createElement("label");
+      row.className = "flex items-center gap-2 text-sm";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = shown.has(g.id);
+      checkbox.addEventListener("change", () => setGenderShown(g.id, checkbox.checked));
+      const text = document.createElement("span");
+      text.textContent = g.label;
+      row.appendChild(checkbox);
+      row.appendChild(text);
+      gendersGrid.appendChild(row);
+    }
+    gendersPanel.appendChild(gendersGrid);
+    container.appendChild(gendersPanel);
 
     // --- Save bar ---
     const saveBar = document.createElement("div");

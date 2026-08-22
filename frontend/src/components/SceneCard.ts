@@ -1,5 +1,7 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
 import { iconPlay, iconPlus, iconMinus } from "../icons.js";
+import { navigateToPerformer } from "../navigation.js";
+import { isGenderShown } from "../genderPrefs.js";
 
 function isWithinLastWeek(releaseDate: string | null): boolean {
   if (!releaseDate) return false;
@@ -237,6 +239,30 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   date.textContent = s.release_date ?? "";
   meta.appendChild(date);
   footer.appendChild(meta);
+
+  // Which genders show here is a user preference (Settings > Performers) —
+  // see genderPrefs.ts.
+  const shownPerformers = s.performers.filter((p) => isGenderShown(p.performer.gender));
+  if (shownPerformers.length > 0) {
+    const performersRow = document.createElement("div");
+    performersRow.className = "text-muted mt-1 overflow-hidden text-ellipsis whitespace-nowrap";
+    shownPerformers.forEach((p, i) => {
+      if (i > 0) performersRow.appendChild(document.createTextNode(", "));
+      // Pure in-app tab switch (see navigation.ts) — not a real link, so no
+      // address-bar change and no page reload.
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "hover:text-link bg-transparent border-0 p-0 text-inherit cursor-pointer";
+      link.textContent = p.performer.name;
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigateToPerformer(p.performer.id);
+      });
+      performersRow.appendChild(link);
+    });
+    footer.appendChild(performersRow);
+  }
 
   card.appendChild(footer);
   return card;

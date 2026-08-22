@@ -10,7 +10,7 @@ export interface Scene {
   studio: { id: string; name: string } | null;
   tags: { id: string; name: string }[];
   images: { id: string; url: string; width: number; height: number }[];
-  performers: { performer: { id: string; name: string }; as: string | null }[];
+  performers: { performer: { id: string; name: string; gender: string | null }; as: string | null }[];
   // Set only by queryMergedFeed — which saved filter (or "Favorites") first
   // surfaced this scene, shown as a sash on the scene card in the Watched feed.
   sourceLabel?: string;

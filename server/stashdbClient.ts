@@ -31,7 +31,7 @@ const SCENE_FIELDS = `
   studio { id name }
   tags { id name }
   images { id url width height }
-  performers { performer { id name } as }
+  performers { performer { id name gender } as }
 `;
 
 const MAX_PER_PAGE = 40;
