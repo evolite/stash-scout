@@ -1,6 +1,10 @@
 import type { AppConfig } from "./config.js";
 import { capMap } from "./cacheUtil.js";
 
+// A hung/unresponsive local Stash otherwise leaves fetch() pending
+// indefinitely — Node's fetch has no default timeout.
+const FETCH_TIMEOUT_MS = 15_000;
+
 async function gql<T>(url: string, apiKey: string, query: string, variables: unknown, cfg: AppConfig): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ApiKey: apiKey };
   if (cfg.cfAccessClientId && cfg.cfAccessClientSecret) {
@@ -11,6 +15,7 @@ async function gql<T>(url: string, apiKey: string, query: string, variables: unk
     method: "POST",
     headers,
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`Local Stash request failed: HTTP ${res.status}`);

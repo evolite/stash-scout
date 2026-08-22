@@ -37,6 +37,10 @@ const SCENE_FIELDS = `
 const MAX_PER_PAGE = 40;
 const MAX_LOOKUP_IDS = 100;
 
+// A hung/unresponsive StashDB otherwise leaves fetch() pending indefinitely —
+// Node's fetch has no default timeout — pinning the request handler open.
+const FETCH_TIMEOUT_MS = 15_000;
+
 // Hard backstop against StashDB's rate limit: no more than STASHDB_MAX_RPM requests
 // leave this process in any rolling 60s window, queued (not dropped) beyond that.
 // This bounds the worst case regardless of what any given feature does above it.
@@ -79,6 +83,7 @@ async function gql<T>(url: string, apiKey: string | undefined, query: string, va
     method: "POST",
     headers: { "Content-Type": "application/json", ApiKey: apiKey },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`StashDB request failed: HTTP ${res.status}`);

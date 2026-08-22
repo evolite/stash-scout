@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { loadInitialConfig } from "./settingsStore.js";
+import { db } from "./db.js";
 import { StashDBClient } from "./stashdbClient.js";
 import { LocalStashClient } from "./localStashClient.js";
 import { WhisparrClient } from "./whisparrClient.js";
@@ -36,6 +37,11 @@ app.use("/api", globalExcludeTagsRouter());
 app.use("/api", settingsRouter(cfg, localStash, whisparr));
 app.use("/api", statsRouter(cfg, whisparr));
 
+// Liveness/readiness probe for container orchestration — deliberately doesn't
+// touch StashDB/Stash/Whisparr (those are external and expected to flap); it
+// only needs to prove this process is alive and still serving requests.
+app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok" }));
+
 // process.cwd() (project root) rather than counting ".." from this file's own
 // location — that depth differs between `tsx watch server/index.ts` (runs the
 // source directly, one level under root) and the compiled build
@@ -45,6 +51,36 @@ const frontendDist = path.join(process.cwd(), "frontend", "dist");
 app.use(express.static(frontendDist));
 app.get("*", (_req, res) => res.sendFile(path.join(frontendDist, "index.html")));
 
-app.listen(cfg.port, "0.0.0.0", () => {
+const server = app.listen(cfg.port, "0.0.0.0", () => {
   console.log(`Stash Scout listening on http://0.0.0.0:${cfg.port}`);
+});
+
+// docker stop / a Compose or K8s redeploy sends SIGTERM and waits a grace
+// period before SIGKILL — without this, in-flight requests get cut off mid-
+// response instead of finishing. server.close() stops accepting new
+// connections and waits out ones already in progress before db.close().
+function shutdown(signal: string): void {
+  console.log(`${signal} received, shutting down`);
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Async routes already try/catch and respond with an error status (see every
+// routes/*.ts file) — these two are a backstop for the case that slips
+// through. Log then exit, not just log: Node's own guidance is that
+// continuing after an uncaught exception leaves the process in an undefined
+// state (here, e.g., an EADDRINUSE on listen() would otherwise be swallowed
+// silently, leaving a process alive but not actually serving anything) —
+// exiting lets the container's restart policy bring up a clean process.
+process.on("uncaughtException", (err) => {
+  console.error("uncaughtException:", err);
+  process.exit(1);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("unhandledRejection:", err);
+  process.exit(1);
 });

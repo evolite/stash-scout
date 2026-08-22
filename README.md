@@ -17,10 +17,10 @@ A web app for browsing [StashDB](https://stashdb.org) with actual filtering, and
 ### Docker (easiest)
 
 ```
-docker run -d -p 8787:8787 -v stash-scout-data:/app/data ghcr.io/evolite/stash-scout:latest
+docker run -d --restart unless-stopped -p 8787:8787 -v stash-scout-data:/app/data ghcr.io/evolite/stash-scout:latest
 ```
 
-Then open `http://localhost:8787`. First load prompts for an app secret — check `docker logs` for the line printed on first boot (or set `APP_SECRET` yourself, see `.env.example`). Every `/api` request needs it, so exposing the port isn't the same as exposing your StashDB/Stash/Whisparr keys. Configure everything else (StashDB API key, Stash, Whisparr) from the **Settings** tab — no env vars or config files to hand-edit. Secrets are encrypted at rest.
+Then open `http://localhost:8787` and configure StashDB API key, Stash, and Whisparr from the **Settings** tab — no env vars or config files to hand-edit. Secrets are encrypted at rest (see `.env.example`). `--restart unless-stopped` brings it back after a host reboot or crash; the image also reports a `/healthz` endpoint so orchestrators (Compose, Portainer, K8s) can detect and restart a hung container.
 
 ### From source
 

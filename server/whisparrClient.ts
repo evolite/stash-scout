@@ -22,6 +22,10 @@ export interface WhisparrQueueItem {
 const MOVIE_CACHE_TTL_MS = 30_000;
 const QUEUE_CACHE_TTL_MS = 5_000;
 
+// A hung/unresponsive Whisparr otherwise leaves fetch() pending indefinitely —
+// Node's fetch has no default timeout.
+const FETCH_TIMEOUT_MS = 15_000;
+
 // Ported from stashgifs/src/WhisparrClient.ts, trimmed to what the backend needs.
 export class WhisparrClient {
   private movieListCache?: { fetchedAt: number; promise: Promise<WhisparrScene[]> };
@@ -40,7 +44,7 @@ export class WhisparrClient {
       headers.set("CF-Access-Client-Secret", this.cfg.cfAccessClientSecret);
     }
     if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    const res = await fetch(url, { ...init, headers });
+    const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`Whisparr ${init.method ?? "GET"} ${path} failed: HTTP ${res.status}`);
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
