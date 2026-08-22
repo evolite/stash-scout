@@ -18,8 +18,15 @@ const savedTab = localStorage.getItem("activeTab");
 // path, so this is the only piece needed to honor it. Only read once at
 // boot; in-app navigation (search box, a scene card's performer link via
 // navigateToPerformer below) never touches the URL.
-const deepLinkedPerformerId = window.location.pathname.match(/^\/performers\/([^/]+)$/)?.[1];
-let activeTab: Tab = deepLinkedPerformerId ? "performers" : TABS.includes(savedTab as Tab) ? (savedTab as Tab) : "watched";
+const deepLinkedPerformerId = /^\/performers\/([^/]+)$/.exec(window.location.pathname)?.[1];
+let activeTab: Tab;
+if (deepLinkedPerformerId) {
+  activeTab = "performers";
+} else if (TABS.includes(savedTab as Tab)) {
+  activeTab = savedTab as Tab;
+} else {
+  activeTab = "watched";
+}
 
 // Set either from the deep link above or by navigateToPerformer (e.g. a scene
 // card's performer link) — consumed once by render() below, then cleared.
@@ -71,11 +78,15 @@ render();
 // not something worth delaying every normal boot for.
 const ONBOARDING_DISMISSED_KEY = "onboardingDismissed";
 if (localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1") {
-  api.settings().then((settings) => {
-    if (settings.stashdbConfigured) return;
-    setTab("settings");
-    document.body.appendChild(
-      renderOnboardingModal(() => localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1")),
-    );
-  });
+  // Vite's configured build target doesn't support real top-level await, so
+  // an async IIFE stands in for it — same effect, no .then() chain.
+  (async () => {
+    const settings = await api.settings();
+    if (!settings.stashdbConfigured) {
+      setTab("settings");
+      document.body.appendChild(
+        renderOnboardingModal(() => localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1")),
+      );
+    }
+  })();
 }
