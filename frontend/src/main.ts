@@ -78,15 +78,11 @@ render();
 // not something worth delaying every normal boot for.
 const ONBOARDING_DISMISSED_KEY = "onboardingDismissed";
 if (localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1") {
-  // Vite's configured build target doesn't support real top-level await, so
-  // an async IIFE stands in for it — same effect, no .then() chain.
-  (async () => {
-    const settings = await api.settings();
-    if (!settings.stashdbConfigured) {
-      setTab("settings");
-      document.body.appendChild(
-        renderOnboardingModal(() => localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1")),
-      );
-    }
-  })();
+  const settings = await api.settings();
+  if (!settings.stashdbConfigured) {
+    setTab("settings");
+    document.body.appendChild(
+      renderOnboardingModal(() => localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1")),
+    );
+  }
 }

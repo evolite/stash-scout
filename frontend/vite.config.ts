@@ -12,5 +12,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Vite's default target predates top-level await; this is a self-hosted,
+    // single-user tool with no legacy-browser requirement, so es2022 (which
+    // main.ts's onboarding check relies on) is a safe minimum.
+    target: "es2022",
   },
 });
