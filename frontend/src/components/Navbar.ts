@@ -153,8 +153,8 @@ const WHISPARR_COLOR = "#ff69b4";
 // Both brand pills (Stash link, Whisparr/downloading badge) share this exact
 // shape so they read as one matched pair in the navbar.
 const BRAND_PILL_BASE =
-  "flex-col justify-center gap-1 h-8 px-3 rounded text-sm font-medium bg-surface-2 text-text-faint no-underline hover:no-underline " +
-  "hover:text-muted hover:bg-white/10 hover:-translate-y-0.5 hover:shadow-md transition duration-150";
+  "flex-col justify-center gap-1 h-8 px-3 rounded text-sm text-text-faint no-underline hover:no-underline " +
+  "hover:text-muted hover:bg-surface-2/60 hover:-translate-y-0.5 transition duration-150";
 
 function brandIcon(src: string, alt: string): HTMLImageElement {
   const img = document.createElement("img");
