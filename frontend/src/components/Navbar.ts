@@ -118,17 +118,15 @@ setSfwMode(isSfwMode());
 // already rendered with an empty URL.
 let localStashRootUrl = "";
 let whisparrBaseUrl = "";
-api
-  .getConfig()
-  .then((cfg) => {
-    localStashRootUrl = cfg.localStashRootUrl ?? "";
-    whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
-    refreshStashLinks();
-    refreshDownloadingBadges();
-  })
-  .catch(() => {
-    // leave both empty — links just won't render
-  });
+try {
+  const cfg = await api.getConfig();
+  localStashRootUrl = cfg.localStashRootUrl ?? "";
+  whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
+  refreshStashLinks();
+  refreshDownloadingBadges();
+} catch {
+  // leave both empty — links just won't render
+}
 
 // Off by default — Feed/Trending hide scenes already in the library unless
 // this is switched on. Read by WatchedView.ts when building its queries.
