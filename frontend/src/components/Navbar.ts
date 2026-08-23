@@ -169,56 +169,58 @@ function brandIcon(src: string, alt: string): HTMLImageElement {
 // Doubles as a Whisparr shortcut when idle — an empty "0 downloading" badge
 // on every page is noise, but an empty slot is wasted space, so it becomes a
 // plain link out to Whisparr until there's actually something to report.
-const DOWNLOADING_BADGE_CLASS = "js-downloading-badge";
 const DOWNLOADING_POLL_MS = 20_000;
 
+// main.ts fully re-renders the navbar (root.innerHTML = "") on every tab
+// switch, so renderDownloadingBadge/renderStashLink below just repoint this
+// at whichever instance is currently mounted, rather than looking it up via
+// document.querySelectorAll — which finds nothing when refresh runs at
+// creation time, before renderNavbar has appended the returned element.
+let currentBadge: HTMLAnchorElement | null = null;
+
 async function refreshDownloadingBadges(): Promise<void> {
-  const badges = document.querySelectorAll<HTMLAnchorElement>(`.${DOWNLOADING_BADGE_CLASS}`);
-  if (badges.length === 0) return;
+  const badge = currentBadge;
+  if (!badge) return;
   try {
     const stats = await api.stats();
-    for (const badge of badges) {
-      const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
-      const track = badge.querySelector<HTMLElement>(".js-dl-track")!;
-      const fill = badge.querySelector<HTMLElement>(".js-dl-fill")!;
-      if (!whisparrBaseUrl) {
-        badge.classList.add("hidden");
-        badge.classList.remove("flex");
-        continue;
-      }
-      // Always a link to Whisparr — only the label/progress-bar content changes.
-      badge.href = whisparrBaseUrl;
-      badge.target = "_blank";
-      badge.rel = "noopener";
-      // Kept the same brand color in both states — an inline color always
-      // wins over the pill's hover:text-muted, so hovering the badge can't
-      // flash the label a different shade than the idle Stash/Whisparr links.
-      label.style.color = WHISPARR_COLOR;
-      if (stats.downloading > 0) {
-        label.textContent = `${stats.downloading} downloading`;
-        fill.style.width = `${stats.downloadProgress ?? 0}%`;
-        track.classList.remove("hidden");
-      } else {
-        label.textContent = "Whisparr";
-        track.classList.add("hidden");
-      }
-      badge.classList.remove("hidden");
-      badge.classList.add("flex");
+    const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
+    const track = badge.querySelector<HTMLElement>(".js-dl-track")!;
+    const fill = badge.querySelector<HTMLElement>(".js-dl-fill")!;
+    if (!whisparrBaseUrl) {
+      badge.classList.add("hidden");
+      badge.classList.remove("flex");
+      return;
     }
+    // Always a link to Whisparr — only the label/progress-bar content changes.
+    badge.href = whisparrBaseUrl;
+    badge.target = "_blank";
+    badge.rel = "noopener";
+    // Kept the same brand color in both states — an inline color always
+    // wins over the pill's hover:text-muted, so hovering the badge can't
+    // flash the label a different shade than the idle Stash/Whisparr links.
+    label.style.color = WHISPARR_COLOR;
+    if (stats.downloading > 0) {
+      label.textContent = `${stats.downloading} downloading`;
+      fill.style.width = `${stats.downloadProgress ?? 0}%`;
+      track.classList.remove("hidden");
+    } else {
+      label.textContent = "Whisparr";
+      track.classList.add("hidden");
+    }
+    badge.classList.remove("hidden");
+    badge.classList.add("flex");
   } catch {
-    // leave badges as-is on a failed refresh
+    // leave the badge as-is on a failed refresh
   }
 }
 
-// main.ts fully re-renders the navbar (root.innerHTML = "") on every tab
-// switch, so this interval is started once at module load — rather than per
-// render — and drives whichever badge element is currently mounted via the
-// shared class selector above, instead of leaking a new timer per switch.
+// Started once at module load rather than per render, driving whichever
+// badge is currently mounted via the module-level reference above.
 setInterval(refreshDownloadingBadges, DOWNLOADING_POLL_MS);
 
 function renderDownloadingBadge(): HTMLElement {
   const badge = document.createElement("a");
-  badge.className = `hidden ${DOWNLOADING_BADGE_CLASS} ${BRAND_PILL_BASE}`;
+  badge.className = `hidden js-downloading-badge ${BRAND_PILL_BASE}`;
 
   const row = document.createElement("span");
   row.className = "flex items-center gap-1.5";
@@ -236,29 +238,29 @@ function renderDownloadingBadge(): HTMLElement {
   track.appendChild(fill);
   badge.appendChild(track);
 
+  currentBadge = badge;
   refreshDownloadingBadges();
   return badge;
 }
 
-const STASH_LINK_CLASS = "js-stash-link";
+let currentStashLink: HTMLAnchorElement | null = null;
 
 function refreshStashLinks(): void {
-  const links = document.querySelectorAll<HTMLAnchorElement>(`.${STASH_LINK_CLASS}`);
-  for (const el of links) {
-    if (!localStashRootUrl) {
-      el.classList.add("hidden");
-      el.classList.remove("flex");
-      continue;
-    }
-    el.href = localStashRootUrl;
-    el.classList.remove("hidden");
-    el.classList.add("flex");
+  const el = currentStashLink;
+  if (!el) return;
+  if (!localStashRootUrl) {
+    el.classList.add("hidden");
+    el.classList.remove("flex");
+    return;
   }
+  el.href = localStashRootUrl;
+  el.classList.remove("hidden");
+  el.classList.add("flex");
 }
 
 function renderStashLink(): HTMLElement {
   const el = document.createElement("a");
-  el.className = `${STASH_LINK_CLASS} hidden ${BRAND_PILL_BASE}`;
+  el.className = `hidden ${BRAND_PILL_BASE}`;
   el.target = "_blank";
   el.rel = "noopener";
 
@@ -271,6 +273,7 @@ function renderStashLink(): HTMLElement {
   row.appendChild(label);
   el.appendChild(row);
 
+  currentStashLink = el;
   refreshStashLinks();
   return el;
 }
