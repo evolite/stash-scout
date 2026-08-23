@@ -30,22 +30,20 @@ function placeholderShade(id: string): string {
 }
 
 function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; className: string } | undefined {
-  // Neutral dark chip: this badge means "matched saved filter", not library
-  // status, so it's deliberately distinct from the status-derived badges below.
-  if (s.sourceLabel) return { text: s.sourceLabel, className: "bg-black/75 text-text border border-white/[.12] font-semibold" };
   switch (status?.kind) {
     case "in-stash":
       return { text: "In Library", className: "badge-in-library" };
-    case "not-added":
-      return isWithinLastWeek(s.release_date) ? { text: "New", className: "badge-new" } : undefined;
     case "monitored":
     case "downloading":
       return { text: "Monitored", className: "badge-monitored" };
     case "previously-added":
       return { text: "Removed", className: "badge-removed" };
-    default:
-      return undefined;
   }
+  // Neutral dark chip: this badge means "matched saved filter", not library
+  // status, so it only shows up when there's no more specific status above.
+  if (s.sourceLabel) return { text: s.sourceLabel, className: "bg-black/75 text-text border border-white/[.12] font-semibold" };
+  if (status?.kind === "not-added" && isWithinLastWeek(s.release_date)) return { text: "New", className: "badge-new" };
+  return undefined;
 }
 
 // One shared floating preview (not one per card) — only ever one hover at a
