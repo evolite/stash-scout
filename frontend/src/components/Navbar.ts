@@ -112,6 +112,24 @@ function setSfwMode(on: boolean): void {
 
 setSfwMode(isSfwMode());
 
+// Populated once at module load — non-secret, only used to build link hrefs.
+// The navbar can render before this resolves (it's a fetch), so both
+// refresh functions below are re-run once config lands to fix up whatever
+// already rendered with an empty URL.
+let localStashRootUrl = "";
+let whisparrBaseUrl = "";
+api
+  .getConfig()
+  .then((cfg) => {
+    localStashRootUrl = cfg.localStashRootUrl ?? "";
+    whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
+    refreshStashLinks();
+    refreshDownloadingBadges();
+  })
+  .catch(() => {
+    // leave both empty — links just won't render
+  });
+
 // Off by default — Feed/Trending hide scenes already in the library unless
 // this is switched on. Read by WatchedView.ts when building its queries.
 const IN_LIBRARY_KEY = "inLibraryMode";
@@ -124,28 +142,70 @@ function setInLibraryMode(on: boolean): void {
   localStorage.setItem(IN_LIBRARY_KEY, on ? "1" : "0");
 }
 
-// Only shown once we know there's something to report — a "0" badge on
-// every page is noise; the full breakdown already lives in StatsView.
+// Bundled locally (frontend/public/brand) rather than hotlinked from each
+// app's own instance URL — those are often only reachable from the server,
+// not from whatever machine the browser is on, so a live favicon fetch would
+// silently fail. Official assets: stashapp/Stash-Docs favicon.ico, and
+// Whisparr/Whisparr Logo/32.png (brand color #FF69B4 sampled from its SVG logo).
+const STASH_ICON_SRC = "/brand/stash.ico";
+const STASH_COLOR = "#c98f5e";
+const WHISPARR_ICON_SRC = "/brand/whisparr.png";
+const WHISPARR_COLOR = "#ff69b4";
+
+// Both brand pills (Stash link, Whisparr/downloading badge) share this exact
+// shape so they read as one matched pair in the navbar.
+const BRAND_PILL_BASE =
+  "flex-col justify-center gap-1 h-8 px-3 rounded text-sm font-medium bg-surface-2 text-text-faint no-underline hover:no-underline " +
+  "hover:text-muted hover:bg-white/10 hover:-translate-y-0.5 hover:shadow-md transition duration-150";
+
+function brandIcon(src: string, alt: string): HTMLImageElement {
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = alt;
+  img.width = 16;
+  img.height = 16;
+  img.className = "rounded-sm";
+  return img;
+}
+
+// Doubles as a Whisparr shortcut when idle — an empty "0 downloading" badge
+// on every page is noise, but an empty slot is wasted space, so it becomes a
+// plain link out to Whisparr until there's actually something to report.
 const DOWNLOADING_BADGE_CLASS = "js-downloading-badge";
 const DOWNLOADING_POLL_MS = 20_000;
 
 async function refreshDownloadingBadges(): Promise<void> {
-  const badges = document.querySelectorAll<HTMLElement>(`.${DOWNLOADING_BADGE_CLASS}`);
+  const badges = document.querySelectorAll<HTMLAnchorElement>(`.${DOWNLOADING_BADGE_CLASS}`);
   if (badges.length === 0) return;
   try {
     const stats = await api.stats();
     for (const badge of badges) {
       const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
+      const track = badge.querySelector<HTMLElement>(".js-dl-track")!;
       const fill = badge.querySelector<HTMLElement>(".js-dl-fill")!;
+      if (!whisparrBaseUrl) {
+        badge.classList.add("hidden");
+        badge.classList.remove("flex");
+        continue;
+      }
+      // Always a link to Whisparr — only the label/progress-bar content changes.
+      badge.href = whisparrBaseUrl;
+      badge.target = "_blank";
+      badge.rel = "noopener";
+      // Kept the same brand color in both states — an inline color always
+      // wins over the pill's hover:text-muted, so hovering the badge can't
+      // flash the label a different shade than the idle Stash/Whisparr links.
+      label.style.color = WHISPARR_COLOR;
       if (stats.downloading > 0) {
         label.textContent = `${stats.downloading} downloading`;
         fill.style.width = `${stats.downloadProgress ?? 0}%`;
-        badge.classList.remove("hidden");
-        badge.classList.add("flex");
+        track.classList.remove("hidden");
       } else {
-        badge.classList.add("hidden");
-        badge.classList.remove("flex");
+        label.textContent = "Whisparr";
+        track.classList.add("hidden");
       }
+      badge.classList.remove("hidden");
+      badge.classList.add("flex");
     }
   } catch {
     // leave badges as-is on a failed refresh
@@ -159,21 +219,19 @@ async function refreshDownloadingBadges(): Promise<void> {
 setInterval(refreshDownloadingBadges, DOWNLOADING_POLL_MS);
 
 function renderDownloadingBadge(): HTMLElement {
-  const badge = document.createElement("span");
-  badge.className = `hidden ${DOWNLOADING_BADGE_CLASS} flex-col justify-center gap-1 h-8 px-3 rounded text-xs font-medium bg-surface-2 text-text-faint`;
+  const badge = document.createElement("a");
+  badge.className = `hidden ${DOWNLOADING_BADGE_CLASS} ${BRAND_PILL_BASE}`;
 
   const row = document.createElement("span");
   row.className = "flex items-center gap-1.5";
-  const dot = document.createElement("span");
-  dot.className = "h-1.5 w-1.5 rounded-full bg-accent animate-pulse";
+  row.appendChild(brandIcon(WHISPARR_ICON_SRC, "Whisparr"));
   const label = document.createElement("span");
   label.className = "js-dl-label";
-  row.appendChild(dot);
   row.appendChild(label);
   badge.appendChild(row);
 
   const track = document.createElement("span");
-  track.className = "block h-1 w-full rounded-full bg-white/10 overflow-hidden";
+  track.className = "js-dl-track block h-1 w-full rounded-full bg-white/10 overflow-hidden";
   const fill = document.createElement("span");
   fill.className = "js-dl-fill block h-full rounded-full bg-accent transition-[width] duration-500";
   fill.style.width = "0%";
@@ -182,6 +240,41 @@ function renderDownloadingBadge(): HTMLElement {
 
   refreshDownloadingBadges();
   return badge;
+}
+
+const STASH_LINK_CLASS = "js-stash-link";
+
+function refreshStashLinks(): void {
+  const links = document.querySelectorAll<HTMLAnchorElement>(`.${STASH_LINK_CLASS}`);
+  for (const el of links) {
+    if (!localStashRootUrl) {
+      el.classList.add("hidden");
+      el.classList.remove("flex");
+      continue;
+    }
+    el.href = localStashRootUrl;
+    el.classList.remove("hidden");
+    el.classList.add("flex");
+  }
+}
+
+function renderStashLink(): HTMLElement {
+  const el = document.createElement("a");
+  el.className = `${STASH_LINK_CLASS} hidden ${BRAND_PILL_BASE}`;
+  el.target = "_blank";
+  el.rel = "noopener";
+
+  const row = document.createElement("span");
+  row.className = "flex items-center gap-1.5";
+  row.appendChild(brandIcon(STASH_ICON_SRC, "Stash"));
+  const label = document.createElement("span");
+  label.textContent = "Stash";
+  label.style.color = STASH_COLOR;
+  row.appendChild(label);
+  el.appendChild(row);
+
+  refreshStashLinks();
+  return el;
 }
 
 const TRACK_BASE = "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-150";
@@ -239,6 +332,7 @@ export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibrar
 
   const right = document.createElement("div");
   right.className = "flex items-center gap-4 h-full";
+  right.appendChild(renderStashLink());
   right.appendChild(renderDownloadingBadge());
   right.appendChild(renderToggle("In Library", isInLibraryMode, setInLibraryMode, onLibraryToggle));
   right.appendChild(renderToggle("SFW Mode", isSfwMode, setSfwMode));
