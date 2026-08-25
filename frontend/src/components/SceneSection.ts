@@ -44,6 +44,10 @@ export function renderSceneSection(opts: {
 
   let page = 1;
   let statuses: Record<string, SceneStatus> = {};
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
+  // Set on every card action so polling keeps running long enough for the
+  // backend's retry-with-backoff (up to ~15s) to resolve.
+  let pollUntil = 0;
   // The single source of truth for what's currently shown — status refreshes
   // (triggered by any card's Add/Monitor click) re-render from this, so an
   // ignored scene needs to actually leave this list, not just its DOM node.
@@ -56,11 +60,19 @@ export function renderSceneSection(opts: {
     hidePreview();
     grid.innerHTML = "";
     for (const scene of currentScenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id), () => {
+      const card = renderSceneCard(scene, statuses[scene.id], (optimistic) => refreshOneStatus(scene.id, optimistic), () => {
         currentScenes = currentScenes.filter((s) => s.id !== scene.id);
         card.remove();
       });
       grid.appendChild(card);
+    }
+  }
+
+  function schedulePolling() {
+    clearInterval(pollTimer);
+    const anyDownloading = Object.values(statuses).some((s) => s.kind === "downloading");
+    if (anyDownloading || Date.now() < pollUntil) {
+      pollTimer = setInterval(refreshStatuses, 2000);
     }
   }
 
@@ -69,15 +81,25 @@ export function renderSceneSection(opts: {
   // full-page-wide `sceneStatuses` call fans out to up to 2 sequential local
   // Stash lookups per scene, and re-running it on every single click was what
   // made "adding something" feel slow (16 cards' worth of lookups per click).
-  async function refreshOneStatus(id: string) {
+  // `optimistic`, when passed, is applied immediately (async request-reply:
+  // the backend mutation runs — and retries — in the background).
+  async function refreshOneStatus(id: string, optimistic?: SceneStatus) {
+    if (optimistic) {
+      statuses = { ...statuses, [id]: optimistic };
+      renderGrid();
+    }
+    pollUntil = Date.now() + 30000;
+    schedulePolling();
     const result = await api.sceneStatuses([id]);
     statuses = { ...statuses, ...result };
     renderGrid();
+    schedulePolling();
   }
 
   async function refreshStatuses() {
     statuses = await api.sceneStatuses(currentScenes.map((s) => s.id));
     renderGrid();
+    schedulePolling();
   }
 
   function updatePagination(count: number, approximate: boolean) {
@@ -105,6 +127,7 @@ export function renderSceneSection(opts: {
   // failed fetch (a transient StashDB error, say) leaves the grid pulsing
   // forever with no way to clear it.
   async function load(bypassCache = false) {
+    clearInterval(pollTimer);
     const isFirstLoad = grid.children.length === 0;
     if (isFirstLoad) {
       grid.replaceChildren(renderSpinner());

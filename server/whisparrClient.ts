@@ -22,6 +22,41 @@ export interface WhisparrQueueItem {
 const MOVIE_CACHE_TTL_MS = 30_000;
 const QUEUE_CACHE_TTL_MS = 5_000;
 
+// Backs the async request-reply flow for Add/Monitor/Unmonitor: the route
+// handler responds before this settles, so a failure has nowhere to go but
+// here. Keyed by stashId (addScene, no movieId yet) or String(movieId)
+// (setMonitored). Consumed (deleted) on read by getSceneStatus, so a failure
+// surfaces for exactly one status poll before reverting to the real state.
+const ERROR_TTL_MS = 30_000;
+const recentErrors = new Map<string, { message: string; expiresAt: number }>();
+
+export function recordWhisparrError(key: string, message: string): void {
+  recentErrors.set(key, { message, expiresAt: Date.now() + ERROR_TTL_MS });
+}
+
+export function consumeWhisparrError(key: string): string | undefined {
+  const entry = recentErrors.get(key);
+  if (!entry) return undefined;
+  recentErrors.delete(key);
+  return entry.expiresAt >= Date.now() ? entry.message : undefined;
+}
+
+// 5 attempts total, incremental backoff — most Whisparr hiccups are
+// transient, so retry in the background before making the client show a
+// failure for what the next request would've fixed anyway.
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === RETRY_DELAYS_MS.length) throw err;
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+}
+
 // A hung/unresponsive Whisparr otherwise leaves fetch() pending indefinitely —
 // Node's fetch has no default timeout.
 const FETCH_TIMEOUT_MS = 15_000;

@@ -71,6 +71,10 @@ export function renderBrowseView(): HTMLElement {
   let filter: SceneFilter = { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
   let statuses: Record<string, SceneStatus> = {};
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  // Set on every card action so polling keeps running long enough for the
+  // backend's retry-with-backoff (up to ~15s) to resolve, even once nothing
+  // is "downloading".
+  let pollUntil = 0;
   let loadedFilterName = "";
 
   function renderSidebar() {
@@ -114,28 +118,36 @@ export function renderBrowseView(): HTMLElement {
     renderSidebar();
   }
 
-  function schedulePollingIfDownloading(scenes: Scene[]) {
+  function schedulePolling(scenes: Scene[]) {
     clearInterval(pollTimer);
     const anyDownloading = Object.values(statuses).some((s) => s.kind === "downloading");
-    if (anyDownloading) {
-      pollTimer = setInterval(() => refreshStatuses(scenes), 5000);
+    if (anyDownloading || Date.now() < pollUntil) {
+      pollTimer = setInterval(() => refreshStatuses(scenes), 2000);
     }
   }
 
   async function refreshStatuses(scenes: Scene[]) {
     statuses = await api.sceneStatuses(scenes.map((s) => s.id));
     renderGrid(scenes);
-    schedulePollingIfDownloading(scenes);
+    schedulePolling(scenes);
   }
 
   // A card action only needs its own scene's status re-checked, not every
   // visible card's — re-running the full batch on every click was fanning out
   // to up to 2 sequential local Stash lookups per scene on the whole page.
-  async function refreshOneStatus(id: string, scenes: Scene[]) {
+  // `optimistic`, when passed, is applied immediately so the UI updates
+  // before the (now async request-reply) backend mutation has even started.
+  async function refreshOneStatus(id: string, scenes: Scene[], optimistic?: SceneStatus) {
+    if (optimistic) {
+      statuses = { ...statuses, [id]: optimistic };
+      renderGrid(scenes);
+    }
+    pollUntil = Date.now() + 30000;
+    schedulePolling(scenes);
     const result = await api.sceneStatuses([id]);
     statuses = { ...statuses, ...result };
     renderGrid(scenes);
-    schedulePollingIfDownloading(scenes);
+    schedulePolling(scenes);
   }
 
   function renderGrid(scenes: Scene[]) {
@@ -144,7 +156,7 @@ export function renderBrowseView(): HTMLElement {
     hidePreview();
     grid.innerHTML = "";
     for (const scene of scenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id, scenes), () => {
+      const card = renderSceneCard(scene, statuses[scene.id], (optimistic) => refreshOneStatus(scene.id, scenes, optimistic), () => {
         scenes.splice(scenes.indexOf(scene), 1);
         hidePreview();
         card.remove();

@@ -1,7 +1,7 @@
 import type { AppConfig } from "./config.js";
 import { isLocalStashConfigured, isWhisparrConfigured } from "./config.js";
 import { LocalStashClient } from "./localStashClient.js";
-import { WhisparrClient } from "./whisparrClient.js";
+import { WhisparrClient, consumeWhisparrError } from "./whisparrClient.js";
 import type { SceneStatus } from "../shared/types.js";
 
 export async function getSceneStatus(
@@ -29,7 +29,14 @@ export async function getSceneStatus(
 
   const movie = await clients.whisparr!.getSceneByStashId(stashId);
   if (!movie) {
+    const error = consumeWhisparrError(stashId);
+    if (error) return { kind: "error", message: error };
     return { kind: "not-added", whisparrConfigured: true };
+  }
+
+  {
+    const error = consumeWhisparrError(String(movie.id));
+    if (error) return { kind: "error", message: error };
   }
 
   if (movie.hasFile) {
