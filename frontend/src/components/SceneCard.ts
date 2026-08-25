@@ -35,12 +35,9 @@ function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; cl
       return { text: "In Library", className: "badge-in-library" };
     case "monitored":
     case "downloading":
-    case "pending": // optimistic Add — assume it lands as Monitored
       return { text: "Monitored", className: "badge-monitored" };
     case "previously-added":
       return { text: "Removed", className: "badge-removed" };
-    case "error":
-      return { text: "Failed", className: "bg-danger/20 text-danger border border-danger" };
   }
   // Neutral dark chip: this badge means "matched saved filter", not library
   // status, so it only shows up when there's no more specific status above.
@@ -132,11 +129,8 @@ function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip"
 // status allows. Skip (-) permanently ignores the scene (api.ignoreScene) and
 // removes the card via onRemove; already-monitored scenes only get a - to
 // unmonitor, since the Monitored badge already communicates their state.
-function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: (optimistic?: SceneStatus) => void, onRemove: () => void): HTMLElement | undefined {
+function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement | undefined {
   if (!status) return undefined;
-  // No buttons while a mutation is in flight (pending) or just failed
-  // (error) — the next status poll settles this within a couple seconds.
-  if (status.kind === "pending" || status.kind === "error") return undefined;
   const buttons: HTMLButtonElement[] = [];
 
   if (status.kind === "in-stash") {
@@ -148,25 +142,25 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
   } else {
     if (status.kind === "not-added" && status.whisparrConfigured) {
       buttons.push(
-        hoverButton("Add Scene", iconPlus(), "add", () => {
-          onStatusChange({ kind: "pending" });
-          api.addToWhisparr(s.id).catch(() => {});
+        hoverButton("Add Scene", iconPlus(), "add", async () => {
+          await api.addToWhisparr(s.id);
+          onStatusChange();
         }),
       );
     } else if (status.kind === "previously-added") {
       buttons.push(
-        hoverButton("Re-enable monitoring", iconPlus(), "add", () => {
-          onStatusChange({ kind: "monitored", movieId: status.movieId });
-          api.setMonitored(status.movieId, true).catch(() => {});
+        hoverButton("Re-enable monitoring", iconPlus(), "add", async () => {
+          await api.setMonitored(status.movieId, true);
+          onStatusChange();
         }),
       );
     }
 
     if (status.kind === "monitored") {
       buttons.push(
-        hoverButton("Unmonitor", iconMinus(), "skip", () => {
-          onStatusChange({ kind: "previously-added", movieId: status.movieId });
-          api.setMonitored(status.movieId, false).catch(() => {});
+        hoverButton("Unmonitor", iconMinus(), "skip", async () => {
+          await api.setMonitored(status.movieId, false);
+          onStatusChange();
         }),
       );
     } else if (status.kind === "not-added" || status.kind === "previously-added") {
@@ -186,7 +180,7 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
   return hover;
 }
 
-export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onStatusChange: (optimistic?: SceneStatus) => void, onRemove: () => void): HTMLElement {
+export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement {
   const card = document.createElement("div");
   card.className = "group relative bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
 

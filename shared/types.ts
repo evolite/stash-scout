@@ -25,14 +25,7 @@ export type SceneStatus =
   | { kind: "not-added"; whisparrConfigured: false }
   | { kind: "previously-added"; movieId: number }
   | { kind: "monitored"; movieId: number }
-  | { kind: "downloading"; movieId: number; queue: { size?: number; sizeleft?: number; status?: string } }
-  // Client-only optimistic state for a just-clicked Add, before the real
-  // movieId exists — never returned by the server.
-  | { kind: "pending" }
-  // Returned once by getSceneStatus after a background Whisparr mutation
-  // (see whisparrClient's retry+error map) exhausts its retries; consumed on
-  // read so the next poll reverts to the real state.
-  | { kind: "error"; message: string };
+  | { kind: "downloading"; movieId: number; queue: { size?: number; sizeleft?: number; status?: string } };
 
 export interface SavedFilter<F = Record<string, unknown>> {
   id: string;
