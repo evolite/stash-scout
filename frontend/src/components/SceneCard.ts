@@ -1,6 +1,6 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
 import { iconPlay, iconPlus, iconMinus } from "../icons.js";
-import { navigateToPerformer } from "../navigation.js";
+import { navigateToPerformer, navigateToStudio } from "../navigation.js";
 import { isGenderShown } from "../genderPrefs.js";
 
 function isWithinLastWeek(releaseDate: string | null): boolean {
@@ -201,6 +201,8 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   if (image) {
     const img = document.createElement("img");
     img.className = "SceneCard-image w-full h-full object-cover object-top block";
+    img.loading = "lazy";
+    img.decoding = "async";
     img.src = image.url;
     img.alt = "";
     imageWrap.appendChild(img);
@@ -229,9 +231,21 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
 
   const meta = document.createElement("div");
   meta.className = "text-muted flex justify-between mt-1";
-  const studio = document.createElement("span");
+  const studio = s.studio?.id
+    ? document.createElement("button")
+    : document.createElement("span");
   studio.className = "SceneCard-text overflow-hidden text-ellipsis whitespace-nowrap";
   studio.textContent = s.studio?.name ?? "";
+  if (studio instanceof HTMLButtonElement) {
+    // Pure in-app tab switch, same as the performer links below.
+    studio.type = "button";
+    studio.className += " bg-transparent border-0 p-0 text-inherit cursor-pointer hover:text-link";
+    studio.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      navigateToStudio(s.studio!.id);
+    });
+  }
   meta.appendChild(studio);
   const date = document.createElement("strong");
   date.textContent = s.release_date ?? "";

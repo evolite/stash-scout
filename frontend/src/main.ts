@@ -3,13 +3,14 @@ import { renderNavbar, type Tab } from "./components/Navbar.js";
 import { renderBrowseView } from "./views/BrowseView.js";
 import { renderWatchedView } from "./views/WatchedView.js";
 import { renderPerformersView } from "./views/PerformersView.js";
+import { renderStudiosView } from "./views/StudiosView.js";
 import { renderStatsView } from "./views/StatsView.js";
 import { renderSettingsView } from "./views/SettingsView.js";
 import { renderOnboardingModal } from "./components/OnboardingModal.js";
-import { onNavigateToPerformer } from "./navigation.js";
+import { onNavigateToPerformer, onNavigateToStudio } from "./navigation.js";
 
 const root = document.getElementById("root")!;
-const TABS: Tab[] = ["browse", "watched", "performers", "stats", "settings"];
+const TABS: Tab[] = ["browse", "watched", "performers", "studios", "stats", "settings"];
 const savedTab = localStorage.getItem("activeTab");
 
 // A request for /performers/<id> (typed, bookmarked, or linked from
@@ -19,9 +20,12 @@ const savedTab = localStorage.getItem("activeTab");
 // boot; in-app navigation (search box, a scene card's performer link via
 // navigateToPerformer below) never touches the URL.
 const deepLinkedPerformerId = /^\/performers\/([^/]+)$/.exec(window.location.pathname)?.[1];
+const deepLinkedStudioId = /^\/studios\/([^/]+)$/.exec(window.location.pathname)?.[1];
 let activeTab: Tab;
 if (deepLinkedPerformerId) {
   activeTab = "performers";
+} else if (deepLinkedStudioId) {
+  activeTab = "studios";
 } else if (TABS.includes(savedTab as Tab)) {
   activeTab = savedTab as Tab;
 } else {
@@ -31,11 +35,19 @@ if (deepLinkedPerformerId) {
 // Set either from the deep link above or by navigateToPerformer (e.g. a scene
 // card's performer link) — consumed once by render() below, then cleared.
 let pendingPerformerId: string | undefined = deepLinkedPerformerId;
+let pendingStudioId: string | undefined = deepLinkedStudioId;
 
 onNavigateToPerformer((id) => {
   activeTab = "performers";
   pendingPerformerId = id;
   localStorage.setItem("activeTab", "performers");
+  render();
+});
+
+onNavigateToStudio((id) => {
+  activeTab = "studios";
+  pendingStudioId = id;
+  localStorage.setItem("activeTab", "studios");
   render();
 });
 
@@ -52,6 +64,9 @@ function render() {
   else if (activeTab === "performers") {
     content.appendChild(renderPerformersView(pendingPerformerId));
     pendingPerformerId = undefined;
+  } else if (activeTab === "studios") {
+    content.appendChild(renderStudiosView(pendingStudioId));
+    pendingStudioId = undefined;
   } else if (activeTab === "stats") content.appendChild(renderStatsView());
   else content.appendChild(renderSettingsView());
 }
@@ -62,7 +77,7 @@ function setTab(tab: Tab) {
   // Leaving Performers (e.g. after landing on a /performers/<id> deep link
   // and then clicking another tab) drops the stale path — replaceState, not
   // pushState, since a plain tab switch shouldn't add a history entry.
-  if (tab !== "performers" && window.location.pathname !== "/") {
+  if (tab !== "performers" && tab !== "studios" && window.location.pathname !== "/") {
     history.replaceState(null, "", "/");
   }
   render();

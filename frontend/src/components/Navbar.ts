@@ -1,11 +1,12 @@
 import { api } from "../api.js";
 
-export type Tab = "browse" | "watched" | "performers" | "stats" | "settings";
+export type Tab = "browse" | "watched" | "performers" | "studios" | "stats" | "settings";
 
 const LEFT_TABS: { id: Tab; label: string }[] = [
   { id: "watched", label: "Feed" },
   { id: "browse", label: "Filters" },
   { id: "performers", label: "Performers" },
+  { id: "studios", label: "Studios" },
   { id: "stats", label: "Stats" },
 ];
 
@@ -118,15 +119,20 @@ setSfwMode(isSfwMode());
 // already rendered with an empty URL.
 let localStashRootUrl = "";
 let whisparrBaseUrl = "";
-try {
-  const cfg = await api.getConfig();
-  localStashRootUrl = cfg.localStashRootUrl ?? "";
-  whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
-  refreshStashLinks();
-  refreshDownloadingBadges();
-} catch {
-  // leave both empty — links just won't render
-}
+// Fire-and-forget, NOT awaited — a top-level await here would suspend this
+// module's evaluation (and thus main.ts's first render()) on a network round
+// trip. The refresh functions below back-fill whatever already rendered.
+api
+  .getConfig()
+  .then((cfg) => {
+    localStashRootUrl = cfg.localStashRootUrl ?? "";
+    whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
+    refreshStashLinks();
+    refreshDownloadingBadges();
+  })
+  .catch(() => {
+    // leave both empty — links just won't render
+  });
 
 // Off by default — Feed/Trending hide scenes already in the library unless
 // this is switched on. Read by WatchedView.ts when building its queries.

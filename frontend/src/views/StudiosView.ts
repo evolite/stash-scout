@@ -2,18 +2,16 @@ import { api, type SavedFilter, type SceneFilter } from "../api.js";
 import { isInLibraryMode } from "../components/Navbar.js";
 import { renderChip } from "../components/Chip.js";
 import { renderSceneSection } from "../components/SceneSection.js";
-import { renderPerformerSearch } from "../components/PerformerSearch.js";
-import { renderPerformerHeader } from "../components/EntityHeader.js";
+import { renderStudioSearch } from "../components/StudioSearch.js";
+import { renderStudioHeader } from "../components/EntityHeader.js";
 
 const PER_PAGE = 32;
 
-// Same "merge a chosen watched filter's tags/studio/exclude_tags into one flat
-// query" trick WatchedView's Trending section uses (see WatchedView.ts's
-// trendingSection.fetchPage) — here `performers` is pinned to the performer
-// being browsed instead of `favorites`. Global exclude tags are applied
-// server-side unconditionally (server/routes/scenes.ts), so nothing extra is
-// needed here for that.
-export function renderPerformersView(initialId?: string): HTMLElement {
+// Mirror of PerformersView: browse one studio's StashDB scenes, optionally
+// narrowed by a chosen watched filter's tags/exclude_tags. The browsed studio
+// is pinned as the `studios` criterion. Global exclude tags are applied
+// server-side unconditionally (server/routes/scenes.ts).
+export function renderStudiosView(initialId?: string): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex flex-col gap-4";
 
@@ -30,14 +28,14 @@ export function renderPerformersView(initialId?: string): HTMLElement {
   const sectionWrap = document.createElement("div");
   container.appendChild(sectionWrap);
 
-  let performerId: string | undefined = initialId;
+  let studioId: string | undefined = initialId;
   let selectedFilterName: string | undefined; // undefined = "All"
   let watchedFilters: SavedFilter[] = [];
   let section: ReturnType<typeof renderSceneSection> | undefined;
 
   function renderHeaderPlaceholder(name?: string) {
     header.innerHTML = "";
-    if (!performerId) return;
+    if (!studioId) return;
     const card = document.createElement("div");
     card.className = "rounded-lg border border-line bg-surface p-5";
     const h = document.createElement("h2");
@@ -49,9 +47,7 @@ export function renderPerformersView(initialId?: string): HTMLElement {
 
   function renderChips() {
     chipBar.innerHTML = "";
-    // A lone "All" chip is just noise — only show the bar once there's an
-    // actual watched filter to pick and a performer to apply it to.
-    if (!performerId || watchedFilters.length === 0) return;
+    if (!studioId || watchedFilters.length === 0) return;
     const label = document.createElement("span");
     label.className = "text-xs text-text-faint mr-1";
     label.textContent = "Watched filter";
@@ -84,58 +80,53 @@ export function renderPerformersView(initialId?: string): HTMLElement {
         const filter: SceneFilter = {
           page,
           per_page: PER_PAGE,
-          performers: performerId,
+          studios: studioId,
           unadded: isInLibraryMode() ? undefined : "1",
           tags: cf?.tags as string | undefined,
           tags_modifier: cf?.tags_modifier as SceneFilter["tags_modifier"],
           exclude_tags: cf?.exclude_tags as string | undefined,
-          studios: cf?.studios as string | undefined,
           sort: "DATE",
           direction: "DESC",
         };
         return api.queryScenes(filter, refresh);
       },
-      emptyMessage: "No scenes found for this performer.",
+      emptyMessage: "No scenes found for this studio.",
     });
     sectionWrap.appendChild(section.element);
   }
 
-  // Selecting a different performer (via the search box, or a scene card's
-  // performer link elsewhere in the app calling navigateToPerformer) is a
-  // plain in-app state update and re-render — no URL/history involvement,
-  // same as every other view in this app.
-  function loadPerformer(id: string, name?: string) {
-    performerId = id;
+  function loadStudio(id: string, name?: string) {
+    studioId = id;
     renderChips();
     renderHeaderPlaceholder(name);
-    api.performerDetails(id).then(
+    api.studioDetails(id).then(
       (d) => {
-        if (performerId === id) header.replaceChildren(renderPerformerHeader(d));
+        if (studioId === id) header.replaceChildren(renderStudioHeader(d));
       },
       () => {}, // keep the placeholder on failure
     );
     mountSection();
   }
 
-  searchRow.appendChild(renderPerformerSearch((id, name) => loadPerformer(id, name)));
+  searchRow.appendChild(renderStudioSearch((id, name) => loadStudio(id, name)));
 
   api.listFilters().then((filters) => {
     watchedFilters = filters.filter((f) => f.watched);
     renderChips();
   });
 
-  if (performerId) {
-    loadPerformer(performerId);
+  if (studioId) {
+    loadStudio(studioId);
   } else {
     const hint = document.createElement("div");
     hint.className =
       "flex flex-col items-center gap-1 rounded-lg border border-dashed border-line py-16 text-center";
     const t = document.createElement("p");
     t.className = "text-text text-sm font-medium";
-    t.textContent = "No performer selected";
+    t.textContent = "No studio selected";
     const sub = document.createElement("p");
     sub.className = "text-muted text-sm";
-    sub.textContent = "Search above to browse a performer's scenes.";
+    sub.textContent = "Search above to browse a studio's scenes.";
     hint.append(t, sub);
     sectionWrap.appendChild(hint);
   }

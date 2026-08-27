@@ -48,8 +48,20 @@ app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok" }));
 // (dist-server/server/index.js, two levels under root), and both dev and
 // prod always launch with cwd = project root per package.json's scripts.
 const frontendDist = path.join(process.cwd(), "frontend", "dist");
-app.use(express.static(frontendDist));
-app.get("*", (_req, res) => res.sendFile(path.join(frontendDist, "index.html")));
+app.use(
+  express.static(frontendDist, {
+    index: false, // index.html always goes through the catch-all below
+    setHeaders: (res, filePath) => {
+      // Vite content-hashes everything under assets/, so it's safe to cache forever.
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  }),
+);
+app.get("*", (_req, res) =>
+  res.set("Cache-Control", "no-cache").sendFile(path.join(frontendDist, "index.html")),
+);
 
 const server = app.listen(cfg.port, "0.0.0.0", () => {
   console.log(`Stash Scout listening on http://0.0.0.0:${cfg.port}`);

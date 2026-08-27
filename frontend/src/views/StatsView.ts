@@ -149,11 +149,14 @@ export function renderStatsView(): HTMLElement {
 
     const grid = document.createElement("div");
     grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]";
-    grid.appendChild(tile("Monitored", stats.monitored));
+    grid.appendChild(tile("In Whisparr", stats.totalInWhisparr));
+    grid.appendChild(tile("Downloaded", stats.downloaded));
     grid.appendChild(
       tile("Downloading", stats.downloading, stats.downloadProgress != null ? `${stats.downloadProgress}%` : undefined),
     );
-    grid.appendChild(tile("Previously Added", stats.previouslyAdded));
+    grid.appendChild(tile("Wanted", stats.wanted));
+    grid.appendChild(tile("Unmonitored", stats.unmonitored));
+    grid.appendChild(tile("Monitored (total)", stats.monitoredTotal));
     grid.appendChild(tile("Ignored", stats.ignoredCount));
     grid.appendChild(tile("Saved Filters", stats.savedFiltersCount));
     grid.appendChild(tile("Watched Filters", stats.watchedFiltersCount));

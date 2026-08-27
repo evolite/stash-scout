@@ -1,5 +1,5 @@
-import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, SavedFilter as BaseSavedFilter } from "../../shared/types.js";
-export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary };
+import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, StudioDetails, SavedFilter as BaseSavedFilter } from "../../shared/types.js";
+export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, StudioDetails };
 
 export interface SceneFilter {
   text?: string;
@@ -54,6 +54,8 @@ export const api = {
   searchPerformers: (term: string) => req<{ id: string; name: string }[]>(`/api/performers/search?term=${encodeURIComponent(term)}`),
   performersByIds: (ids: string[]) =>
     ids.length ? req<{ id: string; name: string }[]>(`/api/performers/byIds?ids=${ids.join(",")}`) : Promise.resolve([]),
+  performerDetails: (id: string) => req<PerformerDetails>(`/api/performers/${encodeURIComponent(id)}/details`),
+  studioDetails: (id: string) => req<StudioDetails>(`/api/studios/${encodeURIComponent(id)}/details`),
   searchStudios: (term: string) => req<{ id: string; name: string }[]>(`/api/studios/search?term=${encodeURIComponent(term)}`),
   studiosByIds: (ids: string[]) =>
     ids.length ? req<{ id: string; name: string }[]>(`/api/studios/byIds?ids=${ids.join(",")}`) : Promise.resolve([]),

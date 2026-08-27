@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { AppConfig } from "./config.js";
-import type { Scene } from "../shared/types.js";
+import type { Scene, PerformerDetails, StudioDetails } from "../shared/types.js";
 import { capMap } from "./cacheUtil.js";
 
 // StashDB's schema only has one `tags` filter (no separate exclude_tags field) — an
@@ -66,35 +66,55 @@ function throttle(): Promise<void> {
 // scan below, a re-render firing the same fetch twice) don't cost a fresh call.
 const CACHE_TTL_MS = 20_000;
 const RESPONSE_CACHE_MAX_ENTRIES = 1000;
-const responseCache = new Map<string, { at: number; data: unknown }>();
+const responseCache = new Map<string, { at: number; expiresAt: number; data: unknown }>();
+// Collapses identical queries issued while one is already in flight (a
+// reset()+load() race in the UI, parallel merged-feed sources that resolve to
+// the same query) down to a single upstream request.
+const inflight = new Map<string, Promise<unknown>>();
 
-async function gql<T>(url: string, apiKey: string | undefined, query: string, variables: unknown, bypassCache = false): Promise<T> {
+async function gql<T>(
+  url: string,
+  apiKey: string | undefined,
+  query: string,
+  variables: unknown,
+  bypassCache = false,
+  ttlMs = CACHE_TTL_MS,
+): Promise<T> {
   if (!apiKey) {
     throw new Error("StashDB is not configured — add an API key in Settings.");
   }
   const cacheKey = query + JSON.stringify(variables);
   const cached = responseCache.get(cacheKey);
-  if (!bypassCache && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+  if (!bypassCache && cached && Date.now() < cached.expiresAt) {
     return cached.data as T;
   }
+  if (!bypassCache) {
+    const pending = inflight.get(cacheKey);
+    if (pending) return pending as Promise<T>;
+  }
 
-  await throttle();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ApiKey: apiKey },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw new Error(`StashDB request failed: HTTP ${res.status}`);
-  }
-  const json = (await res.json()) as { data?: T; errors?: { message: string }[] };
-  if (json.errors?.length) {
-    throw new Error(`StashDB GraphQL error: ${json.errors.map((e) => e.message).join("; ")}`);
-  }
-  responseCache.set(cacheKey, { at: Date.now(), data: json.data });
-  capMap(responseCache, RESPONSE_CACHE_MAX_ENTRIES);
-  return json.data as T;
+  const run = (async (): Promise<T> => {
+    await throttle();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ApiKey: apiKey },
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      throw new Error(`StashDB request failed: HTTP ${res.status}`);
+    }
+    const json = (await res.json()) as { data?: T; errors?: { message: string }[] };
+    if (json.errors?.length) {
+      throw new Error(`StashDB GraphQL error: ${json.errors.map((e) => e.message).join("; ")}`);
+    }
+    responseCache.set(cacheKey, { at: Date.now(), expiresAt: Date.now() + ttlMs, data: json.data });
+    capMap(responseCache, RESPONSE_CACHE_MAX_ENTRIES);
+    return json.data as T;
+  })().finally(() => inflight.delete(cacheKey));
+
+  inflight.set(cacheKey, run);
+  return run;
 }
 
 // Per-filter accumulated results for exclude-tag queries — keyed on the filter
@@ -185,6 +205,7 @@ export class StashDBClient {
       }`,
       variables,
       bypassCache,
+      60_000, // scene data barely changes minute-to-minute; feeds it into the 5-min exclude/merged caches
     );
     return data.queryScenes;
   }
@@ -366,9 +387,13 @@ export class StashDBClient {
 
     let round = 0;
     while (visible().length < skip + perPage && !entry.exhaustedAll && entry.merged.length < MAX_CACHED_SCENES && round < MAX_MERGE_ROUNDS) {
-      for (let i = 0; i < sources.length; i++) {
-        await this.advanceMergedFeedSource(entry, sources[i], entry.cursors[i], opts);
-      }
+      // Fan out to every source in parallel — the rate limiter (throttle())
+      // still caps actual dispatch, this just stops each source's round-trip
+      // latency from stacking. Each advance does its await then a synchronous
+      // dedup-and-append, so concurrent sources can't interleave a duplicate.
+      await Promise.all(
+        sources.map((src, i) => this.advanceMergedFeedSource(entry!, src, entry!.cursors[i], opts)),
+      );
       entry.exhaustedAll = entry.cursors.every((c) => c.exhausted);
       round++;
     }
@@ -416,6 +441,8 @@ export class StashDBClient {
         ${queryName}(term: $term, limit: $limit) { id name }
       }`,
       { term: text, limit: 10 },
+      false,
+      5 * 60_000,
     );
     return data[queryName];
   }
@@ -440,6 +467,8 @@ export class StashDBClient {
       this.cfg.stashdbApiKey,
       `query (${argsDecl}) { ${fields} }`,
       variables,
+      false,
+      30 * 60_000, // id -> name; effectively immutable
     );
     return Object.values(data).filter((t): t is { id: string; name: string } => t !== null);
   }
@@ -461,5 +490,46 @@ export class StashDBClient {
   }
   findStudiosByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
     return this.findByIds("findStudio", ids);
+  }
+
+  // Full record for the Performers/Studios tab header — 30-min TTL, same as the
+  // id->name lookups (this data changes rarely).
+  async findPerformerDetails(id: string): Promise<PerformerDetails | null> {
+    const data = await gql<{ findPerformer: PerformerDetails | null }>(
+      this.cfg.stashdbUrl,
+      this.cfg.stashdbApiKey,
+      `query ($id: ID!) {
+        findPerformer(id: $id) {
+          id name disambiguation gender birth_date age country ethnicity
+          eye_color hair_color height cup_size band_size waist_size hip_size
+          breast_type career_start_year career_end_year aliases scene_count
+          images { url width height }
+          urls { url site { name } }
+        }
+      }`,
+      { id },
+      false,
+      30 * 60_000,
+    );
+    return data.findPerformer;
+  }
+
+  async findStudioDetails(id: string): Promise<StudioDetails | null> {
+    const data = await gql<{ findStudio: StudioDetails | null }>(
+      this.cfg.stashdbUrl,
+      this.cfg.stashdbApiKey,
+      `query ($id: ID!) {
+        findStudio(id: $id) {
+          id name aliases
+          parent { id name }
+          images { url width height }
+          urls { url site { name } }
+        }
+      }`,
+      { id },
+      false,
+      30 * 60_000,
+    );
+    return data.findStudio;
   }
 }

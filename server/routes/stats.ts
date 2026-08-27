@@ -11,16 +11,19 @@ const TIMELINE_DAYS = 30;
 // once over the whole list instead of once per scene id.
 function classifyMovies(movies: WhisparrScene[], queue: WhisparrQueueItem[]) {
   const queuedMovieIds = new Set(queue.map((q) => q.movieId));
-  let monitored = 0;
+  let downloaded = 0;
   let downloading = 0;
-  let previouslyAdded = 0;
+  let wanted = 0;
+  let unmonitored = 0;
+  let monitoredTotal = 0;
   for (const m of movies) {
-    if (m.hasFile) monitored++;
+    if (m.monitored) monitoredTotal++;
+    if (m.hasFile) downloaded++;
     else if (queuedMovieIds.has(m.id)) downloading++;
-    else if (m.monitored) monitored++;
-    else previouslyAdded++;
+    else if (m.monitored) wanted++;
+    else unmonitored++;
   }
-  return { monitored, downloading, previouslyAdded };
+  return { totalInWhisparr: movies.length, downloaded, downloading, wanted, unmonitored, monitoredTotal };
 }
 
 // Bytes-weighted so a mostly-done large file counts more than a barely-started
@@ -62,7 +65,7 @@ export function statsRouter(cfg: AppConfig, whisparr: WhisparrClient) {
 
   router.get("/stats", async (_req, res) => {
     try {
-      let counts = { monitored: 0, downloading: 0, previouslyAdded: 0 };
+      let counts = { totalInWhisparr: 0, downloaded: 0, downloading: 0, wanted: 0, unmonitored: 0, monitoredTotal: 0 };
       let timeline: StatsSummary["timeline"] = [];
       let downloadProgress: number | null = null;
 

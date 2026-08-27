@@ -16,6 +16,47 @@ export interface Scene {
   sourceLabel?: string;
 }
 
+export interface StashImage {
+  url: string;
+  width: number;
+  height: number;
+}
+
+// Detail views for the Performers / Studios tabs — the object you looked up.
+export interface PerformerDetails {
+  id: string;
+  name: string;
+  disambiguation: string | null;
+  gender: string | null;
+  birth_date: string | null;
+  age: number | null;
+  country: string | null;
+  ethnicity: string | null;
+  eye_color: string | null;
+  hair_color: string | null;
+  height: number | null;
+  cup_size: string | null;
+  band_size: number | null;
+  waist_size: number | null;
+  hip_size: number | null;
+  breast_type: string | null;
+  career_start_year: number | null;
+  career_end_year: number | null;
+  aliases: string[];
+  scene_count: number;
+  images: StashImage[];
+  urls: { url: string; site: { name: string } | null }[];
+}
+
+export interface StudioDetails {
+  id: string;
+  name: string;
+  aliases: string[];
+  parent: { id: string; name: string } | null;
+  images: StashImage[];
+  urls: { url: string; site: { name: string } | null }[];
+}
+
 // Ported from StashSeer's checkIfAvailable/handleDownloadFlow state machine
 // (stashseer.js ~1292-1600), collapsed into one server-side status lookup.
 export type SceneStatus =
@@ -47,12 +88,18 @@ export interface IgnoredScene {
 }
 
 export interface StatsSummary {
-  monitored: number;
-  downloading: number;
+  // Whisparr library breakdown — mutually exclusive buckets (except
+  // monitoredTotal, which is a cross-cutting count of everything with the
+  // monitored flag set). All zero when Whisparr isn't configured.
+  totalInWhisparr: number;
+  downloaded: number; // has a file
+  downloading: number; // in the download queue, no file yet
+  wanted: number; // monitored, no file, not downloading
+  unmonitored: number; // no file, not monitored (added then unmonitored)
+  monitoredTotal: number;
   // Aggregate percent complete (0-100) across all queued items, by bytes;
   // null when nothing is downloading or Whisparr didn't report sizes.
   downloadProgress: number | null;
-  previouslyAdded: number;
   ignoredCount: number;
   savedFiltersCount: number;
   watchedFiltersCount: number;

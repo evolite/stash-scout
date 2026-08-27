@@ -127,6 +127,13 @@ export function renderSceneSection(opts: {
       updatePagination(count, !!approximateCount);
       renderGrid();
       refreshStatuses();
+
+      // Warm the next page into the server-side cache so clicking "→" renders
+      // instantly. Fire-and-forget; errors are irrelevant (it's a prefetch).
+      const hasNextPage = approximateCount || page * opts.perPage < count;
+      if (!bypassCache && hasNextPage) {
+        void opts.fetchPage(page + 1).catch(() => {});
+      }
     } finally {
       grid.classList.remove("animate-breathe", "pointer-events-none");
     }

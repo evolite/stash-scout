@@ -126,6 +126,26 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     }
   });
 
+  router.get("/performers/:id/details", async (req, res) => {
+    try {
+      const details = await stashdb.findPerformerDetails(String(req.params.id));
+      if (!details) return res.status(404).json({ error: "not found" });
+      res.json(details);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get("/studios/:id/details", async (req, res) => {
+    try {
+      const details = await stashdb.findStudioDetails(String(req.params.id));
+      if (!details) return res.status(404).json({ error: "not found" });
+      res.json(details);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.get("/studios/search", async (req, res) => {
     try {
       const term = String(req.query.term ?? "");
