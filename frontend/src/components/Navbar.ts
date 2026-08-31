@@ -128,6 +128,7 @@ api
     localStashRootUrl = cfg.localStashRootUrl ?? "";
     whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
     refreshStashLinks();
+    refreshBadgeVisibility();
     refreshDownloadingBadges();
   })
   .catch(() => {
@@ -184,6 +185,34 @@ const DOWNLOADING_POLL_MS = 20_000;
 // creation time, before renderNavbar has appended the returned element.
 let currentBadge: HTMLAnchorElement | null = null;
 
+// Visibility + link target depend only on whether Whisparr is configured
+// (a fast local /api/settings/config call), NOT on the slow /api/stats proxy
+// below. Runs at badge creation — so on any navigation after the first load,
+// where module-level whisparrBaseUrl is already populated, the icon appears
+// synchronously — and again once getConfig() lands on the first load.
+function refreshBadgeVisibility(): void {
+  const badge = currentBadge;
+  if (!badge) return;
+  if (!whisparrBaseUrl) {
+    badge.classList.add("hidden");
+    badge.classList.remove("flex");
+    return;
+  }
+  // Always a link to Whisparr — only the label/progress-bar content changes.
+  badge.href = whisparrBaseUrl;
+  badge.target = "_blank";
+  badge.rel = "noopener";
+  const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
+  // Kept the same brand color in both states — an inline color always
+  // wins over the pill's hover:text-muted, so hovering the badge can't
+  // flash the label a different shade than the idle Stash/Whisparr links.
+  label.style.color = WHISPARR_COLOR;
+  // Default until /api/stats reports otherwise, so first paint isn't blank.
+  if (!label.textContent) label.textContent = "Whisparr";
+  badge.classList.remove("hidden");
+  badge.classList.add("flex");
+}
+
 async function refreshDownloadingBadges(): Promise<void> {
   const badge = currentBadge;
   if (!badge) return;
@@ -192,19 +221,6 @@ async function refreshDownloadingBadges(): Promise<void> {
     const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
     const track = badge.querySelector<HTMLElement>(".js-dl-track")!;
     const fill = badge.querySelector<HTMLElement>(".js-dl-fill")!;
-    if (!whisparrBaseUrl) {
-      badge.classList.add("hidden");
-      badge.classList.remove("flex");
-      return;
-    }
-    // Always a link to Whisparr — only the label/progress-bar content changes.
-    badge.href = whisparrBaseUrl;
-    badge.target = "_blank";
-    badge.rel = "noopener";
-    // Kept the same brand color in both states — an inline color always
-    // wins over the pill's hover:text-muted, so hovering the badge can't
-    // flash the label a different shade than the idle Stash/Whisparr links.
-    label.style.color = WHISPARR_COLOR;
     if (stats.downloading > 0) {
       label.textContent = `${stats.downloading} downloading`;
       fill.style.width = `${stats.downloadProgress ?? 0}%`;
@@ -213,8 +229,6 @@ async function refreshDownloadingBadges(): Promise<void> {
       label.textContent = "Whisparr";
       track.classList.add("hidden");
     }
-    badge.classList.remove("hidden");
-    badge.classList.add("flex");
   } catch {
     // leave the badge as-is on a failed refresh
   }
@@ -245,6 +259,7 @@ function renderDownloadingBadge(): HTMLElement {
   badge.appendChild(track);
 
   currentBadge = badge;
+  refreshBadgeVisibility();
   refreshDownloadingBadges();
   return badge;
 }
