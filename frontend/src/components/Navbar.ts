@@ -245,19 +245,22 @@ function renderDownloadingBadge(): HTMLElement {
   const row = document.createElement("span");
   row.className = "flex items-center gap-1.5";
   row.appendChild(brandIcon(WHISPARR_ICON_SRC, "Whisparr"));
-  const label = document.createElement("span");
-  label.className = "js-dl-label";
-  row.appendChild(label);
 
   // Inline donut (conic-gradient ring) rather than a progress bar below the
   // row — a bar made the flex-col pill grow taller, nudging the Whisparr
   // icon/text out of vertical alignment with the Stash link next to it.
+  // Sits right before the label so the ring and the "N downloading" count
+  // read as one unit. h-4/w-4 to match the 16px brand icon's line box.
   const donut = document.createElement("span");
-  donut.className = "js-dl-donut hidden h-3.5 w-3.5 shrink-0 rounded-full";
+  donut.className = "js-dl-donut hidden h-4 w-4 shrink-0 self-center rounded-full";
   const hole = "radial-gradient(closest-side, transparent 62%, #000 63%)";
   donut.style.setProperty("mask", hole);
   donut.style.setProperty("-webkit-mask", hole);
   row.appendChild(donut);
+
+  const label = document.createElement("span");
+  label.className = "js-dl-label";
+  row.appendChild(label);
   badge.appendChild(row);
 
   currentBadge = badge;
