@@ -220,14 +220,18 @@ async function refreshDownloadingBadges(): Promise<void> {
     const stats = await api.stats();
     const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
     const donut = badge.querySelector<HTMLElement>(".js-dl-donut")!;
+    const icon = badge.querySelector<HTMLElement>(".js-dl-icon")!;
     if (stats.downloading > 0) {
+      // While downloading, the donut stands in for the brand icon.
       label.textContent = `${stats.downloading} downloading`;
       const pct = Math.max(0, Math.min(100, stats.downloadProgress ?? 0));
       donut.style.background = `conic-gradient(${WHISPARR_COLOR} ${pct}%, rgba(255,255,255,0.15) 0)`;
       donut.classList.remove("hidden");
+      icon.classList.add("hidden");
     } else {
       label.textContent = "Whisparr";
       donut.classList.add("hidden");
+      icon.classList.remove("hidden");
     }
   } catch {
     // leave the badge as-is on a failed refresh
@@ -244,7 +248,9 @@ function renderDownloadingBadge(): HTMLElement {
 
   const row = document.createElement("span");
   row.className = "flex items-center gap-1.5";
-  row.appendChild(brandIcon(WHISPARR_ICON_SRC, "Whisparr"));
+  const icon = brandIcon(WHISPARR_ICON_SRC, "Whisparr");
+  icon.classList.add("js-dl-icon");
+  row.appendChild(icon);
 
   // Inline donut (conic-gradient ring) rather than a progress bar below the
   // row — a bar made the flex-col pill grow taller, nudging the Whisparr
