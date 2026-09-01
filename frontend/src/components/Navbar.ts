@@ -219,15 +219,15 @@ async function refreshDownloadingBadges(): Promise<void> {
   try {
     const stats = await api.stats();
     const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
-    const track = badge.querySelector<HTMLElement>(".js-dl-track")!;
-    const fill = badge.querySelector<HTMLElement>(".js-dl-fill")!;
+    const donut = badge.querySelector<HTMLElement>(".js-dl-donut")!;
     if (stats.downloading > 0) {
       label.textContent = `${stats.downloading} downloading`;
-      fill.style.width = `${stats.downloadProgress ?? 0}%`;
-      track.classList.remove("hidden");
+      const pct = Math.max(0, Math.min(100, stats.downloadProgress ?? 0));
+      donut.style.background = `conic-gradient(${WHISPARR_COLOR} ${pct}%, rgba(255,255,255,0.15) 0)`;
+      donut.classList.remove("hidden");
     } else {
       label.textContent = "Whisparr";
-      track.classList.add("hidden");
+      donut.classList.add("hidden");
     }
   } catch {
     // leave the badge as-is on a failed refresh
@@ -248,15 +248,17 @@ function renderDownloadingBadge(): HTMLElement {
   const label = document.createElement("span");
   label.className = "js-dl-label";
   row.appendChild(label);
-  badge.appendChild(row);
 
-  const track = document.createElement("span");
-  track.className = "js-dl-track block h-1 w-full rounded-full bg-white/10 overflow-hidden";
-  const fill = document.createElement("span");
-  fill.className = "js-dl-fill block h-full rounded-full bg-accent transition-[width] duration-500";
-  fill.style.width = "0%";
-  track.appendChild(fill);
-  badge.appendChild(track);
+  // Inline donut (conic-gradient ring) rather than a progress bar below the
+  // row — a bar made the flex-col pill grow taller, nudging the Whisparr
+  // icon/text out of vertical alignment with the Stash link next to it.
+  const donut = document.createElement("span");
+  donut.className = "js-dl-donut hidden h-3.5 w-3.5 shrink-0 rounded-full";
+  const hole = "radial-gradient(closest-side, transparent 62%, #000 63%)";
+  donut.style.setProperty("mask", hole);
+  donut.style.setProperty("-webkit-mask", hole);
+  row.appendChild(donut);
+  badge.appendChild(row);
 
   currentBadge = badge;
   refreshBadgeVisibility();
