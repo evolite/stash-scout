@@ -59,10 +59,17 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
-function qs(filter: Record<string, unknown>): string {
+function qsValue(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return JSON.stringify(v);
+}
+
+function qs(filter: object): string {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(filter)) {
-    if (v !== undefined && v !== "") params.set(k, String(v));
+    if (v === undefined || v === null || v === "") continue;
+    params.set(k, qsValue(v));
   }
   return params.toString();
 }

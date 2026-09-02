@@ -80,26 +80,29 @@ function performerHasCriteria(c: PerformerClientCriteria): boolean {
   return !!(c.eye_color || c.hair_color || c.cup_size || c.height) || c.hasTattoos !== undefined || c.hasPiercings !== undefined;
 }
 
+// Does `actual` fail the `modifier` comparison against `target`? LESS_THAN
+// means actual must be ≤ target, EQUALS exact, anything else ≥ (GREATER_THAN).
+// Strings compare lexically (upper-cased cup sizes: A<B<…<DD<E).
+function failsModifier<T extends number | string>(actual: T, target: T, modifier: string): boolean {
+  if (modifier === "LESS_THAN") return actual > target;
+  if (modifier === "EQUALS") return actual !== target;
+  return actual < target;
+}
+
 function performerMatchesCriteria(p: PerformerResult, c: PerformerClientCriteria): boolean {
   const eq = (a: string | null, b: string) => (a ?? "").toUpperCase() === b.toUpperCase();
+  const has = (list: unknown[] | null | undefined) => list != null && list.length > 0;
   if (c.eye_color && !eq(p.eye_color, c.eye_color)) return false;
   if (c.hair_color && !eq(p.hair_color, c.hair_color)) return false;
   if (c.cup_size) {
     const a = (p.cup_size ?? "").toUpperCase();
-    const b = c.cup_size.value.toUpperCase();
-    if (!a) return false;
-    if (c.cup_size.modifier === "LESS_THAN" ? a > b
-      : c.cup_size.modifier === "EQUALS" ? a !== b
-      : a < b) return false;
+    if (!a || failsModifier(a, c.cup_size.value.toUpperCase(), c.cup_size.modifier)) return false;
   }
   if (c.height) {
-    if (p.height == null) return false;
-    if (c.height.modifier === "LESS_THAN" ? p.height > c.height.value
-      : c.height.modifier === "EQUALS" ? p.height !== c.height.value
-      : p.height < c.height.value) return false;
+    if (p.height == null || failsModifier(p.height, c.height.value, c.height.modifier)) return false;
   }
-  if (c.hasTattoos !== undefined && (p.tattoos != null && p.tattoos.length > 0) !== c.hasTattoos) return false;
-  if (c.hasPiercings !== undefined && (p.piercings != null && p.piercings.length > 0) !== c.hasPiercings) return false;
+  if (c.hasTattoos !== undefined && has(p.tattoos) !== c.hasTattoos) return false;
+  if (c.hasPiercings !== undefined && has(p.piercings) !== c.hasPiercings) return false;
   return true;
 }
 

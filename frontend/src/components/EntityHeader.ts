@@ -129,7 +129,8 @@ function heightDisplay(cm: number): string {
 function measurements(p: PerformerDetails): string | null {
   if (!p.band_size || !p.cup_size) return null;
   const rest = [p.waist_size, p.hip_size].filter(Boolean).join("-");
-  return `${p.band_size}${p.cup_size}${rest ? `-${rest}` : ""}`;
+  const suffix = rest ? `-${rest}` : "";
+  return `${p.band_size}${p.cup_size}${suffix}`;
 }
 
 export function renderPerformerHeader(p: PerformerDetails): HTMLElement {

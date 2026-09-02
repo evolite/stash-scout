@@ -10,7 +10,7 @@ import { renderOnboardingModal } from "./components/OnboardingModal.js";
 import { onNavigateToPerformer, onNavigateToStudio } from "./navigation.js";
 
 const root = document.getElementById("root")!;
-const TABS: Tab[] = ["browse", "watched", "performers", "studios", "stats", "settings"];
+const TABS = new Set<Tab>(["browse", "watched", "performers", "studios", "stats", "settings"]);
 const savedTab = localStorage.getItem("activeTab");
 
 // A request for /performers/<id> (typed, bookmarked, or linked from
@@ -26,7 +26,7 @@ if (deepLinkedPerformerId) {
   activeTab = "performers";
 } else if (deepLinkedStudioId) {
   activeTab = "studios";
-} else if (TABS.includes(savedTab as Tab)) {
+} else if (TABS.has(savedTab as Tab)) {
   activeTab = savedTab as Tab;
 } else {
   activeTab = "watched";
@@ -71,7 +71,7 @@ window.addEventListener("popstate", () => {
     activeTab = "studios";
     pendingStudioId = studio;
   } else {
-    activeTab = tabBeforeDetail ?? (TABS.includes(savedTab as Tab) ? (savedTab as Tab) : "watched");
+    activeTab = tabBeforeDetail ?? (TABS.has(savedTab as Tab) ? (savedTab as Tab) : "watched");
   }
   render();
 });

@@ -122,18 +122,18 @@ let whisparrBaseUrl = "";
 // Fire-and-forget, NOT awaited — a top-level await here would suspend this
 // module's evaluation (and thus main.ts's first render()) on a network round
 // trip. The refresh functions below back-fill whatever already rendered.
-api
-  .getConfig()
-  .then((cfg) => {
+void (async () => {
+  try {
+    const cfg = await api.getConfig();
     localStashRootUrl = cfg.localStashRootUrl ?? "";
     whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
     refreshStashLinks();
     refreshBadgeVisibility();
     refreshDownloadingBadges();
-  })
-  .catch(() => {
+  } catch {
     // leave both empty — links just won't render
-  });
+  }
+})();
 
 // Off by default — Feed/Trending hide scenes already in the library unless
 // this is switched on. Read by WatchedView.ts when building its queries.

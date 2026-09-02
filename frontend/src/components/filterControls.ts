@@ -12,7 +12,7 @@ export const GHOST_BTN =
   "bg-black/20 text-text rounded-lg px-3 py-2 text-sm font-medium hover:bg-black/30 transition-colors shrink-0 whitespace-nowrap";
 
 export function titleCase(v: string): string {
-  return v.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return v.replaceAll("_", " ").toLowerCase().replaceAll(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function fieldText(
