@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { StashDBClient } from "../stashdbClient.js";
-import { parseStashFilter } from "../filterUtils.js";
+import { parseStashFilter, parsePerformerFilter } from "../filterUtils.js";
 import type { AppConfig } from "../config.js";
 import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
@@ -103,6 +103,18 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     try {
       const ids = String(req.query.ids ?? "").split(",").filter(Boolean);
       res.json(await stashdb.findTagsByIds(ids));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Attribute-filtered performer discovery (Filters → Performers sub-tab).
+  router.get("/performers", async (req, res) => {
+    try {
+      const q = req.query as Record<string, unknown>;
+      const { input, criteria } = parsePerformerFilter(q);
+      const refresh = q.refresh === "1" || q.refresh === "true";
+      res.json(await stashdb.queryPerformers(input, criteria, refresh));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

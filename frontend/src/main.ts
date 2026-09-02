@@ -37,17 +37,42 @@ if (deepLinkedPerformerId) {
 let pendingPerformerId: string | undefined = deepLinkedPerformerId;
 let pendingStudioId: string | undefined = deepLinkedStudioId;
 
+// The list tab to return to when the browser Back button pops a
+// /performers/<id> or /studios/<id> entry off the history stack. Views keep
+// their own state across a re-render (module-level in PerformerBrowse etc.),
+// so Back lands on the same populated grid the user left.
+let tabBeforeDetail: Tab | undefined;
+
 onNavigateToPerformer((id) => {
+  // Record the current tab (including "performers" itself — opening a performer
+  // from the discovery grid should Back to that grid, not to some earlier tab).
+  if (activeTab !== "studios") tabBeforeDetail = activeTab;
   activeTab = "performers";
   pendingPerformerId = id;
-  localStorage.setItem("activeTab", "performers");
+  history.pushState(null, "", `/performers/${id}`);
   render();
 });
 
 onNavigateToStudio((id) => {
+  if (activeTab !== "performers" && activeTab !== "studios") tabBeforeDetail = activeTab;
   activeTab = "studios";
   pendingStudioId = id;
-  localStorage.setItem("activeTab", "studios");
+  history.pushState(null, "", `/studios/${id}`);
+  render();
+});
+
+window.addEventListener("popstate", () => {
+  const perf = /^\/performers\/([^/]+)$/.exec(window.location.pathname)?.[1];
+  const studio = /^\/studios\/([^/]+)$/.exec(window.location.pathname)?.[1];
+  if (perf) {
+    activeTab = "performers";
+    pendingPerformerId = perf;
+  } else if (studio) {
+    activeTab = "studios";
+    pendingStudioId = studio;
+  } else {
+    activeTab = tabBeforeDetail ?? (TABS.includes(savedTab as Tab) ? (savedTab as Tab) : "watched");
+  }
   render();
 });
 
@@ -77,7 +102,7 @@ function setTab(tab: Tab) {
   // Leaving Performers (e.g. after landing on a /performers/<id> deep link
   // and then clicking another tab) drops the stale path — replaceState, not
   // pushState, since a plain tab switch shouldn't add a history entry.
-  if (tab !== "performers" && tab !== "studios" && window.location.pathname !== "/") {
+  if (tab !== "studios" && window.location.pathname !== "/") {
     history.replaceState(null, "", "/");
   }
   render();

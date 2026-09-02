@@ -1,5 +1,36 @@
-import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, StudioDetails, SavedFilter as BaseSavedFilter } from "../../shared/types.js";
-export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, StudioDetails };
+import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, PerformerResult, StudioDetails, SavedFilter as BaseSavedFilter, SavedPerformerSearch } from "../../shared/types.js";
+export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, PerformerResult, StudioDetails, SavedPerformerSearch };
+
+export type PerformerSearchSummary = Omit<SavedPerformerSearch, "results"> & { resultCount: number };
+export type PerformerQueryResult = { count: number; performers: PerformerResult[]; approximateCount?: boolean };
+
+type NumMod = "GREATER_THAN" | "LESS_THAN" | "EQUALS";
+
+// Flat wire shape for the "Discover performers" filter — same string-serialized
+// style as SceneFilter. gender/ethnicity/country/age/birth_year/is_favorite are
+// filtered by StashDB; eye_color/hair_color/height/cup_size/tattoos/piercings
+// are filtered server-side by paging StashDB's results (it ignores those).
+export interface PerformerFilter {
+  name?: string;
+  gender?: string;
+  ethnicity?: string;
+  country?: string;
+  birth_year?: number;
+  birth_year_modifier?: "GREATER_THAN" | "LESS_THAN"; // after / before
+  is_favorite?: "1";
+  eye_color?: string;
+  hair_color?: string;
+  height?: number;
+  height_modifier?: NumMod;
+  cup_size?: string;
+  cup_size_modifier?: NumMod; // GREATER_THAN = larger/equal, LESS_THAN = smaller/equal
+  tattoos?: "yes" | "no";
+  piercings?: "yes" | "no";
+  sort?: string;
+  direction?: "ASC" | "DESC";
+  page?: number;
+  per_page?: number;
+}
 
 export interface SceneFilter {
   text?: string;
@@ -28,7 +59,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
-function qs(filter: SceneFilter): string {
+function qs(filter: Record<string, unknown>): string {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(filter)) {
     if (v !== undefined && v !== "") params.set(k, String(v));
@@ -49,6 +80,23 @@ export const api = {
       `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${sourceParam}${showInLibrary ? "&unadded=0" : ""}${refresh ? "&refresh=1" : ""}`,
     );
   },
+  queryPerformers: (filter: PerformerFilter, refresh = false) =>
+    req<PerformerQueryResult>(`/api/performers?${qs(filter)}${refresh ? "&refresh=1" : ""}`),
+  listPerformerSearches: () => req<PerformerSearchSummary[]>(`/api/performer-searches`),
+  getPerformerSearch: (id: string) => req<SavedPerformerSearch>(`/api/performer-searches/${id}`),
+  savePerformerSearch: (name: string, filter: PerformerFilter, results: unknown) =>
+    req<SavedPerformerSearch>(`/api/performer-searches`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, filter, results }),
+    }),
+  updatePerformerSearch: (id: string, patch: { name?: string; filter?: PerformerFilter; results?: unknown }) =>
+    req<SavedPerformerSearch>(`/api/performer-searches/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deletePerformerSearch: (id: string) => req(`/api/performer-searches/${id}`, { method: "DELETE" }),
   searchTags: (term: string) => req<{ id: string; name: string }[]>(`/api/tags/search?term=${encodeURIComponent(term)}`),
   tagsByIds: (ids: string[]) => (ids.length ? req<{ id: string; name: string }[]>(`/api/tags/byIds?ids=${ids.join(",")}`) : Promise.resolve([])),
   searchPerformers: (term: string) => req<{ id: string; name: string }[]>(`/api/performers/search?term=${encodeURIComponent(term)}`),

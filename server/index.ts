@@ -9,6 +9,7 @@ import { scenesRouter } from "./routes/scenes.js";
 import { sceneStatusRouter } from "./routes/sceneStatus.js";
 import { whisparrRouter } from "./routes/whisparr.js";
 import { filtersRouter } from "./routes/filters.js";
+import { performerSearchesRouter } from "./routes/performerSearches.js";
 import { ignoredScenesRouter } from "./routes/ignoredScenes.js";
 import { globalExcludeTagsRouter } from "./routes/globalExcludeTags.js";
 import { settingsRouter } from "./routes/settings.js";
@@ -26,12 +27,17 @@ const whisparr = new WhisparrClient(cfg);
 
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json());
+// 5mb, not the 100kb default: a saved performer search's body carries the
+// fetched result page (dozens of performers, each with an images array), which
+// overflows the default limit and 413s — that's what made "save" fail
+// intermittently depending on result size.
+app.use(express.json({ limit: "5mb" }));
 
 app.use("/api", scenesRouter(stashdb, cfg, localStash, whisparr));
 app.use("/api", sceneStatusRouter(cfg, localStash, whisparr));
 app.use("/api", whisparrRouter(cfg, whisparr));
 app.use("/api", filtersRouter());
+app.use("/api", performerSearchesRouter());
 app.use("/api", ignoredScenesRouter());
 app.use("/api", globalExcludeTagsRouter());
 app.use("/api", settingsRouter(cfg, localStash, whisparr));

@@ -48,6 +48,30 @@ export interface PerformerDetails {
   urls: { url: string; site: { name: string } | null }[];
 }
 
+// One row in the "Discover performers" attribute-filter results grid — a subset
+// of PerformerDetails plus what queryPerformers returns per performer.
+export interface PerformerResult {
+  id: string;
+  name: string;
+  disambiguation: string | null;
+  gender: string | null;
+  birth_date: string | null;
+  age: number | null;
+  country: string | null;
+  ethnicity: string | null;
+  eye_color: string | null;
+  hair_color: string | null;
+  height: number | null;
+  cup_size: string | null;
+  career_start_year: number | null;
+  career_end_year: number | null;
+  scene_count: number;
+  images: StashImage[];
+  // Used for client-side tattoo/piercing keyword filtering (StashDB won't).
+  tattoos?: { location: string | null; description: string | null }[];
+  piercings?: { location: string | null; description: string | null }[];
+}
+
 export interface StudioDetails {
   id: string;
   name: string;
@@ -74,6 +98,18 @@ export interface SavedFilter<F = Record<string, unknown>> {
   createdAt: string;
   filter: F;
   watched: boolean;
+}
+
+// A named performer search: the filter params plus the fetched result list, so
+// it can be restored without re-querying StashDB. `results` is the raw
+// { count, performers, approximateCount } response for the first page.
+export interface SavedPerformerSearch {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  filter: Record<string, unknown>;
+  results: unknown;
 }
 
 export interface GlobalExcludeTag {

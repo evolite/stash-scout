@@ -21,6 +21,10 @@ function textState(message: string): HTMLElement {
 
 type SubTab = "browse" | "excludes";
 
+// Persisted across re-mounts (e.g. returning from a performer detail via the
+// browser Back button) so the user lands back on the sub-tab they left.
+let lastSubTab: SubTab = "browse";
+
 export function renderBrowseView(): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex flex-col gap-3";
@@ -36,11 +40,28 @@ export function renderBrowseView(): HTMLElement {
   container.appendChild(browsePane);
   container.appendChild(excludesPane);
 
-  let subTab: SubTab = "browse";
+  let subTab: SubTab = lastSubTab;
   const SUBTABS: { id: SubTab; label: string }[] = [
     { id: "browse", label: "Browse" },
     { id: "excludes", label: "Exclude Tags" },
   ];
+  const tabButtons = new Map<SubTab, HTMLElement>();
+
+  function showSubTab(id: SubTab) {
+    subTab = id;
+    lastSubTab = id;
+    for (const [tid, btn] of tabButtons) {
+      const active = tid === id;
+      btn.className = active ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+      btn.setAttribute("aria-current", active ? "page" : "false");
+    }
+    browsePane.style.display = id === "browse" ? "" : "none";
+    excludesPane.style.display = id === "excludes" ? "" : "none";
+    if (id === "excludes" && excludesPane.children.length === 0) {
+      renderExcludeTagsPanel().then((panel) => excludesPane.appendChild(panel));
+    }
+  }
+
   for (const t of SUBTABS) {
     const el = document.createElement("button");
     el.type = "button";
@@ -48,18 +69,9 @@ export function renderBrowseView(): HTMLElement {
     el.setAttribute("aria-current", t.id === subTab ? "page" : "false");
     el.textContent = t.label;
     el.addEventListener("click", () => {
-      if (subTab === t.id) return;
-      subTab = t.id;
-      for (const other of Array.from(subTabs.children)) {
-        other.className = other === el ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
-        other.setAttribute("aria-current", other === el ? "page" : "false");
-      }
-      browsePane.style.display = subTab === "browse" ? "" : "none";
-      excludesPane.style.display = subTab === "excludes" ? "" : "none";
-      if (subTab === "excludes" && excludesPane.children.length === 0) {
-        renderExcludeTagsPanel().then((panel) => excludesPane.appendChild(panel));
-      }
+      if (subTab !== t.id) showSubTab(t.id);
     });
+    tabButtons.set(t.id, el);
     subTabs.appendChild(el);
   }
 
@@ -75,10 +87,9 @@ export function renderBrowseView(): HTMLElement {
 
   function renderSidebar() {
     sidebarCol.innerHTML = "";
-    sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter, loadedFilterName, savePreset));
-    renderSavedFiltersPanel(loadSavedFilter).then((panel) => {
-      sidebarCol.appendChild(panel);
-    });
+    const savedHost = document.createElement("div");
+    sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter, loadedFilterName, savePreset, savedHost));
+    renderSavedFiltersPanel(savedHost, loadSavedFilter);
   }
 
   function applyFilter(next: SceneFilter) {
@@ -103,6 +114,11 @@ export function renderBrowseView(): HTMLElement {
   // original, and saving under an existing name overwrites it even if
   // nothing was loaded first.
   async function savePreset(draft: SceneFilter, name: string) {
+    // Commit the drafted sidebar values as the live filter first — otherwise
+    // the renderSidebar() below rebuilds from the stale `filter` and the just-
+    // saved edits vanish from the UI (and a second Save would then persist the
+    // stale values back over the good save).
+    filter = { ...draft };
     const existing = (await api.listFilters()).find((f) => f.name === name);
     if (existing) {
       await api.overwriteFilter(existing.id, draft);
@@ -112,6 +128,7 @@ export function renderBrowseView(): HTMLElement {
       loadedFilterName = saved.name;
     }
     renderSidebar();
+    load();
   }
 
   function schedulePollingIfDownloading(scenes: Scene[]) {
@@ -186,6 +203,10 @@ export function renderBrowseView(): HTMLElement {
 
   renderSidebar();
   contentCol.appendChild(textState("Set your filters and click “Apply filters” to browse StashDB."));
+
+  // Restore the sub-tab the user was last on (e.g. after browser Back from a
+  // performer detail). "browse" is already the visible default.
+  if (subTab !== "browse") showSubTab(subTab);
 
   return container;
 }

@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { AppConfig } from "./config.js";
-import type { Scene, PerformerDetails, StudioDetails } from "../shared/types.js";
+import type { Scene, PerformerDetails, StudioDetails, PerformerResult } from "../shared/types.js";
 import { capMap } from "./cacheUtil.js";
 
 // StashDB's schema only has one `tags` filter (no separate exclude_tags field) — an
@@ -21,6 +21,86 @@ export interface SceneQueryInput {
   per_page: number;
   sort: string;
   direction: string;
+}
+
+// The "Discover performers" filter is split in two: `PerformerQueryInput` is
+// what StashDB's queryPerformers resolver actually honours; everything else
+// (eye/hair colour, height, cup size, tattoos, piercings) is a
+// `PerformerClientCriteria` we apply ourselves by paging + filtering StashDB's
+// results — its schema advertises those criteria but the server silently
+// ignores them.
+export interface PerformerQueryInput {
+  name?: string;
+  gender?: string;
+  ethnicity?: string;
+  country?: { value: string; modifier: string };
+  birth_year?: { value: number; modifier: string };
+  is_favorite?: boolean;
+  page: number;
+  per_page: number;
+  sort: string;
+  direction: string;
+}
+
+// Applied client-side (see queryPerformers). height.modifier is GREATER_THAN
+// (≥), LESS_THAN (≤) or EQUALS; the colour/cup fields are exact enum matches.
+export interface PerformerClientCriteria {
+  eye_color?: string;
+  hair_color?: string;
+  // modifier GREATER_THAN (cup ≥), LESS_THAN (cup ≤) or EQUALS; compared as
+  // upper-cased strings, which orders A<B<…<DD<E correctly enough.
+  cup_size?: { value: string; modifier: string };
+  height?: { value: number; modifier: string };
+  hasTattoos?: boolean; // true = has ≥1, false = has none
+  hasPiercings?: boolean;
+}
+
+const PERFORMER_FIELDS = `
+  id
+  name
+  disambiguation
+  gender
+  birth_date
+  age
+  country
+  ethnicity
+  eye_color
+  hair_color
+  height
+  cup_size
+  career_start_year
+  career_end_year
+  scene_count
+  images { url width height }
+  tattoos { location description }
+  piercings { location description }
+`;
+
+function performerHasCriteria(c: PerformerClientCriteria): boolean {
+  return !!(c.eye_color || c.hair_color || c.cup_size || c.height) || c.hasTattoos !== undefined || c.hasPiercings !== undefined;
+}
+
+function performerMatchesCriteria(p: PerformerResult, c: PerformerClientCriteria): boolean {
+  const eq = (a: string | null, b: string) => (a ?? "").toUpperCase() === b.toUpperCase();
+  if (c.eye_color && !eq(p.eye_color, c.eye_color)) return false;
+  if (c.hair_color && !eq(p.hair_color, c.hair_color)) return false;
+  if (c.cup_size) {
+    const a = (p.cup_size ?? "").toUpperCase();
+    const b = c.cup_size.value.toUpperCase();
+    if (!a) return false;
+    if (c.cup_size.modifier === "LESS_THAN" ? a > b
+      : c.cup_size.modifier === "EQUALS" ? a !== b
+      : a < b) return false;
+  }
+  if (c.height) {
+    if (p.height == null) return false;
+    if (c.height.modifier === "LESS_THAN" ? p.height > c.height.value
+      : c.height.modifier === "EQUALS" ? p.height !== c.height.value
+      : p.height < c.height.value) return false;
+  }
+  if (c.hasTattoos !== undefined && (p.tattoos != null && p.tattoos.length > 0) !== c.hasTattoos) return false;
+  if (c.hasPiercings !== undefined && (p.piercings != null && p.piercings.length > 0) !== c.hasPiercings) return false;
+  return true;
 }
 
 const SCENE_FIELDS = `
@@ -132,6 +212,24 @@ interface ExcludeCacheEntry {
 const FILTER_CACHE_MAX_ENTRIES = 200;
 const excludeCache = new Map<string, ExcludeCacheEntry>();
 
+// Same idea as excludeCache, for attribute-filtered performer discovery — page
+// through queryPerformers and keep only the performers matching the client-side
+// criteria, cached per filter so paging forward reuses earlier fetches.
+const MAX_CACHED_PERFORMERS = Number(process.env.STASHDB_MAX_CACHED_PERFORMERS ?? 300);
+// A rare-attribute filter (e.g. RED eyes) could otherwise page the entire
+// ~100k-performer catalogue at the 30 req/min rate limit — over an hour of
+// fetches for one request. Cap the StashDB pages scanned per request; the
+// per-filter cache persists, so paging forward resumes the scan where it left
+// off rather than restarting.
+const PERFORMER_SCAN_BUDGET = Number(process.env.STASHDB_PERFORMER_SCAN_BUDGET ?? 12);
+interface PerformerFilterCacheEntry {
+  performers: PerformerResult[];
+  exhausted: boolean;
+  internalPage: number;
+  at: number;
+}
+const performerFilterCache = new Map<string, PerformerFilterCacheEntry>();
+
 // "Random" charts mode — see queryScenesRandomWindow below. Bounded to
 // 2010-01-01 onward: StashDB's pre-2010 catalog is thin enough that a
 // uniform pick further back mostly lands on a near-empty window.
@@ -208,6 +306,91 @@ export class StashDBClient {
       60_000, // scene data barely changes minute-to-minute; feeds it into the 5-min exclude/merged caches
     );
     return data.queryScenes;
+  }
+
+  private async rawQueryPerformers(
+    input: Partial<PerformerQueryInput>,
+    bypassCache: boolean,
+  ): Promise<{ count: number; performers: PerformerResult[] }> {
+    const data = await gql<{ queryPerformers: { count: number; performers: PerformerResult[] } }>(
+      this.cfg.stashdbUrl,
+      this.cfg.stashdbApiKey,
+      `query ($input: PerformerQueryInput!) {
+        queryPerformers(input: $input) {
+          count
+          performers { ${PERFORMER_FIELDS} }
+        }
+      }`,
+      {
+        input: {
+          ...input,
+          page: input.page ?? 1,
+          per_page: Math.min(input.per_page ?? 25, MAX_PER_PAGE),
+          sort: input.sort ?? "SCENE_COUNT",
+          direction: input.direction ?? "DESC",
+        },
+      },
+      bypassCache,
+      60_000,
+    );
+    return data.queryPerformers;
+  }
+
+  // Attribute-filtered performer discovery (Filters → Performers). `input` is
+  // the part StashDB filters natively; `criteria` (eye/hair colour, height, cup
+  // size, tattoos, piercings) is applied here by paging through StashDB's
+  // results in the requested sort order and keeping only the matches —
+  // accumulated into a per-filter cache like queryScenesExcluding, capped at
+  // MAX_CACHED_PERFORMERS so a very selective filter comes back
+  // short/approximate rather than scanning the whole catalogue.
+  async queryPerformers(
+    input: Partial<PerformerQueryInput>,
+    criteria: PerformerClientCriteria = {},
+    bypassCache = false,
+  ): Promise<{ count: number; performers: PerformerResult[]; approximateCount: boolean }> {
+    const perPage = Math.min(input.per_page ?? 25, MAX_PER_PAGE);
+    const page = input.page ?? 1;
+
+    if (!performerHasCriteria(criteria)) {
+      const data = await this.rawQueryPerformers({ ...input, page, per_page: perPage }, bypassCache);
+      return { ...data, approximateCount: false };
+    }
+
+    const skip = (page - 1) * perPage;
+    const key = JSON.stringify({ ...input, page: undefined, per_page: undefined, criteria });
+    if (bypassCache) performerFilterCache.delete(key);
+    let entry = performerFilterCache.get(key);
+    if (!entry || Date.now() - entry.at > EXCLUDE_CACHE_TTL_MS) {
+      entry = { performers: [], exhausted: false, internalPage: 1, at: Date.now() };
+      performerFilterCache.set(key, entry);
+      capMap(performerFilterCache, FILTER_CACHE_MAX_ENTRIES);
+    }
+
+    let scannedThisRequest = 0;
+    while (
+      entry.performers.length < skip + perPage &&
+      !entry.exhausted &&
+      entry.performers.length < MAX_CACHED_PERFORMERS &&
+      scannedThisRequest < PERFORMER_SCAN_BUDGET
+    ) {
+      const { performers } = await this.rawQueryPerformers(
+        { ...input, page: entry.internalPage, per_page: MAX_PER_PAGE },
+        bypassCache,
+      );
+      scannedThisRequest++;
+      for (const p of performers) if (performerMatchesCriteria(p, criteria)) entry.performers.push(p);
+      if (performers.length < MAX_PER_PAGE) entry.exhausted = true;
+      else entry.internalPage++;
+    }
+
+    return {
+      // Always the count actually matched so far — while not exhausted it's a
+      // lower bound (approximateCount tells the UI more may follow). StashDB's
+      // own total is meaningless here since it ignores the attribute criteria.
+      count: entry.performers.length,
+      performers: entry.performers.slice(skip, skip + perPage),
+      approximateCount: !entry.exhausted,
+    };
   }
 
   // StashDB has no "include tag A, exclude tag B" query — its `tags` filter takes

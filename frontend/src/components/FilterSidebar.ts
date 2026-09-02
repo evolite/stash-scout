@@ -1,7 +1,6 @@
 import { api, type SceneFilter } from "../api.js";
 import { iconClose } from "../icons.js";
-
-const LABEL_CLASS = "flex flex-col gap-1 text-xs text-muted";
+import { SIDEBAR_CLASS, LABEL_CLASS, applyButton, saveRow } from "./filterControls.js";
 
 // Tag/performer/studio pickers here are simple comma-separated-id inputs backed by
 // a typeahead search — enough to exercise StashDB's INCLUDES/INCLUDES_ALL/EXCLUDES
@@ -102,9 +101,12 @@ export function renderFilterSidebar(
   onApply: (filter: SceneFilter) => void,
   presetName: string,
   onSave: (filter: SceneFilter, name: string) => void,
+  savedBlock: HTMLElement,
 ): HTMLElement {
   const aside = document.createElement("aside");
-  aside.className = "bg-surface rounded-lg p-4 flex flex-col gap-3";
+  aside.className = SIDEBAR_CLASS;
+
+  aside.appendChild(savedBlock);
 
   const draft: SceneFilter = { ...current };
 
@@ -218,30 +220,8 @@ export function renderFilterSidebar(
   sortLabel.appendChild(sortRow);
   aside.appendChild(sortLabel);
 
-  const apply = document.createElement("button");
-  apply.className = "bg-accent text-white rounded px-3 py-1.5 hover:brightness-110";
-  apply.textContent = "Apply filters";
-  apply.addEventListener("click", () => onApply({ ...draft, page: 1 }));
-  aside.appendChild(apply);
-
-  const saveRow = document.createElement("div");
-  saveRow.className = "flex items-stretch gap-2 border-t border-black/20 pt-3";
-  const nameInput = document.createElement("input");
-  nameInput.placeholder = "Preset name";
-  nameInput.value = presetName;
-  nameInput.className = "flex-1 min-w-0";
-  const saveBtn = document.createElement("button");
-  saveBtn.className = "bg-secondary text-white rounded px-3 py-1.5 hover:bg-surface-hover shrink-0 whitespace-nowrap";
-  saveBtn.textContent = "Save";
-  saveBtn.title = "Saves as a new preset, unless a preset with this exact name already exists — then it's overwritten";
-  saveBtn.addEventListener("click", () => {
-    const name = nameInput.value.trim();
-    if (!name) return;
-    onSave({ ...draft, page: 1 }, name);
-  });
-  saveRow.appendChild(nameInput);
-  saveRow.appendChild(saveBtn);
-  aside.appendChild(saveRow);
+  aside.appendChild(applyButton(() => onApply({ ...draft, page: 1 })));
+  aside.appendChild(saveRow(presetName, "Name this preset", (name) => onSave({ ...draft, page: 1 }, name)));
 
   return aside;
 }

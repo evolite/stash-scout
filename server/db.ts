@@ -3,7 +3,7 @@ import { existsSync, renameSync, readFileSync, mkdtempSync, writeFileSync, rmSyn
 import { strict as assert } from "node:assert";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { SavedFilter, GlobalExcludeTag, IgnoredScene } from "../shared/types.js";
+import type { SavedFilter, GlobalExcludeTag, IgnoredScene, SavedPerformerSearch } from "../shared/types.js";
 
 // process.cwd() rather than a path relative to this file's own location — see
 // the same reasoning in index.ts's frontendDist (dev's tsx-run-from-source vs
@@ -31,6 +31,14 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
+  );
+  CREATE TABLE IF NOT EXISTS performer_searches (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    filter TEXT NOT NULL,
+    results TEXT NOT NULL
   );
 `;
 
@@ -102,6 +110,17 @@ export const db = openDb(REAL_DATA_DIR);
 
 export function filterRowToSavedFilter(row: any): SavedFilter {
   return { id: row.id, name: row.name, createdAt: row.created_at, filter: JSON.parse(row.filter), watched: !!row.watched };
+}
+
+export function performerSearchRowTo(row: any): SavedPerformerSearch {
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    filter: JSON.parse(row.filter),
+    results: JSON.parse(row.results),
+  };
 }
 
 // ponytail: no test framework in this project — this is the one runnable
