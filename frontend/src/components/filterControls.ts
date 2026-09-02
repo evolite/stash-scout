@@ -90,6 +90,7 @@ export function fieldModifier(
   }
   const input = document.createElement("input");
   input.type = type;
+  input.className = "flex-1 min-w-0";
   input.value = value === undefined ? "" : String(value);
   const emit = () => {
     const raw = input.value.trim();
