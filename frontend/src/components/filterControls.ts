@@ -11,6 +11,26 @@ export const PRIMARY_BTN =
 export const GHOST_BTN =
   "bg-black/20 text-text rounded-lg px-3 py-2 text-sm font-medium hover:bg-black/30 transition-colors shrink-0 whitespace-nowrap";
 
+// Centered dashed-border placeholder for a results area with nothing in it yet
+// (no filters applied) or nothing to show (no matches). Shared by the Scenes
+// and Performers browsers so both read the same.
+export function emptyState(title: string, subtitle?: string): HTMLElement {
+  const box = document.createElement("div");
+  box.className =
+    "flex flex-col items-center gap-1 rounded-lg border border-dashed border-line py-16 px-4 text-center";
+  const t = document.createElement("p");
+  t.className = "text-text text-sm font-medium m-0";
+  t.textContent = title;
+  box.appendChild(t);
+  if (subtitle) {
+    const s = document.createElement("p");
+    s.className = "text-muted text-sm m-0";
+    s.textContent = subtitle;
+    box.appendChild(s);
+  }
+  return box;
+}
+
 export function titleCase(v: string): string {
   return v.replaceAll("_", " ").toLowerCase().replaceAll(/\b\w/g, (c) => c.toUpperCase());
 }

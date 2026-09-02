@@ -15,6 +15,7 @@ import {
   fieldCheckbox,
   applyButton,
   collapsible,
+  emptyState,
   savedRow,
   saveRow,
 } from "./filterControls.js";
@@ -270,10 +271,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     persist();
     contentCol.innerHTML = "";
     if (result.performers.length === 0) {
-      const p = document.createElement("p");
-      p.className = "text-muted text-sm";
-      p.textContent = "No performers match these filters.";
-      contentCol.appendChild(p);
+      contentCol.appendChild(emptyState("No performers match these filters", "Loosen a filter and Apply again."));
       return;
     }
     const grid = document.createElement("div");
@@ -505,17 +503,9 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
 
   function renderIdleHint() {
     contentCol.innerHTML = "";
-    const hint = document.createElement("div");
-    hint.className =
-      "flex flex-col items-center gap-1 rounded-lg border border-dashed border-line py-16 text-center";
-    const t = document.createElement("p");
-    t.className = "text-text text-sm font-medium";
-    t.textContent = "Set filters, then Apply";
-    const sub = document.createElement("p");
-    sub.className = "text-muted text-sm";
-    sub.textContent = "Or restore a saved search from the sidebar.";
-    hint.append(t, sub);
-    contentCol.appendChild(hint);
+    contentCol.appendChild(
+      emptyState("Set filters, then Apply", "Or restore a saved search from the sidebar."),
+    );
   }
 
   renderSidebarCol();

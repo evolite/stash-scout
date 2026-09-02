@@ -4,6 +4,7 @@ import { renderSavedFiltersPanel } from "../components/SavedFiltersPanel.js";
 import { renderSceneCard, hidePreview } from "../components/SceneCard.js";
 import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
+import { emptyState } from "../components/filterControls.js";
 
 const PER_PAGE = 32;
 
@@ -145,7 +146,7 @@ export function renderBrowseView(): HTMLElement {
   }
 
   renderSidebar();
-  contentCol.appendChild(textState("Set your filters and click “Apply filters” to browse StashDB."));
+  contentCol.appendChild(emptyState("Set filters, then Apply", "Or restore a saved filter from the sidebar."));
 
   return container;
 }
