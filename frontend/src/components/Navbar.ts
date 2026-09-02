@@ -122,7 +122,7 @@ let whisparrBaseUrl = "";
 // Fire-and-forget, NOT awaited — a top-level await here would suspend this
 // module's evaluation (and thus main.ts's first render()) on a network round
 // trip. The refresh functions below back-fill whatever already rendered.
-void (async () => {
+async function loadNavbarConfig(): Promise<void> {
   try {
     const cfg = await api.getConfig();
     localStashRootUrl = cfg.localStashRootUrl ?? "";
@@ -133,7 +133,8 @@ void (async () => {
   } catch {
     // leave both empty — links just won't render
   }
-})();
+}
+void loadNavbarConfig();
 
 // Off by default — Feed/Trending hide scenes already in the library unless
 // this is switched on. Read by WatchedView.ts when building its queries.
