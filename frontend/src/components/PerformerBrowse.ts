@@ -56,27 +56,12 @@ function renderSidebar(
   fields.className = "flex flex-col gap-3.5";
   aside.appendChild(fields);
 
+  // Filtered by StashDB itself.
   fields.append(
+    fieldText("Name contains", "name…", draft.name, (v) => (draft.name = v || undefined)),
     fieldSelect("Gender", GENDERS, draft.gender, "Any", (v) => (draft.gender = v || undefined)),
     fieldSelect("Ethnicity", ETHNICITIES, draft.ethnicity, "Any", (v) => (draft.ethnicity = v || undefined)),
-    fieldSelect("Eye colour", EYE_COLORS, draft.eye_color, "Any", (v) => (draft.eye_color = v || undefined)),
-    fieldSelect("Hair colour", HAIR_COLORS, draft.hair_color, "Any", (v) => (draft.hair_color = v || undefined)),
     fieldText("Country (ISO code, e.g. US)", "US", draft.country, (v) => (draft.country = v || undefined)),
-    fieldModifier(
-      "Cup size (letter, e.g. D)",
-      draft.cup_size,
-      draft.cup_size_modifier,
-      (value, modifier) => {
-        draft.cup_size = value;
-        draft.cup_size_modifier = modifier as PerformerFilter["cup_size_modifier"];
-      },
-      undefined,
-      "text",
-    ),
-    fieldModifier("Height (cm)", draft.height, draft.height_modifier, (value, modifier) => {
-      draft.height = value && Number.isFinite(+value) ? +value : undefined;
-      draft.height_modifier = modifier as PerformerFilter["height_modifier"];
-    }),
     fieldModifier(
       "Birth year",
       draft.birth_year,
@@ -90,10 +75,43 @@ function renderSidebar(
         ["LESS_THAN", "Before"],
       ],
     ),
+    fieldCheckbox("Favourites only", draft.is_favorite === "1", (on) => (draft.is_favorite = on ? "1" : undefined)),
+  );
+
+  // Divider + note: everything below is ignored by StashDB and matched by us
+  // paging through its results (see queryPerformers).
+  const clientBreak = document.createElement("div");
+  clientBreak.className = "border-t border-black/20 pt-3 flex flex-col gap-1";
+  const clientTitle = document.createElement("p");
+  clientTitle.className = "text-xs font-semibold text-text m-0";
+  clientTitle.textContent = "Not filtered by StashDB";
+  const clientNote = document.createElement("p");
+  clientNote.className = "text-[11px] text-muted leading-tight m-0";
+  clientNote.textContent =
+    "StashDB ignores these, so we match them by scanning its results — counts are approximate and very narrow searches may stop short. Set gender / ethnicity / country above for the best results.";
+  clientBreak.append(clientTitle, clientNote);
+  fields.appendChild(clientBreak);
+
+  fields.append(
+    fieldSelect("Eye colour", EYE_COLORS, draft.eye_color, "Any", (v) => (draft.eye_color = v || undefined)),
+    fieldSelect("Hair colour", HAIR_COLORS, draft.hair_color, "Any", (v) => (draft.hair_color = v || undefined)),
+    fieldModifier("Height (cm)", draft.height, draft.height_modifier, (value, modifier) => {
+      draft.height = value && Number.isFinite(+value) ? +value : undefined;
+      draft.height_modifier = modifier as PerformerFilter["height_modifier"];
+    }),
+    fieldModifier(
+      "Cup size (letter, e.g. D)",
+      draft.cup_size,
+      draft.cup_size_modifier,
+      (value, modifier) => {
+        draft.cup_size = value;
+        draft.cup_size_modifier = modifier as PerformerFilter["cup_size_modifier"];
+      },
+      undefined,
+      "text",
+    ),
     fieldSelect("Tattoos", ["yes", "no"], draft.tattoos, "Any", (v) => (draft.tattoos = (v || undefined) as PerformerFilter["tattoos"])),
     fieldSelect("Piercings", ["yes", "no"], draft.piercings, "Any", (v) => (draft.piercings = (v || undefined) as PerformerFilter["piercings"])),
-    fieldText("Name contains", "name…", draft.name, (v) => (draft.name = v || undefined)),
-    fieldCheckbox("Favourites only", draft.is_favorite === "1", (on) => (draft.is_favorite = on ? "1" : undefined)),
   );
 
   const sortRow = document.createElement("label");
@@ -126,12 +144,6 @@ function renderSidebar(
 
   fields.appendChild(applyButton(() => onApply({ ...draft, page: 1 })));
   fields.appendChild(saveRow(presetName, "Name this search", (name) => onSave({ ...draft, page: 1 }, name)));
-
-  const note = document.createElement("p");
-  note.className = "text-[11px] text-muted leading-tight border-t border-black/20 pt-3";
-  note.textContent =
-    "Eye/hair colour, height, cup size and tattoo/piercing filters are matched by scanning StashDB's results, so counts are approximate and very narrow searches may stop short. Narrow with gender/ethnicity/country too for the best results.";
-  fields.appendChild(note);
 
   return aside;
 }
