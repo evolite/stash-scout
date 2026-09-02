@@ -78,18 +78,21 @@ function renderSidebar(
     fieldCheckbox("Favourites only", draft.is_favorite === "1", (on) => (draft.is_favorite = on ? "1" : undefined)),
   );
 
-  // Divider + note: everything below is ignored by StashDB and matched by us
-  // paging through its results (see queryPerformers).
+  // Divider: everything below is ignored by StashDB and matched by us paging
+  // through its results (see queryPerformers). The "why" is on the ⓘ tooltip.
   const clientBreak = document.createElement("div");
-  clientBreak.className = "border-t border-black/20 pt-3 flex flex-col gap-1";
-  const clientTitle = document.createElement("p");
-  clientTitle.className = "text-xs font-semibold text-text m-0";
+  clientBreak.className = "border-t border-black/20 pt-3 flex items-center gap-1.5";
+  const clientTitle = document.createElement("span");
+  clientTitle.className = "text-xs font-semibold text-text";
   clientTitle.textContent = "Not filtered by StashDB";
-  const clientNote = document.createElement("p");
-  clientNote.className = "text-[11px] text-muted leading-tight m-0";
-  clientNote.textContent =
+  const info = document.createElement("span");
+  info.className =
+    "inline-flex items-center justify-center w-4 h-4 rounded-full bg-black/20 text-muted text-[10px] font-bold cursor-help select-none";
+  info.textContent = "i";
+  info.setAttribute("aria-label", "Why these are separate");
+  info.title =
     "StashDB ignores these, so we match them by scanning its results — counts are approximate and very narrow searches may stop short. Set gender / ethnicity / country above for the best results.";
-  clientBreak.append(clientTitle, clientNote);
+  clientBreak.append(clientTitle, info);
   fields.appendChild(clientBreak);
 
   fields.append(
