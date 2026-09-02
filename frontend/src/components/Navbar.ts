@@ -4,7 +4,7 @@ export type Tab = "browse" | "watched" | "performers" | "studios" | "stats" | "s
 
 const LEFT_TABS: { id: Tab; label: string }[] = [
   { id: "watched", label: "Feed" },
-  { id: "browse", label: "Filters" },
+  { id: "browse", label: "Scenes" },
   { id: "performers", label: "Performers" },
   { id: "studios", label: "Studios" },
   { id: "stats", label: "Stats" },

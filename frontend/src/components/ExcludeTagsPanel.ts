@@ -10,7 +10,7 @@ export async function renderExcludeTagsPanel(): Promise<HTMLElement> {
 
   const note = document.createElement("p");
   note.className = "text-xs text-muted m-0";
-  note.textContent = "Applied everywhere scenes are fetched — Filters, New Releases, and Trending — instead of adding the same exclude to every filter.";
+  note.textContent = "Applied everywhere scenes are fetched — Scenes, New Releases, and Trending — instead of adding the same exclude to every filter.";
   wrap.appendChild(note);
 
   const chips = document.createElement("div");
