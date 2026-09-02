@@ -1,17 +1,12 @@
 import { api } from "../api.js";
 import { iconClose } from "../icons.js";
 
-// Global exclude tags apply everywhere scenes are fetched — Filters, Feed
-// (New Releases + Trending) — instead of adding the same exclude to every
-// saved filter individually.
+// Global exclude tags apply everywhere scenes are fetched — the Scenes tab and
+// the Feed (New Releases + Trending) — instead of adding the same exclude to
+// every saved filter individually. Rendered inside a Settings section.
 export async function renderExcludeTagsPanel(): Promise<HTMLElement> {
   const wrap = document.createElement("div");
-  wrap.className = "bg-surface rounded-lg p-3.5 flex flex-col gap-2 max-w-2xl";
-
-  const note = document.createElement("p");
-  note.className = "text-xs text-muted m-0";
-  note.textContent = "Applied everywhere scenes are fetched — Scenes, New Releases, and Trending — instead of adding the same exclude to every filter.";
-  wrap.appendChild(note);
+  wrap.className = "flex flex-col gap-2";
 
   const chips = document.createElement("div");
   chips.className = "flex gap-2 items-center mb-2 flex-wrap";

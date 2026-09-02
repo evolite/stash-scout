@@ -26,7 +26,7 @@ export function renderOnboardingModal(onDismiss: () => void): HTMLElement {
     "Add your StashDB API key here in Settings first — nothing else works without it.",
     "Local Stash and Whisparr are optional: connect them to see what you already own and add what you don't, right from a scene card.",
     "Save a search as a filter and mark it “watched” to feed it into the Feed tab's New Releases.",
-    "Global Exclude Tags (under Scenes) hides a tag everywhere at once, instead of adding it to every filter.",
+    "Global Exclude Tags (in Settings) hides a tag everywhere at once, instead of adding it to every filter.",
   ]) {
     const li = document.createElement("li");
     li.textContent = item;

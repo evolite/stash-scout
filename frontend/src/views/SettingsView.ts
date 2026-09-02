@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { GENDERS, getShownGenders, setGenderShown } from "../genderPrefs.js";
+import { renderExcludeTagsPanel } from "../components/ExcludeTagsPanel.js";
 
 function statusPill(ok: boolean | null): HTMLElement {
   const pill = document.createElement("span");
@@ -238,6 +239,23 @@ export function renderSettingsView(): HTMLElement {
     }
     gendersPanel.appendChild(gendersGrid);
     container.appendChild(gendersPanel);
+
+    // --- Global exclude tags ---
+    // Server-synced but self-persisting (each add/remove hits the API on its
+    // own), so like the genders panel it sits outside the dirty-tracked Save
+    // flow above.
+    const excludePanel = document.createElement("div");
+    excludePanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3 mt-4";
+    const excludeTitle = document.createElement("h3");
+    excludeTitle.className = "m-0 text-sm font-semibold";
+    excludeTitle.textContent = "Global exclude tags";
+    const excludeSub = document.createElement("p");
+    excludeSub.className = "m-0 text-xs text-muted";
+    excludeSub.textContent =
+      "Hidden everywhere scenes are fetched — the Scenes tab and the Feed — instead of adding the same exclude to every saved filter.";
+    excludePanel.append(excludeTitle, excludeSub);
+    container.appendChild(excludePanel);
+    renderExcludeTagsPanel().then((p) => excludePanel.appendChild(p));
 
     // --- Save bar ---
     const saveBar = document.createElement("div");
