@@ -2,6 +2,7 @@ import { api, type Scene, type SceneStatus } from "../api.js";
 import { iconPlay, iconPlus, iconMinus } from "../icons.js";
 import { navigateToPerformer, navigateToStudio } from "../navigation.js";
 import { isGenderShown } from "../genderPrefs.js";
+import { isInLibraryMode } from "./Navbar.js";
 
 function isWithinLastWeek(releaseDate: string | null): boolean {
   if (!releaseDate) return false;
@@ -126,12 +127,16 @@ function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip"
 // The single place scene actions live — a compact icon row that only appears
 // on hover, same for every section (Trending, New Releases): Play if it's
 // already in the local Stash, otherwise a +/- pair for whatever the current
-// status allows. Skip (-) permanently ignores the scene (api.ignoreScene) and
-// removes the card via onRemove; already-monitored scenes only get a - to
-// unmonitor, since the Monitored badge already communicates their state.
+// status allows. Skip (-) always removes the card via onRemove (permanent
+// dismiss). Add/Monitor (+) removes it too — but only when "In Library" mode
+// is off, where the list is explicitly "scenes not in your library" (unadded
+// filter) so a just-added scene would fall out on the next refresh anyway.
+// With In Library mode on, the list keeps in-library scenes, so a newly
+// monitored one stays put with an updated badge (onStatusChange).
 function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement | undefined {
   if (!status) return undefined;
   const buttons: HTMLButtonElement[] = [];
+  const afterAdd = isInLibraryMode() ? onStatusChange : onRemove;
 
   if (status.kind === "in-stash") {
     buttons.push(
@@ -144,14 +149,14 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
       buttons.push(
         hoverButton("Add Scene", iconPlus(), "add", async () => {
           await api.addToWhisparr(s.id);
-          onStatusChange();
+          afterAdd();
         }),
       );
     } else if (status.kind === "previously-added") {
       buttons.push(
         hoverButton("Re-enable monitoring", iconPlus(), "add", async () => {
           await api.setMonitored(status.movieId, true);
-          onStatusChange();
+          afterAdd();
         }),
       );
     }
