@@ -406,9 +406,12 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     renderDetail(id, name);
   }
 
-  // Back to the grid without a history push — used by the in-detail "Back to
-  // results" button, which calls history.back(); this is the fallback path.
+  // Back to the performer grid. Doesn't use history.back() — the previous
+  // history entry can be a scene detail/results page (e.g. arrived here by
+  // clicking a performer from a scene), and "Back to results" must always
+  // return to the performer results.
   function showGrid() {
+    if (window.location.pathname.startsWith("/performers/")) history.replaceState(null, "", "/");
     detailId = undefined;
     if (lastResult) renderResults(lastResult);
     else renderIdleHint();
@@ -423,7 +426,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     back.type = "button";
     back.className = "text-xs text-link hover:underline bg-transparent border-0 p-0 self-start mb-2";
     back.textContent = "← Back to results";
-    back.addEventListener("click", () => (window.history.length > 1 ? history.back() : showGrid()));
+    back.addEventListener("click", () => showGrid());
     contentCol.appendChild(back);
 
     const wrap = document.createElement("div");
