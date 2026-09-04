@@ -68,9 +68,9 @@ export function setHideStraightScenes(v: boolean): void {
 // (unreported gender, non-binary/trans/intersex only, no performers) is
 // always shown.
 export function shouldShowScene(scene: { performers: { performer: { gender: string | null } }[] }): boolean {
-  const genders = scene.performers.map((p) => p.performer.gender);
-  const hasFemale = genders.includes("FEMALE");
-  const hasMale = genders.includes("MALE");
+  const genders = new Set(scene.performers.map((p) => p.performer.gender));
+  const hasFemale = genders.has("FEMALE");
+  const hasMale = genders.has("MALE");
   if (getHideGayScenes() && hasMale && !hasFemale) return false;
   if (getHideLesbianScenes() && hasFemale && !hasMale) return false;
   if (getHideStraightScenes() && hasMale && hasFemale) return false;
