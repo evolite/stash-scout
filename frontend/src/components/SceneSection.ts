@@ -2,6 +2,7 @@ import { api, type Scene, type SceneStatus } from "../api.js";
 import { renderSceneCard, hidePreview } from "./SceneCard.js";
 import { renderPagination } from "./Pagination.js";
 import { iconCheckCircle } from "../icons.js";
+import { shouldShowScene } from "../genderPrefs.js";
 
 function textState(message: string): HTMLElement {
   const wrap = document.createElement("div");
@@ -115,7 +116,7 @@ export function renderSceneSection(opts: {
     try {
       const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
       statuses = {};
-      currentScenes = scenes;
+      currentScenes = scenes.filter(shouldShowScene);
 
       if (scenes.length === 0 && page === 1) {
         grid.innerHTML = "";

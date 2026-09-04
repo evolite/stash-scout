@@ -1,5 +1,15 @@
 import { api } from "../api.js";
-import { GENDERS, getShownGenders, setGenderShown } from "../genderPrefs.js";
+import {
+  GENDERS,
+  getShownGenders,
+  setGenderShown,
+  getHideGayScenes,
+  setHideGayScenes,
+  getHideLesbianScenes,
+  setHideLesbianScenes,
+  getHideStraightScenes,
+  setHideStraightScenes,
+} from "../genderPrefs.js";
 import { renderExcludeTagsPanel } from "../components/ExcludeTagsPanel.js";
 
 function statusPill(ok: boolean | null): HTMLElement {
@@ -79,7 +89,7 @@ function section(title: string, subtitle: string): { section: HTMLElement; body:
 
 export function renderSettingsView(): HTMLElement {
   const container = document.createElement("div");
-  container.className = "max-w-2xl";
+  container.className = "grid grid-cols-[minmax(360px,480px)_1fr] gap-4 items-start";
   const loading = document.createElement("p");
   loading.className = "text-muted text-sm";
   loading.textContent = "Loading…";
@@ -89,9 +99,15 @@ export function renderSettingsView(): HTMLElement {
     const [cfg, settings, test] = await Promise.all([api.getConfig(), api.settings(), api.testSettings()]);
     container.innerHTML = "";
 
+    const leftCol = document.createElement("div");
+    leftCol.className = "flex flex-col gap-4";
+    const rightCol = document.createElement("div");
+    rightCol.className = "flex flex-col gap-4";
+    container.append(leftCol, rightCol);
+
     const panel = document.createElement("div");
     panel.className = "bg-surface border border-line rounded-lg divide-y divide-line";
-    container.appendChild(panel);
+    leftCol.appendChild(panel);
 
     let dirty = false;
     function markDirty() {
@@ -102,7 +118,7 @@ export function renderSettingsView(): HTMLElement {
     }
 
     // --- StashDB ---
-    const stashdbS = section("StashDB", "Metadata for scenes, performers, and studios.");
+    const stashdbS = section("StashDB", "Scene & performer metadata.");
     setStatusPill(stashdbS.pill, test.stashdb);
     const stashdbUrl = fieldRow("URL", { value: cfg.stashdbUrl });
     const stashdbKey = fieldRow("API Key", { type: "password", placeholder: cfg.stashdbApiKeySet ? "(unchanged)" : "not set" });
@@ -111,7 +127,7 @@ export function renderSettingsView(): HTMLElement {
     panel.appendChild(stashdbS.section);
 
     // --- Local Stash ---
-    const stashS = section("Local Stash", "Checks what's already in your library.");
+    const stashS = section("Local Stash", "Checks your library.");
     setStatusPill(stashS.pill, test.localStash);
     if (!settings.localStashConfigured) stashS.note.textContent = "not configured";
     const stashGqlUrl = fieldRow("GraphQL URL", { value: cfg.localStashUrl, placeholder: "http://localhost:9999/graphql" });
@@ -125,7 +141,7 @@ export function renderSettingsView(): HTMLElement {
     panel.appendChild(stashS.section);
 
     // --- Whisparr ---
-    const whisparrS = section("Whisparr", "Downloads monitored scenes automatically.");
+    const whisparrS = section("Whisparr", "Auto-downloads monitored scenes.");
     setStatusPill(whisparrS.pill, test.whisparr);
     if (!settings.whisparrConfigured) whisparrS.note.textContent = "not configured";
     else if (!settings.whisparrFullyConfigured) whisparrS.note.textContent = "missing root folder / quality profile";
@@ -194,7 +210,7 @@ export function renderSettingsView(): HTMLElement {
     panel.appendChild(whisparrS.section);
 
     // --- Cloudflare Access ---
-    const cfS = section("Cloudflare Access", "Only needed if Stash or Whisparr sit behind Access.");
+    const cfS = section("Cloudflare Access", "Only if Stash/Whisparr sit behind it.");
     cfS.pill.remove(); // no independent connection test — shared by Stash/Whisparr's own status
     const cfId = fieldRow("Client ID", { value: cfg.cfAccessClientId });
     const cfSecret = fieldRow("Client Secret", { type: "password", placeholder: cfg.cfAccessClientSecretSet ? "(unchanged)" : "not set" });
@@ -212,17 +228,14 @@ export function renderSettingsView(): HTMLElement {
     // instantly (localStorage, see genderPrefs.ts), so it's kept outside
     // `panel`/the dirty-tracking Save flow above on purpose.
     const gendersPanel = document.createElement("div");
-    gendersPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3 mt-4";
+    gendersPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const gendersTitle = document.createElement("h3");
     gendersTitle.className = "m-0 text-sm font-semibold";
-    gendersTitle.textContent = "Performers shown on scene cards";
-    const gendersSub = document.createElement("p");
-    gendersSub.className = "m-0 text-xs text-muted";
-    gendersSub.textContent = "A performer with no gender recorded on StashDB always shows, regardless of these.";
+    gendersTitle.textContent = "Genders shown on cards";
+    gendersTitle.title = "A performer with no gender recorded always shows, regardless of these.";
     gendersPanel.appendChild(gendersTitle);
-    gendersPanel.appendChild(gendersSub);
     const gendersGrid = document.createElement("div");
-    gendersGrid.className = "grid grid-cols-2 gap-2";
+    gendersGrid.className = "grid grid-cols-3 gap-2";
     const shown = getShownGenders();
     for (const g of GENDERS) {
       const row = document.createElement("label");
@@ -238,28 +251,55 @@ export function renderSettingsView(): HTMLElement {
       gendersGrid.appendChild(row);
     }
     gendersPanel.appendChild(gendersGrid);
-    container.appendChild(gendersPanel);
+    rightCol.appendChild(gendersPanel);
+
+    // --- Hide scenes by cast ---
+    // Whole-scene filter, same localStorage pattern as the panel above.
+    const sceneFilterPanel = document.createElement("div");
+    sceneFilterPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
+    const sfTitle = document.createElement("h3");
+    sfTitle.className = "m-0 text-sm font-semibold";
+    sfTitle.textContent = "Hide scenes";
+    sceneFilterPanel.appendChild(sfTitle);
+    const sfRow = document.createElement("div");
+    sfRow.className = "flex flex-wrap gap-4";
+    for (const [label, get, set] of [
+      ["Gay", getHideGayScenes, setHideGayScenes],
+      ["Lesbian", getHideLesbianScenes, setHideLesbianScenes],
+      ["Straight", getHideStraightScenes, setHideStraightScenes],
+    ] as const) {
+      const row = document.createElement("label");
+      row.className = "flex items-center gap-2 text-sm";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = get();
+      checkbox.addEventListener("change", () => set(checkbox.checked));
+      const text = document.createElement("span");
+      text.textContent = label;
+      row.appendChild(checkbox);
+      row.appendChild(text);
+      sfRow.appendChild(row);
+    }
+    sceneFilterPanel.appendChild(sfRow);
+    rightCol.appendChild(sceneFilterPanel);
 
     // --- Global exclude tags ---
     // Server-synced but self-persisting (each add/remove hits the API on its
     // own), so like the genders panel it sits outside the dirty-tracked Save
     // flow above.
     const excludePanel = document.createElement("div");
-    excludePanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3 mt-4";
+    excludePanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const excludeTitle = document.createElement("h3");
     excludeTitle.className = "m-0 text-sm font-semibold";
     excludeTitle.textContent = "Global exclude tags";
-    const excludeSub = document.createElement("p");
-    excludeSub.className = "m-0 text-xs text-muted";
-    excludeSub.textContent =
-      "Hidden everywhere scenes are fetched — the Scenes tab and the Feed — instead of adding the same exclude to every saved filter.";
-    excludePanel.append(excludeTitle, excludeSub);
-    container.appendChild(excludePanel);
+    excludeTitle.title = "Hidden everywhere scenes are fetched — Scenes and the Feed — instead of adding the same exclude to every saved filter.";
+    excludePanel.append(excludeTitle);
+    rightCol.appendChild(excludePanel);
     renderExcludeTagsPanel().then((p) => excludePanel.appendChild(p));
 
     // --- Save bar ---
     const saveBar = document.createElement("div");
-    saveBar.className = "flex items-center justify-between gap-2 mt-4";
+    saveBar.className = "flex items-center justify-between gap-2";
     const bottomNote = document.createElement("span");
     bottomNote.className = "text-xs text-muted";
     const saveBtn = document.createElement("button");
@@ -268,7 +308,7 @@ export function renderSettingsView(): HTMLElement {
     saveBtn.disabled = true;
     saveBar.appendChild(bottomNote);
     saveBar.appendChild(saveBtn);
-    container.appendChild(saveBar);
+    leftCol.appendChild(saveBar);
 
     saveBtn.addEventListener("click", async () => {
       saveBtn.disabled = true;

@@ -38,3 +38,41 @@ export function isGenderShown(gender: string | null): boolean {
   if (gender === null) return true;
   return getShownGenders().has(gender);
 }
+
+const HIDE_GAY_KEY = "hideGayScenes";
+const HIDE_LESBIAN_KEY = "hideLesbianScenes";
+const HIDE_STRAIGHT_KEY = "hideStraightScenes";
+
+export function getHideGayScenes(): boolean {
+  return localStorage.getItem(HIDE_GAY_KEY) === "true";
+}
+export function setHideGayScenes(v: boolean): void {
+  localStorage.setItem(HIDE_GAY_KEY, String(v));
+}
+export function getHideLesbianScenes(): boolean {
+  return localStorage.getItem(HIDE_LESBIAN_KEY) === "true";
+}
+export function setHideLesbianScenes(v: boolean): void {
+  localStorage.setItem(HIDE_LESBIAN_KEY, String(v));
+}
+export function getHideStraightScenes(): boolean {
+  return localStorage.getItem(HIDE_STRAIGHT_KEY) === "true";
+}
+export function setHideStraightScenes(v: boolean): void {
+  localStorage.setItem(HIDE_STRAIGHT_KEY, String(v));
+}
+
+// Whole-scene filter (distinct from isGenderShown, which only hides
+// individual performer chips within a card). Only MALE/FEMALE count for
+// classification; a scene with no clear all-male or all-female signal
+// (unreported gender, non-binary/trans/intersex only, no performers) is
+// always shown.
+export function shouldShowScene(scene: { performers: { performer: { gender: string | null } }[] }): boolean {
+  const genders = scene.performers.map((p) => p.performer.gender);
+  const hasFemale = genders.includes("FEMALE");
+  const hasMale = genders.includes("MALE");
+  if (getHideGayScenes() && hasMale && !hasFemale) return false;
+  if (getHideLesbianScenes() && hasFemale && !hasMale) return false;
+  if (getHideStraightScenes() && hasMale && hasFemale) return false;
+  return true;
+}
