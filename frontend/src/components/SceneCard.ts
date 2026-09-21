@@ -38,7 +38,7 @@ function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; cl
     case "downloading":
       return { text: "Monitored", className: "badge-monitored" };
     case "previously-added":
-      return { text: "Removed", className: "badge-removed" };
+      return { text: "Unmonitored", className: "badge-removed" };
   }
   // Neutral dark chip: this badge means "matched saved filter", not library
   // status, so it only shows up when there's no more specific status above.
@@ -145,22 +145,7 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
       }),
     );
   } else {
-    if (status.kind === "not-added" && status.whisparrConfigured) {
-      buttons.push(
-        hoverButton("Add Scene", iconPlus(), "add", async () => {
-          await api.addToWhisparr(s.id);
-          afterAdd();
-        }),
-      );
-    } else if (status.kind === "previously-added") {
-      buttons.push(
-        hoverButton("Re-enable monitoring", iconPlus(), "add", async () => {
-          await api.setMonitored(status.movieId, true);
-          afterAdd();
-        }),
-      );
-    }
-
+    // Minus first, plus second.
     if (status.kind === "monitored") {
       buttons.push(
         hoverButton("Unmonitor", iconMinus(), "skip", async () => {
@@ -173,6 +158,22 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
         hoverButton("Skip — permanently dismiss this scene", iconMinus(), "skip", async () => {
           await api.ignoreScene(s.id);
           onRemove();
+        }),
+      );
+    }
+
+    if (status.kind === "not-added" && status.whisparrConfigured) {
+      buttons.push(
+        hoverButton("Add Scene", iconPlus(), "add", async () => {
+          await api.addToWhisparr(s.id);
+          afterAdd();
+        }),
+      );
+    } else if (status.kind === "previously-added") {
+      buttons.push(
+        hoverButton("Re-enable monitoring", iconPlus(), "add", async () => {
+          await api.setMonitored(status.movieId, true);
+          afterAdd();
         }),
       );
     }
