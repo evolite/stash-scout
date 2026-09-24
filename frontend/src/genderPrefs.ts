@@ -63,16 +63,14 @@ export function setHideStraightScenes(v: boolean): void {
 }
 
 // Whole-scene filter (distinct from isGenderShown, which only hides
-// individual performer chips within a card). Only MALE/FEMALE count for
-// classification; a scene with no clear all-male or all-female signal
-// (unreported gender, non-binary/trans/intersex only, no performers) is
-// always shown.
-export function shouldShowScene(scene: { performers: { performer: { gender: string | null } }[] }): boolean {
-  const genders = new Set(scene.performers.map((p) => p.performer.gender));
-  const hasFemale = genders.has("FEMALE");
-  const hasMale = genders.has("MALE");
-  if (getHideGayScenes() && hasMale && !hasFemale) return false;
-  if (getHideLesbianScenes() && hasFemale && !hasMale) return false;
-  if (getHideStraightScenes() && hasMale && hasFemale) return false;
-  return true;
+// individual performer chips within a card). Applied server-side
+// (server/statusFilter.ts) so pages come back full rather than being thinned
+// out after pagination — this just builds the query param.
+export function hideParam(): string {
+  const hide = [
+    getHideGayScenes() && "gay",
+    getHideLesbianScenes() && "lesbian",
+    getHideStraightScenes() && "straight",
+  ].filter(Boolean);
+  return hide.length ? `&hide=${hide.join(",")}` : "";
 }

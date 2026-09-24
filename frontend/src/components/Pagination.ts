@@ -13,12 +13,10 @@ export function renderPagination(opts: {
 }): HTMLElement {
   const { page, perPage, count, approximate, onPage } = opts;
   const knownTotalPages = Math.max(1, Math.ceil(count / perPage));
-  // `approximate` (server-side "not confirmed exhausted yet") is the only signal
-  // worth trusting here — this app's feeds filter/merge scenes server-side, so a
-  // short page doesn't mean there's nothing more, just that this round didn't
-  // turn up a full one. While unexhausted, assume there's room for a full
-  // window ahead; once the server confirms exhaustion, size exactly.
-  const totalPages = approximate ? Math.max(knownTotalPages, page + WINDOW_SIZE - 1) : knownTotalPages;
+  // `approximate` = the server hasn't confirmed the end yet, and `count` is
+  // only what it has actually found so far (+1). List just those pages plus
+  // "next" — guessing a full window ahead advertised pages that came back empty.
+  const totalPages = approximate ? Math.max(knownTotalPages, page + 1) : knownTotalPages;
 
   const wrap = document.createElement("div");
   wrap.className = "flex flex-col items-end gap-1.5 mt-3";

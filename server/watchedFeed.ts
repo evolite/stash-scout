@@ -5,7 +5,7 @@ import type { WhisparrClient } from "./whisparrClient.js";
 import type { Scene } from "../shared/types.js";
 import { db, filterRowToSavedFilter } from "./db.js";
 import { parseStashFilter } from "./filterUtils.js";
-import { fetchFilteredPage } from "./statusFilter.js";
+import { fetchFilteredPage, type Orientation } from "./statusFilter.js";
 
 const WATCHED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
 
@@ -27,7 +27,7 @@ export function getIgnoredIds(): Set<string> {
 // deduped, unadded-only" result, just rendered differently.
 export async function getWatchedFeed(
   deps: { stashdb: StashDBClient; cfg: AppConfig; localStash: LocalStashClient; whisparr: WhisparrClient },
-  opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean },
+  opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean; hide?: Orientation[] },
 ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
   const { stashdb, cfg, localStash, whisparr } = deps;
   const { page, perPage, refresh = false } = opts;
@@ -71,7 +71,9 @@ export async function getWatchedFeed(
   // fetchFilteredPage may call queryMergedFeed several times per request as it
   // pages through raw results, and re-deleting the cache on every one of those
   // internal calls would wipe out progress made by the previous call.
-  let pendingReset = (randomize && page === 1) || refresh;
+  const reseed = (randomize && page === 1) || refresh;
+  let pendingReset = reseed;
+  const unadded = opts.unadded !== false;
   return fetchFilteredPage(
     cfg,
     localStash,
@@ -79,10 +81,13 @@ export async function getWatchedFeed(
     (rawPage, pp) => {
       const reset = pendingReset;
       pendingReset = false;
-      return stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, ignoredIds, { randomize, reset, bypassCache: refresh });
+      // Ignored scenes are dropped by fetchFilteredPage instead — filtering
+      // them here would shift raw page boundaries under its cursor.
+      return stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, new Set(), { randomize, reset, bypassCache: refresh });
     },
     page,
     perPage,
-    { requireUnadded: opts.unadded !== false },
+    JSON.stringify({ route: "watched", cacheKey, unadded, hide: opts.hide ?? [] }),
+    { requireUnadded: unadded, excludeIds: ignoredIds, hide: opts.hide, bypassCache: reseed },
   );
 }

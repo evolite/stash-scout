@@ -6,7 +6,6 @@ import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
 import { emptyState } from "../components/filterControls.js";
 import { isInLibraryMode } from "../components/Navbar.js";
-import { shouldShowScene } from "../genderPrefs.js";
 
 const PER_PAGE = 32;
 
@@ -132,8 +131,7 @@ export function renderBrowseView(): HTMLElement {
     contentCol.innerHTML = "";
     contentCol.appendChild(renderSkeletonGrid());
     try {
-      const { count, scenes: rawScenes, approximateCount } = await api.queryScenes({ ...filter, unadded: isInLibraryMode() ? undefined : "1" });
-      const scenes = rawScenes.filter(shouldShowScene);
+      const { count, scenes, approximateCount } = await api.queryScenes({ ...filter, unadded: isInLibraryMode() ? undefined : "1" });
       statuses = {};
       contentCol.innerHTML = "";
       const grid = document.createElement("div");

@@ -5,7 +5,7 @@ import type { AppConfig } from "../config.js";
 import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
 import { getGlobalExcludeIds, mergeExcludeIds, getWatchedFeed, getIgnoredIds } from "../watchedFeed.js";
-import { fetchFilteredPage } from "../statusFilter.js";
+import { fetchFilteredPage, parseHide } from "../statusFilter.js";
 
 export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
@@ -30,19 +30,28 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       // already does, only when actually needed.
       const unadded = q.unadded === "1";
       const maxDuration = q.max_duration ? Number(q.max_duration) : undefined;
+      const hide = parseHide(q.hide);
       const ignoredIds = getIgnoredIds();
-      if (unadded || maxDuration || ignoredIds.size > 0) {
+      if (unadded || maxDuration || hide.length > 0 || ignoredIds.size > 0) {
+        // Only the first raw fetch of a refresh should bypass the source cache,
+        // or each round would wipe the previous round's progress.
+        let bypass = refresh;
+        const cacheKey = JSON.stringify({ route: "scenes", ...input, page: undefined, per_page: undefined, allExcludes, unadded, maxDuration, hide });
         const result = await fetchFilteredPage(
           cfg,
           localStash,
           whisparr,
-          (rawPage, pp) =>
-            allExcludes.length > 0
-              ? stashdb.queryScenesExcluding({ ...input, page: rawPage, per_page: pp }, allExcludes, refresh)
-              : stashdb.queryScenes({ ...input, page: rawPage, per_page: pp }, refresh),
+          (rawPage, pp) => {
+            const b = bypass;
+            bypass = false;
+            return allExcludes.length > 0
+              ? stashdb.queryScenesExcluding({ ...input, page: rawPage, per_page: pp }, allExcludes, b)
+              : stashdb.queryScenes({ ...input, page: rawPage, per_page: pp }, b);
+          },
           page,
           perPage,
-          { requireUnadded: unadded, maxDurationSeconds: maxDuration, excludeIds: ignoredIds },
+          cacheKey,
+          { requireUnadded: unadded, maxDurationSeconds: maxDuration, excludeIds: ignoredIds, hide, bypassCache: refresh },
         );
         res.json(result);
         return;
@@ -72,17 +81,24 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const refresh = q.refresh === "1" || q.refresh === "true";
       const allExcludes = mergeExcludeIds(excludeTagIds, getGlobalExcludeIds());
       const unadded = q.unadded === "1";
+      const hide = parseHide(q.hide);
       const ignoredIds = getIgnoredIds();
 
+      let bypass = refresh;
+      const cacheKey = JSON.stringify({ route: "random", ...input, page: undefined, per_page: undefined, allExcludes, unadded, hide });
       const result = await fetchFilteredPage(
         cfg,
         localStash,
         whisparr,
-        (rawPage, pp) =>
-          stashdb.queryScenesRandomWindow({ ...input, page: rawPage, per_page: pp }, allExcludes, { reset: refresh, bypassCache: refresh }),
+        (rawPage, pp) => {
+          const b = bypass;
+          bypass = false;
+          return stashdb.queryScenesRandomWindow({ ...input, page: rawPage, per_page: pp }, allExcludes, { reset: b, bypassCache: b });
+        },
         page,
         perPage,
-        { requireUnadded: unadded, excludeIds: ignoredIds },
+        cacheKey,
+        { requireUnadded: unadded, excludeIds: ignoredIds, hide, bypassCache: refresh },
       );
       res.json(result);
     } catch (err) {
@@ -190,7 +206,8 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const refresh = q.refresh === "1" || q.refresh === "true";
       const source = typeof q.source === "string" ? q.source : undefined;
       const unadded = q.unadded !== "0";
-      const result = await getWatchedFeed({ stashdb, cfg, localStash, whisparr }, { window, page, perPage, refresh, source, unadded });
+      const hide = parseHide(q.hide);
+      const result = await getWatchedFeed({ stashdb, cfg, localStash, whisparr }, { window, page, perPage, refresh, source, unadded, hide });
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

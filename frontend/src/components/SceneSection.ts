@@ -2,7 +2,6 @@ import { api, type Scene, type SceneStatus } from "../api.js";
 import { renderSceneCard, hidePreview } from "./SceneCard.js";
 import { renderPagination } from "./Pagination.js";
 import { iconCheckCircle } from "../icons.js";
-import { shouldShowScene } from "../genderPrefs.js";
 
 function textState(message: string): HTMLElement {
   const wrap = document.createElement("div");
@@ -116,7 +115,14 @@ export function renderSceneSection(opts: {
     try {
       const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
       statuses = {};
-      currentScenes = scenes.filter(shouldShowScene);
+      currentScenes = scenes;
+
+      // Past the confirmed end (e.g. the list shrank since the page was
+      // listed) — step back to the real last page instead of a blank grid.
+      if (scenes.length === 0 && page > 1 && !approximateCount) {
+        page = Math.max(1, Math.ceil(count / opts.perPage));
+        return load(bypassCache);
+      }
 
       if (scenes.length === 0 && page === 1) {
         grid.innerHTML = "";

@@ -204,10 +204,12 @@ async function gql<T>(
 // (minus page), so "next page" reuses previously-fetched StashDB pages instead
 // of rescanning. Capped in size and lifetime to bound memory and staleness.
 const EXCLUDE_CACHE_TTL_MS = 5 * 60_000;
-const MAX_CACHED_SCENES = Number(process.env.STASHDB_MAX_CACHED_SCENES ?? 200);
+// StashDB pages fetched per call; the per-filter cache persists, so a deep or
+// heavily-excluded page resumes the scan on the next call instead of stopping
+// at a fixed total.
+const SCENE_SCAN_BUDGET = Number(process.env.STASHDB_SCENE_SCAN_BUDGET ?? 5);
 interface ExcludeCacheEntry {
   scenes: Scene[];
-  totalCount: number;
   exhausted: boolean;
   internalPage: number;
   at: number;
@@ -401,9 +403,9 @@ export class StashDBClient {
   // already include each scene's full tag list), drop scenes carrying an excluded
   // tag, and keep the accumulated result *cached per filter* (not per page) so
   // paging forward through the browser reuses what's already been fetched instead
-  // of re-scanning from page 1 every time. Capped at MAX_CACHED_SCENES total —
-  // we're rate-limited by StashDB, so a heavily-excluded or very deep query comes
-  // back short/approximate rather than fetching indefinitely to force a full page.
+  // of re-scanning from page 1 every time. Each call fetches at most SCENE_SCAN_BUDGET
+  // pages — we're rate-limited by StashDB, so a heavily-excluded or very deep
+  // query comes back short/approximate and resumes on the next call.
   async queryScenesExcluding(
     input: Partial<SceneQueryInput>,
     excludeTagIds: string[],
@@ -417,15 +419,14 @@ export class StashDBClient {
     if (bypassCache) excludeCache.delete(key);
     let entry = excludeCache.get(key);
     if (!entry || Date.now() - entry.at > EXCLUDE_CACHE_TTL_MS) {
-      entry = { scenes: [], totalCount: 0, exhausted: false, internalPage: 1, at: Date.now() };
+      entry = { scenes: [], exhausted: false, internalPage: 1, at: Date.now() };
       excludeCache.set(key, entry);
       capMap(excludeCache, FILTER_CACHE_MAX_ENTRIES);
     }
     const excludeSet = new Set(excludeTagIds);
 
-    while (entry.scenes.length < skip + perPage && !entry.exhausted && entry.scenes.length < MAX_CACHED_SCENES) {
-      const { count, scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache);
-      entry.totalCount = count;
+    for (let fetched = 0; entry.scenes.length < skip + perPage && !entry.exhausted && fetched < SCENE_SCAN_BUDGET; fetched++) {
+      const { scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache);
       for (const scene of scenes) {
         if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
       }
@@ -437,7 +438,7 @@ export class StashDBClient {
     }
 
     return {
-      count: entry.exhausted ? entry.scenes.length : entry.totalCount,
+      count: entry.exhausted ? entry.scenes.length : entry.scenes.length + 1,
       scenes: entry.scenes.slice(skip, skip + perPage),
       approximateCount: !entry.exhausted,
     };
@@ -493,7 +494,7 @@ export class StashDBClient {
     }
     const excludeSet = new Set(excludeTagIds);
 
-    while (entry.scenes.length < skip + perPage && !entry.exhausted && entry.scenes.length < MAX_CACHED_SCENES) {
+    for (let fetched = 0; entry.scenes.length < skip + perPage && !entry.exhausted && fetched < SCENE_SCAN_BUDGET; fetched++) {
       await this.advanceRandomWindowEntry(entry, baseInput, excludeSet, opts.bypassCache);
     }
 
@@ -572,7 +573,7 @@ export class StashDBClient {
     const visible = () => entry!.merged.filter((s) => !ignoredIds.has(s.id));
 
     let round = 0;
-    while (visible().length < skip + perPage && !entry.exhaustedAll && entry.merged.length < MAX_CACHED_SCENES && round < MAX_MERGE_ROUNDS) {
+    while (visible().length < skip + perPage && !entry.exhaustedAll && round < MAX_MERGE_ROUNDS) {
       // Fan out to every source in parallel — the rate limiter (throttle())
       // still caps actual dispatch, this just stops each source's round-trip
       // latency from stacking. Each advance does its await then a synchronous

@@ -1,4 +1,5 @@
 import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, PerformerResult, StudioDetails, SavedFilter as BaseSavedFilter, SavedPerformerSearch } from "../../shared/types.js";
+import { hideParam } from "./genderPrefs.js";
 export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, PerformerResult, StudioDetails, SavedPerformerSearch };
 
 export type PerformerSearchSummary = Omit<SavedPerformerSearch, "results"> & { resultCount: number };
@@ -76,15 +77,15 @@ function qs(filter: object): string {
 
 export const api = {
   queryScenes: (filter: SceneFilter, refresh = false) =>
-    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}${refresh ? "&refresh=1" : ""}`),
+    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}${hideParam()}${refresh ? "&refresh=1" : ""}`),
   // Same filter shape as queryScenes — sort/date are ignored server-side, it
   // always picks its own random ~2-month window.
   randomScenes: (filter: SceneFilter, refresh = false) =>
-    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes/random?${qs(filter)}${refresh ? "&refresh=1" : ""}`),
+    req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes/random?${qs(filter)}${hideParam()}${refresh ? "&refresh=1" : ""}`),
   watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, showInLibrary = false, refresh = false) => {
     const sourceParam = source ? `&source=${encodeURIComponent(source)}` : "";
     return req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(
-      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${sourceParam}${showInLibrary ? "&unadded=0" : ""}${refresh ? "&refresh=1" : ""}`,
+      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${sourceParam}${showInLibrary ? "&unadded=0" : ""}${hideParam()}${refresh ? "&refresh=1" : ""}`,
     );
   },
   queryPerformers: (filter: PerformerFilter, refresh = false) =>
