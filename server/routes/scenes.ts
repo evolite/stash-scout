@@ -39,8 +39,7 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
         const cacheKey = JSON.stringify({ route: "scenes", ...input, page: undefined, per_page: undefined, allExcludes, unadded, maxDuration, hide });
         const result = await fetchFilteredPage(
           cfg,
-          localStash,
-          whisparr,
+          { localStash, whisparr },
           (rawPage, pp) => {
             const b = bypass;
             bypass = false;
@@ -88,8 +87,7 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const cacheKey = JSON.stringify({ route: "random", ...input, page: undefined, per_page: undefined, allExcludes, unadded, hide });
       const result = await fetchFilteredPage(
         cfg,
-        localStash,
-        whisparr,
+        { localStash, whisparr },
         (rawPage, pp) => {
           const b = bypass;
           bypass = false;

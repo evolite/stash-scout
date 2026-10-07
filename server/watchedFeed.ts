@@ -76,8 +76,7 @@ export async function getWatchedFeed(
   const unadded = opts.unadded !== false;
   return fetchFilteredPage(
     cfg,
-    localStash,
-    whisparr,
+    { localStash, whisparr },
     (rawPage, pp) => {
       const reset = pendingReset;
       pendingReset = false;

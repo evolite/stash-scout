@@ -39,7 +39,10 @@ function orientationHidden(scene: Scene, hide: Orientation[]): boolean {
   const genders = new Set(scene.performers.map((p) => p.performer.gender));
   const f = genders.has("FEMALE");
   const m = genders.has("MALE");
-  const o: Orientation | null = m && f ? "straight" : m ? "gay" : f ? "lesbian" : null;
+  let o: Orientation | null = null;
+  if (m && f) o = "straight";
+  else if (m) o = "gay";
+  else if (f) o = "lesbian";
   return o !== null && hide.includes(o);
 }
 
@@ -52,8 +55,7 @@ function orientationHidden(scene: Scene, hide: Orientation[]): boolean {
 // the same raw page is re-read next time, `seen` drops the repeats.
 export async function fetchFilteredPage(
   cfg: AppConfig,
-  localStash: LocalStashClient,
-  whisparr: WhisparrClient,
+  clients: { localStash: LocalStashClient; whisparr: WhisparrClient },
   fetchRawPage: (rawPage: number, perPage: number) => Promise<{ scenes: Scene[]; approximateCount?: boolean }>,
   page: number,
   perPage: number,
@@ -76,7 +78,7 @@ export async function fetchFilteredPage(
     const fresh = raw.scenes.filter((s) => !entry!.seen.has(s.id));
     fresh.forEach((s) => entry!.seen.add(s.id));
     const statuses = opts.requireUnadded
-      ? await Promise.all(fresh.map((s) => getSceneStatus(cfg, s.id, { localStash, whisparr })))
+      ? await Promise.all(fresh.map((s) => getSceneStatus(cfg, s.id, clients)))
       : null;
     fresh.forEach((scene, i) => {
       if (statuses && ALREADY_ADDED_KINDS.has(statuses[i].kind)) return;
