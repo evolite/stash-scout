@@ -159,14 +159,14 @@ function renderCard(p: PerformerResult, onOpen: (id: string, name: string) => vo
   card.addEventListener("click", () => onOpen(p.id, p.name));
 
   const img = document.createElement("div");
-  img.className = "aspect-[2/3] bg-black/30 bg-center bg-cover";
+  img.className = "sfw-img aspect-[2/3] bg-black/30 bg-center bg-cover";
   if (p.images[0]?.url) img.style.backgroundImage = `url("${p.images[0].url}")`;
   card.appendChild(img);
 
   const body = document.createElement("div");
   body.className = "p-2 flex flex-col gap-1";
   const name = document.createElement("div");
-  name.className = "text-sm font-semibold text-text truncate";
+  name.className = "sfw-text text-sm font-semibold text-text truncate";
   name.textContent = p.name;
   body.appendChild(name);
 
@@ -182,7 +182,7 @@ function renderCard(p: PerformerResult, onOpen: (id: string, name: string) => vo
     `${p.scene_count} scenes`,
   ].filter(Boolean);
   const meta = document.createElement("div");
-  meta.className = "text-[11px] text-muted leading-tight";
+  meta.className = "sfw-text text-[11px] text-muted leading-tight";
   meta.textContent = bits.join(" · ");
   body.appendChild(meta);
 

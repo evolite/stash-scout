@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { renderNavbar, type Tab } from "./components/Navbar.js";
+import { renderNavbar, setSfwMode, type Tab } from "./components/Navbar.js";
 import { renderBrowseView } from "./views/BrowseView.js";
 import { renderSubscribedView } from "./views/SubscribedView.js";
 import { renderPerformersView } from "./views/PerformersView.js";
@@ -76,8 +76,25 @@ window.addEventListener("popstate", () => {
   render();
 });
 
+// Dev-only (__DEV_INSTANCE__ is false in the build, so all of this is stripped):
+// red DEV banner, heavy-redaction CSS, and blur mode re-forced on every render()
+// (i.e. every navigation) — the toggle can be switched off but never sticks.
+if (__DEV_INSTANCE__) await import("./dev.css");
+
+function renderDevBanner(): HTMLElement {
+  const b = document.createElement("div");
+  // inline styles, not Tailwind classes: the scanner would ship those utilities in release CSS too
+  b.style.cssText = "background:#dc2626;color:#fff;text-align:center;font:700 12px sans-serif;letter-spacing:.2em;padding:4px";
+  b.textContent = "DEV";
+  return b;
+}
+
 function render() {
   root.innerHTML = "";
+  if (__DEV_INSTANCE__) {
+    setSfwMode(true);
+    root.appendChild(renderDevBanner());
+  }
   root.appendChild(renderNavbar(activeTab, setTab, render));
 
   const content = document.createElement("main");

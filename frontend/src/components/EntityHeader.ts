@@ -95,12 +95,12 @@ function shell(
   const titleRow = document.createElement("div");
   titleRow.className = "flex flex-wrap items-baseline gap-x-3 gap-y-1";
   const h = document.createElement("h2");
-  h.className = "text-xl font-semibold leading-tight";
+  h.className = "sfw-text text-xl font-semibold leading-tight";
   h.textContent = name;
   titleRow.appendChild(h);
   if (sub) {
     const s = document.createElement("span");
-    s.className = "text-sm text-muted";
+    s.className = "sfw-text text-sm text-muted";
     s.textContent = sub;
     titleRow.appendChild(s);
   }

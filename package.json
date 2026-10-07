@@ -8,6 +8,7 @@
     "dev:frontend": "vite frontend --config frontend/vite.config.ts",
     "build:frontend": "vite build frontend --config frontend/vite.config.ts",
     "build:server": "tsc -p tsconfig.server.json",
+    "build:dev-frontend": "DEV_INSTANCE=1 npm run build:frontend",
     "build": "npm run build:frontend && npm run build:server",
     "start": "node dist-server/server/index.js"
   },

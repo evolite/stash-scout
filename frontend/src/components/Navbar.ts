@@ -106,12 +106,12 @@ function isSfwMode(): boolean {
   return localStorage.getItem(SFW_KEY) === "1";
 }
 
-function setSfwMode(on: boolean): void {
+export function setSfwMode(on: boolean): void {
   localStorage.setItem(SFW_KEY, on ? "1" : "0");
   document.documentElement.classList.toggle("sfw", on);
 }
 
-setSfwMode(isSfwMode());
+setSfwMode(__DEV_INSTANCE__ || isSfwMode());
 
 // Populated once at module load — non-secret, only used to build link hrefs.
 // The navbar can render before this resolves (it's a fetch), so both

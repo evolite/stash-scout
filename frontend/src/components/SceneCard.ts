@@ -254,6 +254,7 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   }
   meta.appendChild(studio);
   const date = document.createElement("strong");
+  date.className = "sfw-text";
   date.textContent = s.release_date ?? "";
   meta.appendChild(date);
   footer.appendChild(meta);
@@ -263,7 +264,7 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   const shownPerformers = s.performers.filter((p) => isGenderShown(p.performer.gender));
   if (shownPerformers.length > 0) {
     const performersRow = document.createElement("div");
-    performersRow.className = "text-muted mt-1 overflow-hidden text-ellipsis whitespace-nowrap";
+    performersRow.className = "sfw-text text-muted mt-1 overflow-hidden text-ellipsis whitespace-nowrap";
     shownPerformers.forEach((p, i) => {
       if (i > 0) performersRow.appendChild(document.createTextNode(", "));
       // Pure in-app tab switch (see navigation.ts) — not a real link, so no

@@ -1,7 +1,12 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig({
+// __DEV_INSTANCE__ gates the DEV banner / forced blur / redaction. True under
+// `vite` dev, or when building for this workspace's own instance
+// (DEV_INSTANCE=1, see build:dev-frontend). The Docker release build sets
+// neither, so all of it is stripped from what ships.
+export default defineConfig(({ mode }) => ({
+  define: { __DEV_INSTANCE__: String(mode === "development" || process.env.DEV_INSTANCE === "1") },
   plugins: [tailwindcss()],
   root: import.meta.dirname,
   server: {
@@ -19,4 +24,4 @@ export default defineConfig({
     // main.ts's onboarding check relies on) is a safe minimum.
     target: "es2022",
   },
-});
+}));

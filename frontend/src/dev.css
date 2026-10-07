@@ -1,0 +1,21 @@
+/* Dev-only (loaded when __DEV_INSTANCE__ is true; never in the release build).
+   Heavier than prod SFW Mode: images fully obscured, text redacted. */
+html.sfw main img,
+html.sfw .fixed img,
+html.sfw .SceneCard-image,
+html.sfw .sfw-img {
+  filter: blur(80px) saturate(0) brightness(0.3);
+}
+
+html.sfw a:has(> .SceneCard-image) {
+  overflow: hidden;
+}
+
+html.sfw .SceneCard-text,
+html.sfw .sfw-text {
+  background: currentColor;
+  color: transparent;
+  filter: none;
+  border-radius: 2px;
+  user-select: none;
+}
