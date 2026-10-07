@@ -1,46 +1,31 @@
 # Stash Scout
 
-A web app for browsing [StashDB](https://stashdb.org) with actual filtering, and for tracking what's new so you don't have to re-check saved searches by hand. Ties into [Stash](https://github.com/stashapp/stash) and [Whisparr](https://wiki.servarr.com/whisparr) so you can see what you already have and grab what you don't, right from the scene cards.
+A weekend project for people who live in [StashDB](https://stashdb.org): browse it with real filters, keep an eye on what's new, and see at a glance what you already own. Plugs into [Stash](https://github.com/stashapp/stash) and [Whisparr](https://wiki.servarr.com/whisparr) so you can grab what's missing without leaving the page.
 
-## What it does
+Grew out of the [StashSeer](https://codeberg.org/surging9143/StashSeer) userscript.
 
-- **Feed** — two grids in one tab:
-  - **New Releases**: scenes matched by your saved filters (once you mark them "watched") plus your favorited StashDB performers, windowed by Week/Month/Year. Filter chips narrow it down to a single source. Each card shows which filter matched and gets an Add / Skip action — Skip is permanent.
-  - **Trending**: what's trending on StashDB, with chips for New, Favorited performers, Under 30 min, and Not in library (combinable). Cards badge whether a scene is New, Monitored, already In Library, or previously Removed.
-- **Filters** — search StashDB with real filters: multiple tags (AND/OR), exclude tags, performers, studios, date, sort. Save any combo, reload it later, mark it "watched" to feed it into New Releases.
-- **Stats** — counts (monitored, downloading, previously added, ignored, saved/watched filters) and a timeline of what's come in.
-- **Settings** — StashDB/Stash/Whisparr connections, global exclude tags (skip a tag everywhere instead of adding it to every filter), SFW mode.
-- Scene cards show Play (if it's in Stash), Add to Whisparr, Monitored, Downloading, etc. — same button states/colors as the [StashSeer](https://codeberg.org/surging9143/StashSeer) userscript this grew out of.
+## What you get
 
-## Running it
+- **Feed** — new releases from your watched filters and favorite performers, plus what's trending on StashDB.
+- **Filters** — tag AND/OR, excludes, performers, studios, dates. Save combos and reuse them.
+- **Stats** — a quick look at what's monitored, downloading and ignored.
+- **Scene cards** — Play, Add, Monitored, In Library, all at a glance.
 
-### Docker (easiest)
+## Run it
 
 ```
-docker run -d --restart unless-stopped -p 8787:8787 -v stash-scout-data:/app/data ghcr.io/evolite/stash-scout:latest
+docker run -d --restart unless-stopped -p 8787:8787 \
+  -v stash-scout-data:/app/data ghcr.io/evolite/stash-scout:latest
 ```
 
-Then open `http://localhost:8787` and configure StashDB API key, Stash, and Whisparr from the **Settings** tab — no env vars or config files to hand-edit. Secrets are encrypted at rest (see `.env.example`). `--restart unless-stopped` brings it back after a host reboot or crash; the image also reports a `/healthz` endpoint so orchestrators (Compose, Portainer, K8s) can detect and restart a hung container.
+Open `http://localhost:8787` and hook up StashDB, Stash and Whisparr under **Settings**. No config files to edit.
 
-### From source
-
-```
-npm install
-npm run build
-npm start
-```
-
-Only `PORT` is an env var (`.env`, defaults to 8787) — everything else is configured through the app.
-
-## Stack
-
-Plain TypeScript + Vite on the frontend (no framework), a small Express backend, SQLite (Node's built-in `node:sqlite`) for saved filters/settings/ignored scenes. Styled to look like StashDB's own dark theme. Built this way on purpose: it's a personal tool, not a product.
-
-## Releasing
-
-Push a `v*.*.*` tag and GitHub Actions builds + pushes the image to GHCR:
+Prefer source?
 
 ```
-git tag v0.1.0
-git push origin v0.1.0
+npm install && npm run build && npm start
 ```
+
+## Under the hood
+
+TypeScript, Vite and Tailwind on the front, a small Express server, SQLite for storage. No framework, on purpose. It's a personal tool, not a product.
