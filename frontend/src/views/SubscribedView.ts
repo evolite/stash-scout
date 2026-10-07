@@ -37,7 +37,7 @@ function renderRefreshButton(onClick: () => Promise<void>): HTMLElement {
   return btn;
 }
 
-export function renderWatchedView(): HTMLElement {
+export function renderSubscribedView(): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex flex-col gap-3";
 
@@ -78,10 +78,10 @@ export function renderWatchedView(): HTMLElement {
   }
   feedWrap.appendChild(subTabs);
 
-  // Filter-name chip bar — one chip per saved filter currently marked "watched"
+  // Filter-name chip bar — one chip per saved filter currently marked "subscribed"
   // (plus the always-on "Favorites" source), driven by real data from
   // /api/filters rather than hardcoded names.
-  // ponytail: chips list every watched filter, not just ones with a match
+  // ponytail: chips list every subscribed filter, not just ones with a match
   // right now (that needs a per-filter count query) — narrow to non-empty
   // filters later if an empty chip proves annoying in practice.
   const sourceChipBar = document.createElement("div");
@@ -113,7 +113,7 @@ export function renderWatchedView(): HTMLElement {
   const feedSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
     fetchPage: async (page, refresh) => {
-      const result = await api.watchedFeed(page, SECTION_PER_PAGE, window, selectedSource, isInLibraryMode(), refresh);
+      const result = await api.subscribedFeed(page, SECTION_PER_PAGE, window, selectedSource, isInLibraryMode(), refresh);
       return { ...result, count: Math.min(result.count, FEED_LIMIT), approximateCount: false };
     },
     emptyMessage: "Nothing new right now.",
@@ -171,9 +171,9 @@ export function renderWatchedView(): HTMLElement {
   // (the default) is plain unfiltered trending, exactly like before; picking a
   // specific saved filter (or "Favorites") narrows Trending's own
   // TRENDING-sorted query by that filter's tags/performers/studios/exclude_tags
-  // instead of switching to the windowed watched feed New Releases uses.
+  // instead of switching to the windowed subscribed feed New Releases uses.
   let selectedTrendingSource: string | undefined; // undefined = "All matches"
-  let watchedFilters: SavedFilter[] = [];
+  let subscribedFilters: SavedFilter[] = [];
   const trendingChipBar = document.createElement("div");
   trendingChipBar.className = "flex gap-1.5 flex-wrap mb-3";
   trendingWrap.appendChild(trendingChipBar);
@@ -187,7 +187,7 @@ export function renderWatchedView(): HTMLElement {
         trendingSection.reset();
       }),
     );
-    for (const f of watchedFilters) {
+    for (const f of subscribedFilters) {
       trendingChipBar.appendChild(
         renderChip(f.name, selectedTrendingSource === f.name, () => {
           selectedTrendingSource = f.name;
@@ -211,7 +211,7 @@ export function renderWatchedView(): HTMLElement {
   const trendingSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
     fetchPage: async (page, refresh) => {
-      const chosen = watchedFilters.find((f) => f.name === selectedTrendingSource);
+      const chosen = subscribedFilters.find((f) => f.name === selectedTrendingSource);
       const cf = chosen?.filter as Record<string, unknown> | undefined;
       const filter = {
         page,
@@ -236,15 +236,15 @@ export function renderWatchedView(): HTMLElement {
   trendingWrap.appendChild(trendingSection.element);
 
   // Shared by both chip bars — one saved-filters lookup drives New Releases'
-  // exclusive source picker and Trending's, keyed the same way (watched-flagged
+  // exclusive source picker and Trending's, keyed the same way (subscribed-flagged
   // filters + a synthetic "Favorites"/"Favorites" entry). No reload here: the
-  // default "All" selection's query never depends on watchedFilters (only a
+  // default "All" selection's query never depends on subscribedFilters (only a
   // named-filter chip click does, and those chips don't exist to click until
   // this resolves anyway) — reloading on arrival was a guaranteed-redundant
   // re-fetch of what trendingSection's own initial load() already got.
   api.listFilters().then((filters) => {
-    watchedFilters = filters.filter((f) => f.watched);
-    const names = watchedFilters.map((f) => f.name);
+    subscribedFilters = filters.filter((f) => f.subscribed);
+    const names = subscribedFilters.map((f) => f.name);
     names.push("Favorites");
     renderSourceChips(names);
     renderTrendingChips();

@@ -27,7 +27,7 @@ function renderSpinner(): HTMLElement {
   return wrap;
 }
 
-// A self-contained paginated scene grid — used by Feed/Trending (WatchedView)
+// A self-contained paginated scene grid — used by Feed/Trending (SubscribedView)
 // and the Performers tab, each with their own page cursor and status polling.
 export function renderSceneSection(opts: {
   perPage: number;

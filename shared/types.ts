@@ -12,7 +12,7 @@ export interface Scene {
   images: { id: string; url: string; width: number; height: number }[];
   performers: { performer: { id: string; name: string; gender: string | null }; as: string | null }[];
   // Set only by queryMergedFeed — which saved filter (or "Favorites") first
-  // surfaced this scene, shown as a sash on the scene card in the Watched feed.
+  // surfaced this scene, shown as a sash on the scene card in the Subscribed feed.
   sourceLabel?: string;
 }
 
@@ -97,7 +97,7 @@ export interface SavedFilter<F = Record<string, unknown>> {
   name: string;
   createdAt: string;
   filter: F;
-  watched: boolean;
+  subscribed: boolean;
 }
 
 // A named performer search: the filter params plus the fetched result list, so
@@ -138,6 +138,6 @@ export interface StatsSummary {
   downloadProgress: number | null;
   ignoredCount: number;
   savedFiltersCount: number;
-  watchedFiltersCount: number;
+  subscribedFiltersCount: number;
   timeline: { date: string; count: number }[];
 }

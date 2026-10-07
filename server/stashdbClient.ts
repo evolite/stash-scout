@@ -251,7 +251,7 @@ interface RandomWindowEntry {
 }
 const randomWindowCache = new Map<string, RandomWindowEntry>();
 
-// Merged "watched filters" feed — same idea as excludeCache but fanning out to
+// Merged "subscribed filters" feed — same idea as excludeCache but fanning out to
 // several source filters, deduping by scene id, and keeping each source's own
 // page cursor so growing the feed doesn't restart every source from page 1.
 //
@@ -260,7 +260,7 @@ const randomWindowCache = new Map<string, RandomWindowEntry>();
 // per-source and re-interleaved by array position on every read). A pure global
 // date sort would let one prolific filter's results fill the entire visible page
 // before a rarer filter's results ever surfaced — round-robin guarantees every
-// watched filter gets representation. Appending directly (instead of recomputing
+// subscribed filter gets representation. Appending directly (instead of recomputing
 // row-by-row from each source's current length) matters because a slower source
 // growing between two page fetches would otherwise retroactively fill earlier
 // "rows", shifting every later position and re-serving a scene already sent on a
@@ -534,7 +534,7 @@ export class StashDBClient {
     if (!entry.exhausted) entry.internalPage++;
   }
 
-  // Merges several saved filters (the Watched feed) into one paginated, deduped
+  // Merges several saved filters (the Subscribed feed) into one paginated, deduped
   // result — round-robinned across sources (see interleave() above) — cached per
   // filter-set so paging forward reuses each source's already-fetched pages
   // instead of re-querying every source again.

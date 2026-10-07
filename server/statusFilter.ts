@@ -5,7 +5,7 @@ import type { Scene } from "../shared/types.js";
 import { getSceneStatus } from "./stateMachine.js";
 import { capMap } from "./cacheUtil.js";
 
-// Shared by Watched and Favorites: both are "what's new to act on" feeds where
+// Shared by Subscribed and Favorites: both are "what's new to act on" feeds where
 // scenes already playable (in Stash) or already added to Whisparr in any form
 // don't belong.
 const ALREADY_ADDED_KINDS = new Set(["in-stash", "monitored", "previously-added", "downloading"]);

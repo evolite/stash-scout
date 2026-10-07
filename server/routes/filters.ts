@@ -17,9 +17,9 @@ export function filtersRouter() {
       name: String(req.body.name ?? "Untitled"),
       createdAt: new Date().toISOString(),
       filter: req.body.filter ?? {},
-      watched: false,
+      subscribed: false,
     };
-    db.prepare("INSERT INTO filters (id, name, created_at, filter, watched) VALUES (?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO filters (id, name, created_at, filter, subscribed) VALUES (?, ?, ?, ?, ?)").run(
       entry.id,
       entry.name,
       entry.createdAt,
@@ -33,13 +33,13 @@ export function filtersRouter() {
     const row = db.prepare("SELECT * FROM filters WHERE id = ?").get(req.params.id);
     if (!row) return void res.status(404).end();
     const entry = rowToFilter(row);
-    if (typeof req.body.watched === "boolean") entry.watched = req.body.watched;
+    if (typeof req.body.subscribed === "boolean") entry.subscribed = req.body.subscribed;
     if (req.body.filter && typeof req.body.filter === "object") entry.filter = req.body.filter;
     if (typeof req.body.name === "string" && req.body.name.trim()) entry.name = req.body.name.trim();
-    db.prepare("UPDATE filters SET name = ?, filter = ?, watched = ? WHERE id = ?").run(
+    db.prepare("UPDATE filters SET name = ?, filter = ?, subscribed = ? WHERE id = ?").run(
       entry.name,
       JSON.stringify(entry.filter),
-      entry.watched ? 1 : 0,
+      entry.subscribed ? 1 : 0,
       entry.id,
     );
     res.json(entry);

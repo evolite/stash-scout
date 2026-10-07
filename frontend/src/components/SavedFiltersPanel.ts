@@ -32,13 +32,13 @@ export async function renderSavedFiltersPanel(
     }
 
     for (const f of filters) {
-      const watch = document.createElement("input");
-      watch.type = "checkbox";
-      watch.checked = f.watched;
-      watch.className = "shrink-0 w-auto";
-      watch.title = "Show this filter's results in the Feed";
-      watch.addEventListener("click", (e) => e.stopPropagation());
-      watch.addEventListener("change", () => api.setFilterWatched(f.id, watch.checked));
+      const subscribe = document.createElement("input");
+      subscribe.type = "checkbox";
+      subscribe.checked = f.subscribed;
+      subscribe.className = "shrink-0 w-auto";
+      subscribe.title = "Subscribe: show this filter's results in the Feed";
+      subscribe.addEventListener("click", (e) => e.stopPropagation());
+      subscribe.addEventListener("change", () => api.setFilterSubscribed(f.id, subscribe.checked));
 
       body.appendChild(
         savedRow({
@@ -49,7 +49,7 @@ export async function renderSavedFiltersPanel(
             await api.deleteFilter(f.id);
             await refresh();
           },
-          trailing: watch,
+          trailing: subscribe,
         }),
       );
     }

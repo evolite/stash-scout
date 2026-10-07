@@ -17,7 +17,7 @@ const SCHEMA = `
     name TEXT NOT NULL,
     created_at TEXT NOT NULL,
     filter TEXT NOT NULL,
-    watched INTEGER NOT NULL DEFAULT 0
+    subscribed INTEGER NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS global_exclude_tags (
     id TEXT PRIMARY KEY,
@@ -69,8 +69,8 @@ function migrateFromJson(db: DatabaseSync, dataDir: string): void {
   db.exec("BEGIN");
   try {
     const filters = readJsonSync<SavedFilter[]>(dataDir, "filters.json", []);
-    const insertFilter = db.prepare("INSERT OR IGNORE INTO filters (id, name, created_at, filter, watched) VALUES (?, ?, ?, ?, ?)");
-    for (const f of filters) insertFilter.run(f.id, f.name, f.createdAt, JSON.stringify(f.filter), f.watched ? 1 : 0);
+    const insertFilter = db.prepare("INSERT OR IGNORE INTO filters (id, name, created_at, filter, subscribed) VALUES (?, ?, ?, ?, ?)");
+    for (const f of filters) insertFilter.run(f.id, f.name, f.createdAt, JSON.stringify(f.filter), ((f as { watched?: boolean }).watched ?? f.subscribed) ? 1 : 0); // legacy JSON files say "watched"
 
     const excludeTags = readJsonSync<GlobalExcludeTag[]>(dataDir, "global-exclude-tags.json", []);
     const insertExcludeTag = db.prepare("INSERT OR IGNORE INTO global_exclude_tags (id, name, added_at) VALUES (?, ?, ?)");
@@ -102,6 +102,9 @@ function migrateFromJson(db: DatabaseSync, dataDir: string): void {
 export function openDb(dataDir: string): DatabaseSync {
   const db = new DatabaseSync(path.join(dataDir, "app.db"));
   db.exec(SCHEMA);
+  // Pre-rename DBs call the column "watched" (renamed to "subscribed").
+  const cols = db.prepare("PRAGMA table_info(filters)").all() as { name: string }[];
+  if (cols.some((c) => c.name === "watched")) db.exec("ALTER TABLE filters RENAME COLUMN watched TO subscribed");
   migrateFromJson(db, dataDir);
   return db;
 }
@@ -109,7 +112,7 @@ export function openDb(dataDir: string): DatabaseSync {
 export const db = openDb(REAL_DATA_DIR);
 
 export function filterRowToSavedFilter(row: any): SavedFilter {
-  return { id: row.id, name: row.name, createdAt: row.created_at, filter: JSON.parse(row.filter), watched: !!row.watched };
+  return { id: row.id, name: row.name, createdAt: row.created_at, filter: JSON.parse(row.filter), subscribed: !!row.subscribed };
 }
 
 export function performerSearchRowTo(row: any): SavedPerformerSearch {

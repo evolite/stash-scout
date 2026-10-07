@@ -418,7 +418,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
   }
 
   // Ported from the old standalone Performers tab: performer search box, header,
-  // watched-filter chips, and the scene list pinned to this performer.
+  // subscribed-filter chips, and the scene list pinned to this performer.
   function renderDetail(id: string, knownName?: string) {
     contentCol.innerHTML = "";
 
@@ -457,7 +457,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     wrap.appendChild(sectionWrap);
 
     let selectedFilterName: string | undefined;
-    let watchedFilters: SavedFilter[] = [];
+    let subscribedFilters: SavedFilter[] = [];
     let section: ReturnType<typeof renderSceneSection> | undefined;
 
     function mountSection() {
@@ -465,7 +465,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
       section = renderSceneSection({
         perPage: DETAIL_PER_PAGE,
         fetchPage: async (page, refresh) => {
-          const chosen = watchedFilters.find((f) => f.name === selectedFilterName);
+          const chosen = subscribedFilters.find((f) => f.name === selectedFilterName);
           const cf = chosen?.filter as Record<string, unknown> | undefined;
           const filter: SceneFilter = {
             page,
@@ -488,10 +488,10 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
 
     function renderChips() {
       chipBar.innerHTML = "";
-      if (watchedFilters.length === 0) return;
+      if (subscribedFilters.length === 0) return;
       const label = document.createElement("span");
       label.className = "text-xs text-text-faint mr-1";
-      label.textContent = "Watched filter";
+      label.textContent = "Subscribed filter";
       chipBar.appendChild(label);
       chipBar.appendChild(
         renderChip("All", selectedFilterName === undefined, () => {
@@ -500,7 +500,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
           section?.reset();
         }),
       );
-      for (const f of watchedFilters) {
+      for (const f of subscribedFilters) {
         chipBar.appendChild(
           renderChip(f.name, selectedFilterName === f.name, () => {
             selectedFilterName = f.name;
@@ -514,7 +514,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     mountSection();
     api.listFilters().then((filters) => {
       if (detailId !== id) return;
-      watchedFilters = filters.filter((f) => f.watched);
+      subscribedFilters = filters.filter((f) => f.subscribed);
       renderChips();
     });
   }

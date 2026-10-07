@@ -82,10 +82,10 @@ export const api = {
   // always picks its own random ~2-month window.
   randomScenes: (filter: SceneFilter, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes/random?${qs(filter)}${hideParam()}${refresh ? "&refresh=1" : ""}`),
-  watchedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, showInLibrary = false, refresh = false) => {
+  subscribedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, showInLibrary = false, refresh = false) => {
     const sourceParam = source ? `&source=${encodeURIComponent(source)}` : "";
     return req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(
-      `/api/watched-feed?page=${page}&per_page=${perPage}&window=${window}${sourceParam}${showInLibrary ? "&unadded=0" : ""}${hideParam()}${refresh ? "&refresh=1" : ""}`,
+      `/api/subscribed-feed?page=${page}&per_page=${perPage}&window=${window}${sourceParam}${showInLibrary ? "&unadded=0" : ""}${hideParam()}${refresh ? "&refresh=1" : ""}`,
     );
   },
   queryPerformers: (filter: PerformerFilter, refresh = false) =>
@@ -132,11 +132,11 @@ export const api = {
       body: JSON.stringify({ name, filter }),
     }),
   deleteFilter: (id: string) => req(`/api/filters/${id}`, { method: "DELETE" }),
-  setFilterWatched: (id: string, watched: boolean) =>
+  setFilterSubscribed: (id: string, subscribed: boolean) =>
     req<SavedFilter>(`/api/filters/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ watched }),
+      body: JSON.stringify({ subscribed }),
     }),
   overwriteFilter: (id: string, filter: SceneFilter) =>
     req<SavedFilter>(`/api/filters/${id}`, {

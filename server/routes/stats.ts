@@ -77,9 +77,9 @@ export function statsRouter(cfg: AppConfig, whisparr: WhisparrClient) {
       }
 
       const ignoredCount = (db.prepare("SELECT COUNT(*) as c FROM ignored_scenes").get() as { c: number }).c;
-      const filterCounts = db.prepare("SELECT COUNT(*) as total, SUM(watched) as watched FROM filters").get() as {
+      const filterCounts = db.prepare("SELECT COUNT(*) as total, SUM(subscribed) as subscribed FROM filters").get() as {
         total: number;
-        watched: number | null;
+        subscribed: number | null;
       };
 
       const summary: StatsSummary = {
@@ -87,7 +87,7 @@ export function statsRouter(cfg: AppConfig, whisparr: WhisparrClient) {
         downloadProgress,
         ignoredCount,
         savedFiltersCount: filterCounts.total,
-        watchedFiltersCount: filterCounts.watched ?? 0,
+        subscribedFiltersCount: filterCounts.subscribed ?? 0,
         timeline,
       };
       res.json(summary);

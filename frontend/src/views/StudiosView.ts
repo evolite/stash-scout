@@ -8,7 +8,7 @@ import { renderStudioHeader } from "../components/EntityHeader.js";
 const PER_PAGE = 32;
 
 // Mirror of PerformersView: browse one studio's StashDB scenes, optionally
-// narrowed by a chosen watched filter's tags/exclude_tags. The browsed studio
+// narrowed by a chosen subscribed filter's tags/exclude_tags. The browsed studio
 // is pinned as the `studios` criterion. Global exclude tags are applied
 // server-side unconditionally (server/routes/scenes.ts).
 export function renderStudiosView(initialId?: string): HTMLElement {
@@ -30,7 +30,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
 
   let studioId: string | undefined = initialId;
   let selectedFilterName: string | undefined; // undefined = "All"
-  let watchedFilters: SavedFilter[] = [];
+  let subscribedFilters: SavedFilter[] = [];
   let section: ReturnType<typeof renderSceneSection> | undefined;
 
   function renderHeaderPlaceholder(name?: string) {
@@ -47,10 +47,10 @@ export function renderStudiosView(initialId?: string): HTMLElement {
 
   function renderChips() {
     chipBar.innerHTML = "";
-    if (!studioId || watchedFilters.length === 0) return;
+    if (!studioId || subscribedFilters.length === 0) return;
     const label = document.createElement("span");
     label.className = "text-xs text-text-faint mr-1";
-    label.textContent = "Watched filter";
+    label.textContent = "Subscribed filter";
     chipBar.appendChild(label);
     chipBar.appendChild(
       renderChip("All", selectedFilterName === undefined, () => {
@@ -59,7 +59,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
         section?.reset();
       }),
     );
-    for (const f of watchedFilters) {
+    for (const f of subscribedFilters) {
       chipBar.appendChild(
         renderChip(f.name, selectedFilterName === f.name, () => {
           selectedFilterName = f.name;
@@ -75,7 +75,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
     section = renderSceneSection({
       perPage: PER_PAGE,
       fetchPage: async (page, refresh) => {
-        const chosen = watchedFilters.find((f) => f.name === selectedFilterName);
+        const chosen = subscribedFilters.find((f) => f.name === selectedFilterName);
         const cf = chosen?.filter as Record<string, unknown> | undefined;
         const filter: SceneFilter = {
           page,
@@ -111,7 +111,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
   searchRow.appendChild(renderStudioSearch((id, name) => loadStudio(id, name)));
 
   api.listFilters().then((filters) => {
-    watchedFilters = filters.filter((f) => f.watched);
+    subscribedFilters = filters.filter((f) => f.subscribed);
     renderChips();
   });
 

@@ -159,7 +159,7 @@ export function renderStatsView(): HTMLElement {
     grid.appendChild(tile("Monitored (total)", stats.monitoredTotal));
     grid.appendChild(tile("Ignored", stats.ignoredCount));
     grid.appendChild(tile("Saved Filters", stats.savedFiltersCount));
-    grid.appendChild(tile("Watched Filters", stats.watchedFiltersCount));
+    grid.appendChild(tile("Subscribed Filters", stats.subscribedFiltersCount));
     body.appendChild(grid);
 
     body.appendChild(renderTimeline(stats.timeline));

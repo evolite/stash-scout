@@ -7,7 +7,7 @@ import { db, filterRowToSavedFilter } from "./db.js";
 import { parseStashFilter } from "./filterUtils.js";
 import { fetchFilteredPage, type Orientation } from "./statusFilter.js";
 
-const WATCHED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
+const SUBSCRIBED_WINDOW_DAYS: Record<string, number> = { week: 7, month: 30, year: 365 };
 
 export function getGlobalExcludeIds(): string[] {
   return (db.prepare("SELECT id FROM global_exclude_tags").all() as { id: string }[]).map((t) => t.id);
@@ -21,26 +21,26 @@ export function getIgnoredIds(): Set<string> {
   return new Set((db.prepare("SELECT id FROM ignored_scenes").all() as { id: string }[]).map((s) => s.id));
 }
 
-// Shared by the JSON /watched-feed route (paginated, for the frontend grid) and
+// Shared by the JSON /subscribed-feed route (paginated, for the frontend grid) and
 // the RSS feed route (single large page, for Whisparr's RSS import list) — both
-// need the exact same "merge every watched filter + Favorites, windowed,
+// need the exact same "merge every subscribed filter + Favorites, windowed,
 // deduped, unadded-only" result, just rendered differently.
-export async function getWatchedFeed(
+export async function getSubscribedFeed(
   deps: { stashdb: StashDBClient; cfg: AppConfig; localStash: LocalStashClient; whisparr: WhisparrClient },
   opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean; hide?: Orientation[] },
 ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
   const { stashdb, cfg, localStash, whisparr } = deps;
   const { page, perPage, refresh = false } = opts;
-  const windowDays = WATCHED_WINDOW_DAYS[opts.window] ?? WATCHED_WINDOW_DAYS.week;
+  const windowDays = SUBSCRIBED_WINDOW_DAYS[opts.window] ?? SUBSCRIBED_WINDOW_DAYS.week;
   // Month/year are long enough spans that date order goes stale fast — randomize
   // instead, reshuffling on every fresh page-1 visit (see queryMergedFeed).
   const randomize = opts.window === "month" || opts.window === "year";
 
-  const watchedFilters = (db.prepare("SELECT * FROM filters WHERE watched = 1").all() as any[]).map(filterRowToSavedFilter);
+  const subscribedFilters = (db.prepare("SELECT * FROM filters WHERE subscribed = 1").all() as any[]).map(filterRowToSavedFilter);
   const globalExcludes = getGlobalExcludeIds();
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let sources = [
-    ...watchedFilters.map((f) => {
+    ...subscribedFilters.map((f) => {
       const { input, excludeTagIds } = parseStashFilter(f.filter as Record<string, unknown>);
       input.date = { value: cutoff, modifier: "GREATER_THAN" };
       return { input, excludeTagIds: mergeExcludeIds(excludeTagIds, globalExcludes), label: f.name };
@@ -63,7 +63,7 @@ export async function getWatchedFeed(
     cutoff,
     globalExcludes,
     source: opts.source ?? "all",
-    filters: watchedFilters.map((f) => ({ id: f.id, filter: f.filter })),
+    filters: subscribedFilters.map((f) => ({ id: f.id, filter: f.filter })),
   });
   const ignoredIds = getIgnoredIds();
 
@@ -86,7 +86,7 @@ export async function getWatchedFeed(
     },
     page,
     perPage,
-    JSON.stringify({ route: "watched", cacheKey, unadded, hide: opts.hide ?? [] }),
+    JSON.stringify({ route: "subscribed", cacheKey, unadded, hide: opts.hide ?? [] }),
     { requireUnadded: unadded, excludeIds: ignoredIds, hide: opts.hide, bypassCache: reseed },
   );
 }

@@ -1,7 +1,7 @@
 import { api } from "./api.js";
 import { renderNavbar, type Tab } from "./components/Navbar.js";
 import { renderBrowseView } from "./views/BrowseView.js";
-import { renderWatchedView } from "./views/WatchedView.js";
+import { renderSubscribedView } from "./views/SubscribedView.js";
 import { renderPerformersView } from "./views/PerformersView.js";
 import { renderStudiosView } from "./views/StudiosView.js";
 import { renderStatsView } from "./views/StatsView.js";
@@ -10,7 +10,7 @@ import { renderOnboardingModal } from "./components/OnboardingModal.js";
 import { onNavigateToPerformer, onNavigateToStudio } from "./navigation.js";
 
 const root = document.getElementById("root")!;
-const TABS = new Set<Tab>(["browse", "watched", "performers", "studios", "stats", "settings"]);
+const TABS = new Set<Tab>(["browse", "subscribed", "performers", "studios", "stats", "settings"]);
 const savedTab = localStorage.getItem("activeTab");
 
 // A request for /performers/<id> (typed, bookmarked, or linked from
@@ -29,7 +29,7 @@ if (deepLinkedPerformerId) {
 } else if (TABS.has(savedTab as Tab)) {
   activeTab = savedTab as Tab;
 } else {
-  activeTab = "watched";
+  activeTab = "subscribed";
 }
 
 // Set either from the deep link above or by navigateToPerformer (e.g. a scene
@@ -71,7 +71,7 @@ window.addEventListener("popstate", () => {
     activeTab = "studios";
     pendingStudioId = studio;
   } else {
-    activeTab = tabBeforeDetail ?? (TABS.has(savedTab as Tab) ? (savedTab as Tab) : "watched");
+    activeTab = tabBeforeDetail ?? (TABS.has(savedTab as Tab) ? (savedTab as Tab) : "subscribed");
   }
   render();
 });
@@ -85,7 +85,7 @@ function render() {
   root.appendChild(content);
 
   if (activeTab === "browse") content.appendChild(renderBrowseView());
-  else if (activeTab === "watched") content.appendChild(renderWatchedView());
+  else if (activeTab === "subscribed") content.appendChild(renderSubscribedView());
   else if (activeTab === "performers") {
     content.appendChild(renderPerformersView(pendingPerformerId));
     pendingPerformerId = undefined;

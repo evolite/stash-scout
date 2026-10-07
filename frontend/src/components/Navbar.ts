@@ -1,9 +1,9 @@
 import { api } from "../api.js";
 
-export type Tab = "browse" | "watched" | "performers" | "studios" | "stats" | "settings";
+export type Tab = "browse" | "subscribed" | "performers" | "studios" | "stats" | "settings";
 
 const LEFT_TABS: { id: Tab; label: string }[] = [
-  { id: "watched", label: "Feed" },
+  { id: "subscribed", label: "Feed" },
   { id: "browse", label: "Scenes" },
   { id: "performers", label: "Performers" },
   { id: "studios", label: "Studios" },
@@ -137,7 +137,7 @@ async function loadNavbarConfig(): Promise<void> {
 void loadNavbarConfig();
 
 // Off by default — Feed/Trending hide scenes already in the library unless
-// this is switched on. Read by WatchedView.ts when building its queries.
+// this is switched on. Read by SubscribedView.ts when building its queries.
 const IN_LIBRARY_KEY = "inLibraryMode";
 
 export function isInLibraryMode(): boolean {
@@ -346,7 +346,7 @@ function renderToggle(label: string, isOn: () => boolean, setOn: (on: boolean) =
 
 // onLibraryToggle: the app's simple full-rerender-on-change model (see
 // main.ts's setTab) doesn't otherwise reach the "In Library" state into
-// WatchedView's already-mounted sections — clicking the toggle re-renders the
+// SubscribedView's already-mounted sections — clicking the toggle re-renders the
 // whole app so Feed/Trending re-fetch with the new setting immediately.
 export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibraryToggle: () => void): HTMLElement {
   const nav = document.createElement("nav");
