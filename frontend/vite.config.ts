@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  root: __dirname,
+  plugins: [tailwindcss()],
+  root: import.meta.dirname,
   server: {
     host: "0.0.0.0",
     proxy: {
