@@ -1,6 +1,6 @@
 # Stash Scout
 
-A weekend project for people who live in [StashDB](https://stashdb.org): browse it with real filters, keep an eye on what's new, and see at a glance what you already own. Plugs into [Stash](https://github.com/stashapp/stash) and [Whisparr](https://wiki.servarr.com/whisparr) so you can grab what's missing without leaving the page.
+A weekend project for people who use [StashDB](https://stashdb.org) for discovery: browse it with enhanced filtering, subscribe to your custom filters, and see at a glance what you already own, and ignore content you don't plan to get so you always have a streamlined and easily browsable list. Plugs into [Stash](https://github.com/stashapp/stash) and [Whisparr](https://wiki.servarr.com/whisparr) so you can grab what's missing without leaving the page.
 
 Grew out of the [StashSeer](https://codeberg.org/surging9143/StashSeer) userscript.
 
@@ -28,4 +28,4 @@ npm install && npm run build && npm start
 
 ## Under the hood
 
-TypeScript, Vite and Tailwind on the front, a small Express server, SQLite for storage. No framework, on purpose. It's a personal tool, not a product.
+TypeScript, Vite and Tailwind on the front, a small Express server, SQLite for storage.
