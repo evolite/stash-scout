@@ -51,7 +51,7 @@ export async function getSubscribedFeed(
       label: "Favorites",
     },
   ];
-  // The New Releases filter-name chip bar narrows to a single source's matches
+  // The Subscriptions filter-name chip bar narrows to a single source's matches
   // instead of the full merge — "all" (or no source) keeps every source active.
   if (opts.source && opts.source !== "all") {
     sources = sources.filter((s) => s.label === opts.source);

@@ -49,7 +49,7 @@ export function renderSubscribedView(): HTMLElement {
   feedHeadingRow.className = "flex items-center gap-2 mb-1.5";
   const feedHeading = document.createElement("h3");
   feedHeading.className = "text-base font-semibold";
-  feedHeading.textContent = "New Releases";
+  feedHeading.textContent = "Subscriptions";
   feedHeadingRow.appendChild(feedHeading);
   const pendingBadge = document.createElement("span");
   pendingBadge.className = "rounded bg-accent-dim text-accent text-[11px] font-bold px-2 py-0.5";
@@ -167,11 +167,11 @@ export function renderSubscribedView(): HTMLElement {
   }
   trendingWrap.appendChild(sortToggle);
 
-  // Same exclusive saved-filter chip bar as New Releases above — "All matches"
+  // Same exclusive saved-filter chip bar as Subscriptions above — "All matches"
   // (the default) is plain unfiltered trending, exactly like before; picking a
   // specific saved filter (or "Favorites") narrows Trending's own
   // TRENDING-sorted query by that filter's tags/performers/studios/exclude_tags
-  // instead of switching to the windowed subscribed feed New Releases uses.
+  // instead of switching to the windowed subscribed feed Subscriptions uses.
   let selectedTrendingSource: string | undefined; // undefined = "All matches"
   let subscribedFilters: SavedFilter[] = [];
   const trendingChipBar = document.createElement("div");
@@ -235,7 +235,7 @@ export function renderSubscribedView(): HTMLElement {
   trendingHeadingRow.appendChild(renderRefreshButton(() => trendingSection.refresh()));
   trendingWrap.appendChild(trendingSection.element);
 
-  // Shared by both chip bars — one saved-filters lookup drives New Releases'
+  // Shared by both chip bars — one saved-filters lookup drives Subscriptions'
   // exclusive source picker and Trending's, keyed the same way (subscribed-flagged
   // filters + a synthetic "Favorites"/"Favorites" entry). No reload here: the
   // default "All" selection's query never depends on subscribedFilters (only a

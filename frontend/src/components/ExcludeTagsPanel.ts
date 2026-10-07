@@ -2,7 +2,7 @@ import { api } from "../api.js";
 import { iconClose } from "../icons.js";
 
 // Global exclude tags apply everywhere scenes are fetched — the Scenes tab and
-// the Feed (New Releases + Trending) — instead of adding the same exclude to
+// the Feed (Subscriptions + Trending) — instead of adding the same exclude to
 // every saved filter individually. Rendered inside a Settings section.
 export async function renderExcludeTagsPanel(): Promise<HTMLElement> {
   const wrap = document.createElement("div");

@@ -125,7 +125,7 @@ function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip"
 }
 
 // The single place scene actions live — a compact icon row that only appears
-// on hover, same for every section (Trending, New Releases): Play if it's
+// on hover, same for every section (Trending, Subscriptions): Play if it's
 // already in the local Stash, otherwise a +/- pair for whatever the current
 // status allows. Skip (-) always removes the card via onRemove (permanent
 // dismiss). Add/Monitor (+) removes it too — but only when "In Library" mode
