@@ -77,7 +77,7 @@ export function statsRouter(cfg: AppConfig, whisparr: WhisparrClient) {
       }
 
       const ignoredCount = (db.prepare("SELECT COUNT(*) as c FROM ignored_scenes").get() as { c: number }).c;
-      const filterCounts = db.prepare("SELECT COUNT(*) as total, SUM(subscribed) as subscribed FROM filters").get() as {
+      const filterCounts = db.prepare("SELECT COUNT(*) as total, SUM(watched) as subscribed FROM filters").get() as {
         total: number;
         subscribed: number | null;
       };

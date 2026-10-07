@@ -4,12 +4,22 @@ A weekend project for people who use [StashDB](https://stashdb.org) for discover
 
 Grew out of the [StashSeer](https://codeberg.org/surging9143/StashSeer) userscript.
 
-## What you get
+## Why not just StashDB or StashSeer?
 
-- **Feed** — new releases from your watched filters and favorite performers, plus what's trending on StashDB.
-- **Filters** — tag AND/OR, excludes, performers, studios, dates. Save combos and reuse them.
-- **Stats** — a quick look at what's monitored, downloading and ignored.
-- **Scene cards** — Play, Add, Monitored, In Library, all at a glance.
+|  | StashDB | StashSeer userscript | **Stash Scout** |
+|---|:-:|:-:|:-:|
+| Browse and search scenes | ✅ | ✅ | ✅ |
+| Library / Whisparr status on scene cards | ❌ | ✅ | ✅ |
+| Add to Whisparr from the card | ❌ | ✅ | ✅ |
+| Save filters and reuse them | ❌ | ❌ | ✅ |
+| **Subscribe** to a filter and get a feed of what's new | ❌ | ❌ | ✅ |
+| Exclude tags everywhere, once | ❌ | ❌ | ✅ |
+| Skip scenes for good, so they stop showing up | ❌ | ❌ | ✅ |
+| Trending, narrowed to what you don't own yet | ❌ | ❌ | ✅ |
+| Stats on what's monitored, downloading and ignored | ❌ | ❌ | ✅ |
+| Runs as its own app, no browser add-on | ✅ | ❌ | ✅ |
+
+**The short version:** build a filter once, hit Subscribe, and new matches show up in your Feed. No more re-running the same searches by hand.
 
 ## Run it
 

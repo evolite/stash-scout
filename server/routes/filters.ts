@@ -19,7 +19,7 @@ export function filtersRouter() {
       filter: req.body.filter ?? {},
       subscribed: false,
     };
-    db.prepare("INSERT INTO filters (id, name, created_at, filter, subscribed) VALUES (?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO filters (id, name, created_at, filter, watched) VALUES (?, ?, ?, ?, ?)").run(
       entry.id,
       entry.name,
       entry.createdAt,
@@ -36,7 +36,7 @@ export function filtersRouter() {
     if (typeof req.body.subscribed === "boolean") entry.subscribed = req.body.subscribed;
     if (req.body.filter && typeof req.body.filter === "object") entry.filter = req.body.filter;
     if (typeof req.body.name === "string" && req.body.name.trim()) entry.name = req.body.name.trim();
-    db.prepare("UPDATE filters SET name = ?, filter = ?, subscribed = ? WHERE id = ?").run(
+    db.prepare("UPDATE filters SET name = ?, filter = ?, watched = ? WHERE id = ?").run(
       entry.name,
       JSON.stringify(entry.filter),
       entry.subscribed ? 1 : 0,

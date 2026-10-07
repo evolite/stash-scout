@@ -36,7 +36,7 @@ export async function getSubscribedFeed(
   // instead, reshuffling on every fresh page-1 visit (see queryMergedFeed).
   const randomize = opts.window === "month" || opts.window === "year";
 
-  const subscribedFilters = (db.prepare("SELECT * FROM filters WHERE subscribed = 1").all() as any[]).map(filterRowToSavedFilter);
+  const subscribedFilters = (db.prepare("SELECT * FROM filters WHERE watched = 1").all() as any[]).map(filterRowToSavedFilter);
   const globalExcludes = getGlobalExcludeIds();
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let sources = [
