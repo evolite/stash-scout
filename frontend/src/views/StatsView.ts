@@ -1,22 +1,85 @@
 import { api, type StatsSummary } from "../api.js";
 import { iconRefresh } from "../icons.js";
 
-const TILE = "bg-surface rounded-lg p-3.5 flex flex-col gap-1";
-const TILE_VALUE = "text-2xl font-bold";
-const TILE_LABEL = "text-xs text-muted";
+const CARD = "bg-surface border border-line rounded-lg";
+const SECTION_LABEL = "m-0 text-[11px] font-medium uppercase tracking-wider text-text-faint";
 
-function tile(label: string, value: number, suffix?: string): HTMLElement {
-  const el = document.createElement("div");
-  el.className = TILE;
-  const v = document.createElement("div");
-  v.className = TILE_VALUE;
-  v.textContent = suffix ? `${value} (${suffix})` : String(value);
-  const l = document.createElement("div");
-  l.className = TILE_LABEL;
-  l.textContent = label;
-  el.appendChild(v);
-  el.appendChild(l);
-  return el;
+function el(tag: string, className: string, text?: string): HTMLElement {
+  const e = document.createElement(tag);
+  e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+const fmt = (n: number) => n.toLocaleString();
+
+function renderHero(s: StatsSummary): HTMLElement {
+  const card = el("div", `${CARD} p-5 flex flex-col gap-4`);
+  const top = el("div", "flex items-end justify-between gap-4 flex-wrap");
+  const left = el("div", "flex flex-col gap-1");
+  left.appendChild(el("h4", SECTION_LABEL, "In Whisparr"));
+  left.appendChild(el("div", "text-4xl font-semibold tabular-nums leading-none", fmt(s.totalInWhisparr)));
+  top.appendChild(left);
+  const pct = s.totalInWhisparr ? Math.round((s.downloaded / s.totalInWhisparr) * 100) : 0;
+  top.appendChild(el("div", "text-sm text-muted tabular-nums", `${pct}% downloaded`));
+  card.appendChild(top);
+
+  const segments = [
+    { label: "Downloaded", n: s.downloaded, color: "bg-success" },
+    { label: "Downloading", n: s.downloading, color: "bg-accent" },
+    { label: "Wanted", n: s.wanted, color: "bg-warning" },
+    { label: "Unmonitored", n: s.unmonitored, color: "bg-text-faint" },
+  ];
+  // Total-zero → empty track only (no divide-by-zero).
+  const bar = el("div", "flex h-2 rounded-full overflow-hidden bg-surface-3 gap-px");
+  for (const seg of segments) {
+    if (!seg.n || !s.totalInWhisparr) continue;
+    const part = el("div", seg.color);
+    part.style.flex = `${seg.n} 0 0`;
+    part.title = `${seg.label}: ${fmt(seg.n)}`;
+    bar.appendChild(part);
+  }
+  card.appendChild(bar);
+
+  const legend = el("div", "grid gap-3 grid-cols-[repeat(auto-fit,minmax(110px,1fr))]");
+  for (const seg of segments) {
+    const item = el("div", "flex flex-col gap-0.5");
+    const label = el("div", "flex items-center gap-1.5 text-xs text-muted");
+    label.appendChild(el("span", `inline-block w-2 h-2 rounded-full ${seg.color}`));
+    label.appendChild(document.createTextNode(seg.label));
+    const value = el("div", "text-lg font-semibold tabular-nums", fmt(seg.n));
+    if (seg.label === "Downloading" && seg.n > 0 && s.downloadProgress != null) {
+      value.appendChild(el("span", "ml-1.5 text-sm font-normal text-accent", `${s.downloadProgress}%`));
+    }
+    item.appendChild(label);
+    item.appendChild(value);
+    legend.appendChild(item);
+  }
+  card.appendChild(legend);
+
+  if (s.downloading > 0 && s.downloadProgress != null) {
+    const track = el("div", "h-1 rounded-full bg-surface-3 overflow-hidden");
+    const fill = el("div", "h-full bg-accent");
+    fill.style.width = `${s.downloadProgress}%`;
+    track.appendChild(fill);
+    card.appendChild(track);
+  }
+  return card;
+}
+
+function renderSecondary(s: StatsSummary): HTMLElement {
+  const row = el("div", `${CARD} px-5 py-3 grid grid-cols-3 gap-4`);
+  for (const [label, n] of [
+    ["Saved filters", s.savedFiltersCount],
+    ["Subscribed", s.subscribedFiltersCount],
+    ["Ignored scenes", s.ignoredCount],
+  ] as const) {
+    const cell = el("div", "flex flex-col gap-0.5");
+    cell.appendChild(el("div", "text-xs text-muted", label));
+    cell.appendChild(el("div", "text-xl font-semibold tabular-nums", fmt(n)));
+    row.appendChild(cell);
+  }
+  return row;
 }
 
 function renderRefreshButton(onClick: () => void): HTMLElement {
@@ -39,11 +102,11 @@ function formatShortDate(isoDate: string): string {
 
 function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
   const wrap = document.createElement("div");
-  wrap.className = "bg-surface rounded-lg p-3.5 flex flex-col gap-2";
+  wrap.className = `${CARD} p-4 flex flex-col gap-3`;
 
   const h = document.createElement("h4");
-  h.className = "m-0 text-sm";
-  h.textContent = "Added to Whisparr — Last 30 Days";
+  h.className = SECTION_LABEL;
+  h.textContent = "Added to Whisparr · Last 30 days";
   wrap.appendChild(h);
 
   if (timeline.length === 0) {
@@ -53,6 +116,21 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
     wrap.appendChild(p);
     return wrap;
   }
+
+  const total = timeline.reduce((n, d) => n + d.count, 0);
+  const best = timeline.reduce((m, d) => (d.count > m.count ? d : m), timeline[0]);
+  const summary = el("div", "flex gap-6 flex-wrap");
+  for (const [label, value] of [
+    ["Added", fmt(total)],
+    ["Daily avg", (total / timeline.length).toFixed(1)],
+    ["Best day", best.count ? `${best.count} · ${formatShortDate(best.date)}` : "—"],
+  ]) {
+    const cell = el("div", "flex flex-col gap-0.5");
+    cell.appendChild(el("div", "text-xs text-muted", label));
+    cell.appendChild(el("div", "text-lg font-semibold tabular-nums", value));
+    summary.appendChild(cell);
+  }
+  wrap.appendChild(summary);
 
   const maxCount = Math.max(1, ...timeline.map((d) => d.count));
   const midCount = Math.round(maxCount / 2);
@@ -77,7 +155,7 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
 
   for (const frac of [0, 0.5, 1]) {
     const gridline = document.createElement("div");
-    gridline.className = "absolute left-0 right-0 border-t border-white/10";
+    gridline.className = "absolute left-0 right-0 border-t border-line/60";
     gridline.style.top = `${frac * 100}%`;
     chartArea.appendChild(gridline);
   }
@@ -86,7 +164,8 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
   bars.className = "absolute inset-0 flex items-end gap-[2px]";
   for (const day of timeline) {
     const bar = document.createElement("div");
-    bar.className = "flex-1 bg-accent rounded-t-sm hover:brightness-125";
+    const isToday = day === timeline[timeline.length - 1];
+    bar.className = `flex-1 rounded-t-sm hover:bg-accent ${day.count === 0 ? "bg-line" : isToday ? "bg-accent" : "bg-accent/60"}`;
     const heightPx = Math.max(2, Math.round((day.count / maxCount) * CHART_HEIGHT_PX));
     bar.style.height = `${heightPx}px`;
     bar.title = `${formatShortDate(day.date)}: ${day.count} scene${day.count === 1 ? "" : "s"}`;
@@ -136,7 +215,7 @@ export function renderStatsView(): HTMLElement {
   container.appendChild(headingRow);
 
   const body = document.createElement("div");
-  body.className = "flex flex-col gap-3";
+  body.className = "flex flex-col gap-4";
   const loading = document.createElement("p");
   loading.className = "text-muted text-sm";
   loading.textContent = "Loading…";
@@ -144,23 +223,18 @@ export function renderStatsView(): HTMLElement {
   container.appendChild(body);
 
   async function load() {
-    const stats = await api.stats();
+    let stats: StatsSummary;
+    try {
+      stats = await api.stats();
+    } catch (err) {
+      body.innerHTML = "";
+      body.appendChild(el("p", "text-danger text-sm", `Couldn't load stats: ${(err as Error).message}`));
+      return;
+    }
     body.innerHTML = "";
 
-    const grid = document.createElement("div");
-    grid.className = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]";
-    grid.appendChild(tile("In Whisparr", stats.totalInWhisparr));
-    grid.appendChild(tile("Downloaded", stats.downloaded));
-    grid.appendChild(
-      tile("Downloading", stats.downloading, stats.downloadProgress != null ? `${stats.downloadProgress}%` : undefined),
-    );
-    grid.appendChild(tile("Wanted", stats.wanted));
-    grid.appendChild(tile("Unmonitored", stats.unmonitored));
-    grid.appendChild(tile("Monitored (total)", stats.monitoredTotal));
-    grid.appendChild(tile("Ignored", stats.ignoredCount));
-    grid.appendChild(tile("Saved Filters", stats.savedFiltersCount));
-    grid.appendChild(tile("Subscribed Filters", stats.subscribedFiltersCount));
-    body.appendChild(grid);
+    body.appendChild(renderHero(stats));
+    body.appendChild(renderSecondary(stats));
 
     body.appendChild(renderTimeline(stats.timeline));
   }
