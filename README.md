@@ -1,8 +1,18 @@
-# Stash Scout
+### Stash Scout
 
-A weekend project for people who use [StashDB](https://stashdb.org) for discovery: browse it with enhanced filtering, subscribe to your custom filters, and see at a glance what you already own, and ignore content you don't plan to get so you always have a streamlined and easily browsable list. Plugs into [Stash](https://github.com/stashapp/stash) and [Whisparr](https://wiki.servarr.com/whisparr) so you can grab what's missing without leaving the page.
+A project for personal use as i often find myself browsing StashDB for content 
 
-Grew out of the [StashSeer](https://codeberg.org/surging9143/StashSeer) userscript.
+My issue was that StashDB does not natively support excluding tags, or further filtering down searches beyond one tag. I also found myself constantly looking up the same tags etc, So this is an attempt to improve my own experience. It is Vibe coded, and i want to be upfront about that. 
+
+The idea is that i wanted a place where i could create searches, and save them, and or subscribe to them so i get a feed of what’s new within my “interests”. I can add them to stash through whisparr if i want, and i can ignore the scene if i see it’s not for me. Keeping my dash clean.
+
+I also wanted to be able to filter away tags like VR and things that don’t match my sexual preference etc and do that globally.
+
+Should also be respectful of the StashDB API limits :)
+
+Also have a small plugin which integrates some parts with Stash (Links to stash-scout form performer / studio) (“Scout-Plugin” from my index. https://codeberg.org/surging9143/pages/src/branch/main/index.yml)
+
+Grew out of the StashSeer userscript.
 
 ## Why not just StashDB or StashSeer?
 
