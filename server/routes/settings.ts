@@ -27,6 +27,23 @@ const EDITABLE_FIELDS = [
   "oidcAllowed",
 ] as const;
 
+// Returns why the merged config would leave nobody able to log in, or null if fine.
+async function authConfigError(next: AppConfig): Promise<string | null> {
+  if (next.authMode === "local" && !(next.authUsername && next.authPasswordHash)) {
+    return "local auth needs a username and password";
+  }
+  if (next.authMode !== "oidc") return null;
+  if (!(next.oidcIssuer && next.oidcClientId && next.oidcClientSecret)) {
+    return "oidc needs issuer, client ID and client secret";
+  }
+  try {
+    await discoverOidc(next);
+    return null;
+  } catch {
+    return "OIDC discovery failed — check the issuer URL";
+  }
+}
+
 export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
 
@@ -80,19 +97,8 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     // Lockout guard: validate the merged result before applying, so a bad
     // toggle can't leave nobody able to log in.
     const next = { ...cfg, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== "" && v !== undefined)) } as AppConfig;
-    if (next.authMode === "local" && !(next.authUsername && next.authPasswordHash)) {
-      return res.status(400).json({ error: "local auth needs a username and password" });
-    }
-    if (next.authMode === "oidc") {
-      if (!(next.oidcIssuer && next.oidcClientId && next.oidcClientSecret)) {
-        return res.status(400).json({ error: "oidc needs issuer, client ID and client secret" });
-      }
-      try {
-        await discoverOidc(next);
-      } catch {
-        return res.status(400).json({ error: "OIDC discovery failed — check the issuer URL" });
-      }
-    }
+    const authError = await authConfigError(next);
+    if (authError) return res.status(400).json({ error: authError });
     await updateConfig(cfg, patch);
     res.status(204).end();
   });

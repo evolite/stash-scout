@@ -87,6 +87,51 @@ function section(title: string, subtitle: string): { section: HTMLElement; body:
   return { section: el, body, pill, note };
 }
 
+interface SettingsPage {
+  id: string;
+  group: string;
+  label: string;
+  el: HTMLElement;
+  saves: boolean;
+}
+
+const SAVED_PAGE_KEY = "settingsPage";
+
+// Left nav: grouped buttons that show one page at a time and remember the last one.
+function renderNav(nav: HTMLElement, pages: SettingsPage[], saveBar: HTMLElement): void {
+  const navButtons = new Map<string, HTMLButtonElement>();
+  function showPage(id: string) {
+    const target = pages.find((pg) => pg.id === id) ?? pages[0];
+    for (const pg of pages) pg.el.hidden = pg !== target;
+    saveBar.hidden = !target.saves;
+    for (const [bid, b] of navButtons) {
+      const on = bid === target.id;
+      b.className = `text-left text-sm px-3 py-1.5 rounded transition-colors ${on ? "bg-surface-2 text-text font-medium" : "text-muted hover:text-text hover:bg-surface-2/60"}`;
+      b.setAttribute("aria-current", on ? "page" : "false");
+    }
+    localStorage.setItem(SAVED_PAGE_KEY, target.id);
+  }
+  for (const group of new Set(pages.map((pg) => pg.group))) {
+    const heading = document.createElement("div");
+    heading.className = "text-[11px] uppercase tracking-wider text-text-faint px-3 pb-1";
+    heading.textContent = group;
+    const list = document.createElement("div");
+    list.className = "flex flex-col gap-0.5";
+    for (const pg of pages.filter((p) => p.group === group)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = pg.label;
+      b.addEventListener("click", () => showPage(pg.id));
+      navButtons.set(pg.id, b);
+      list.appendChild(b);
+    }
+    const block = document.createElement("div");
+    block.append(heading, list);
+    nav.appendChild(block);
+  }
+  showPage(localStorage.getItem(SAVED_PAGE_KEY) ?? pages[0].id);
+}
+
 export function renderSettingsView(): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex gap-8 items-start";
@@ -108,7 +153,7 @@ export function renderSettingsView(): HTMLElement {
     content.className = "flex-1 min-w-0 max-w-xl flex flex-col gap-4";
     container.append(nav, content);
 
-    const pages: { id: string; group: string; label: string; el: HTMLElement; saves: boolean }[] = [];
+    const pages: SettingsPage[] = [];
     function addPage(group: string, id: string, label: string, el: HTMLElement, saves: boolean) {
       el.classList.add("bg-surface", "border", "border-line", "rounded-lg");
       pages.push({ id, group, label, el, saves });
@@ -356,39 +401,7 @@ export function renderSettingsView(): HTMLElement {
     saveBar.appendChild(saveBtn);
     content.appendChild(saveBar);
 
-    // --- Left nav ---
-    const SAVED_PAGE_KEY = "settingsPage";
-    const navButtons = new Map<string, HTMLButtonElement>();
-    function showPage(id: string) {
-      const target = pages.find((pg) => pg.id === id) ?? pages[0];
-      for (const pg of pages) pg.el.hidden = pg !== target;
-      saveBar.hidden = !target.saves;
-      for (const [bid, b] of navButtons) {
-        const on = bid === target.id;
-        b.className = `text-left text-sm px-3 py-1.5 rounded transition-colors ${on ? "bg-surface-2 text-text font-medium" : "text-muted hover:text-text hover:bg-surface-2/60"}`;
-        b.setAttribute("aria-current", on ? "page" : "false");
-      }
-      localStorage.setItem(SAVED_PAGE_KEY, target.id);
-    }
-    for (const group of [...new Set(pages.map((pg) => pg.group))]) {
-      const heading = document.createElement("div");
-      heading.className = "text-[11px] uppercase tracking-wider text-text-faint px-3 pb-1";
-      heading.textContent = group;
-      const list = document.createElement("div");
-      list.className = "flex flex-col gap-0.5";
-      for (const pg of pages.filter((p) => p.group === group)) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = pg.label;
-        b.addEventListener("click", () => showPage(pg.id));
-        navButtons.set(pg.id, b);
-        list.appendChild(b);
-      }
-      const block = document.createElement("div");
-      block.append(heading, list);
-      nav.appendChild(block);
-    }
-    showPage(localStorage.getItem(SAVED_PAGE_KEY) ?? pages[0].id);
+    renderNav(nav, pages, saveBar);
 
     saveBtn.addEventListener("click", async () => {
       saveBtn.disabled = true;

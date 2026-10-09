@@ -5,7 +5,7 @@ import type { AppConfig } from "./config.js";
 import { sessionKey } from "./secretStore.js";
 
 export const COOKIE = "ss_session";
-const SESSION_MS = 7 * 24 * 3600_000;
+const SESSION_MS = 7 * 24 * 3_600_000;
 
 export function hashPassword(pw: string): string {
   const salt = randomBytes(16);
