@@ -89,7 +89,7 @@ function section(title: string, subtitle: string): { section: HTMLElement; body:
 
 export function renderSettingsView(): HTMLElement {
   const container = document.createElement("div");
-  container.className = "grid grid-cols-[minmax(360px,480px)_1fr] gap-4 items-start";
+  container.className = "flex gap-8 items-start";
   const loading = document.createElement("p");
   loading.className = "text-muted text-sm";
   loading.textContent = "Loading…";
@@ -99,15 +99,21 @@ export function renderSettingsView(): HTMLElement {
     const [cfg, settings, test] = await Promise.all([api.getConfig(), api.settings(), api.testSettings()]);
     container.innerHTML = "";
 
-    const leftCol = document.createElement("div");
-    leftCol.className = "flex flex-col gap-4";
-    const rightCol = document.createElement("div");
-    rightCol.className = "flex flex-col gap-4";
-    container.append(leftCol, rightCol);
+    // Radarr-style layout: grouped left nav, one sub page shown at a time.
+    // Every page is built up front and just hidden/shown, so a single Save
+    // covers edits made across the config pages.
+    const nav = document.createElement("nav");
+    nav.className = "w-52 shrink-0 flex flex-col gap-4 sticky top-4";
+    const content = document.createElement("div");
+    content.className = "flex-1 min-w-0 max-w-xl flex flex-col gap-4";
+    container.append(nav, content);
 
-    const panel = document.createElement("div");
-    panel.className = "bg-surface border border-line rounded-lg divide-y divide-line";
-    leftCol.appendChild(panel);
+    const pages: { id: string; group: string; label: string; el: HTMLElement; saves: boolean }[] = [];
+    function addPage(group: string, id: string, label: string, el: HTMLElement, saves: boolean) {
+      el.classList.add("bg-surface", "border", "border-line", "rounded-lg");
+      pages.push({ id, group, label, el, saves });
+      content.appendChild(el);
+    }
 
     let dirty = false;
     function markDirty() {
@@ -124,7 +130,7 @@ export function renderSettingsView(): HTMLElement {
     const stashdbKey = fieldRow("API Key", { type: "password", placeholder: cfg.stashdbApiKeySet ? "(unchanged)" : "not set" });
     stashdbS.body.appendChild(stashdbUrl.row);
     stashdbS.body.appendChild(stashdbKey.row);
-    panel.appendChild(stashdbS.section);
+    addPage("Connections", "stashdb", "StashDB", stashdbS.section, true);
 
     // --- Local Stash ---
     const stashS = section("Local Stash", "Checks your library.");
@@ -138,7 +144,7 @@ export function renderSettingsView(): HTMLElement {
     stashS.body.appendChild(stashGqlUrl.row);
     stashS.body.appendChild(stashRootUrl.row);
     stashS.body.appendChild(stashKey.row);
-    panel.appendChild(stashS.section);
+    addPage("Connections", "stash", "Local Stash", stashS.section, true);
 
     // --- Whisparr ---
     const whisparrS = section("Whisparr", "Auto-downloads monitored scenes.");
@@ -207,7 +213,7 @@ export function renderSettingsView(): HTMLElement {
       }
     });
     whisparrS.body.appendChild(loadOptionsBtn);
-    panel.appendChild(whisparrS.section);
+    addPage("Connections", "whisparr", "Whisparr", whisparrS.section, true);
 
     // --- Cloudflare Access ---
     const cfS = section("Cloudflare Access", "Only if Stash/Whisparr sit behind it.");
@@ -216,7 +222,7 @@ export function renderSettingsView(): HTMLElement {
     const cfSecret = fieldRow("Client Secret", { type: "password", placeholder: cfg.cfAccessClientSecretSet ? "(unchanged)" : "not set" });
     cfS.body.appendChild(cfId.row);
     cfS.body.appendChild(cfSecret.row);
-    panel.appendChild(cfS.section);
+    addPage("Connections", "cloudflare", "Cloudflare Access", cfS.section, true);
 
     // --- Authentication ---
     const authS = section("Authentication", "Require a login to use this app.");
@@ -238,7 +244,15 @@ export function renderSettingsView(): HTMLElement {
     const oidcAllowed = fieldRow("Allowed email / sub", { value: cfg.oidcAllowed, placeholder: "blank = anyone the provider authenticates" });
     const oidcHint = document.createElement("p");
     oidcHint.className = "m-0 text-xs text-muted";
-    oidcHint.textContent = `Redirect URI to register: ${location.origin}/api/auth/oidc/callback`;
+    // Built from the URL you're browsing on (the server derives the same value
+    // from the request Host/X-Forwarded-Proto), so it follows wherever the app is served.
+    oidcHint.append(
+      "Add this as an allowed redirect URI in your OIDC provider (not here) — it must match exactly: ",
+    );
+    const oidcUri = document.createElement("code");
+    oidcUri.className = "text-text break-all select-all";
+    oidcUri.textContent = `${location.origin}/api/auth/oidc/callback`;
+    oidcHint.appendChild(oidcUri);
     const localRows = [authUser.row, authPass.row];
     const oidcRows = [oidcIssuer.row, oidcId.row, oidcSecret.row, oidcAllowed.row, oidcHint];
     authS.body.append(modeRow, ...localRows, ...oidcRows);
@@ -248,22 +262,22 @@ export function renderSettingsView(): HTMLElement {
     };
     modeSel.addEventListener("change", syncAuthRows);
     syncAuthRows();
-    panel.appendChild(authS.section);
+    addPage("System", "auth", "Authentication", authS.section, true);
 
-    panel.querySelectorAll("input, select").forEach((input) => {
+    pages.forEach((pg) => pg.el.querySelectorAll("input, select").forEach((input) => {
       input.addEventListener("input", markDirty);
       input.addEventListener("change", markDirty);
-    });
+    }));
 
     // --- Performer genders shown on scene cards ---
     // A browsing preference, not a server-synced connection setting — applies
     // instantly (localStorage, see genderPrefs.ts), so it's kept outside
-    // `panel`/the dirty-tracking Save flow above on purpose.
+    // the config pages / dirty-tracking Save flow on purpose.
     const gendersPanel = document.createElement("div");
     gendersPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const gendersTitle = document.createElement("h3");
     gendersTitle.className = "m-0 text-sm font-semibold";
-    gendersTitle.textContent = "Genders shown on cards";
+    gendersTitle.textContent = "Genders on Cards";
     gendersTitle.title = "A performer with no gender recorded always shows, regardless of these.";
     gendersPanel.appendChild(gendersTitle);
     const gendersGrid = document.createElement("div");
@@ -283,15 +297,15 @@ export function renderSettingsView(): HTMLElement {
       gendersGrid.appendChild(row);
     }
     gendersPanel.appendChild(gendersGrid);
-    rightCol.appendChild(gendersPanel);
+    addPage("Browsing", "genders", "Genders on Cards", gendersPanel, false);
 
     // --- Hide scenes by cast ---
-    // Whole-scene filter, same localStorage pattern as the panel above.
+    // Whole-scene filter, same localStorage pattern as the genders page.
     const sceneFilterPanel = document.createElement("div");
     sceneFilterPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const sfTitle = document.createElement("h3");
     sfTitle.className = "m-0 text-sm font-semibold";
-    sfTitle.textContent = "Hide scenes";
+    sfTitle.textContent = "Hide Scenes by Gender";
     sceneFilterPanel.appendChild(sfTitle);
     const sfRow = document.createElement("div");
     sfRow.className = "flex flex-wrap gap-4";
@@ -313,7 +327,7 @@ export function renderSettingsView(): HTMLElement {
       sfRow.appendChild(row);
     }
     sceneFilterPanel.appendChild(sfRow);
-    rightCol.appendChild(sceneFilterPanel);
+    addPage("Browsing", "hide", "Hide Scenes by Gender", sceneFilterPanel, false);
 
     // --- Global exclude tags ---
     // Server-synced but self-persisting (each add/remove hits the API on its
@@ -323,10 +337,10 @@ export function renderSettingsView(): HTMLElement {
     excludePanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const excludeTitle = document.createElement("h3");
     excludeTitle.className = "m-0 text-sm font-semibold";
-    excludeTitle.textContent = "Global exclude tags";
+    excludeTitle.textContent = "Global Exclusion Filters";
     excludeTitle.title = "Hidden everywhere scenes are fetched — Scenes and the Feed — instead of adding the same exclude to every saved filter.";
     excludePanel.append(excludeTitle);
-    rightCol.appendChild(excludePanel);
+    addPage("Browsing", "exclude", "Global Exclusion Filters", excludePanel, false);
     renderExcludeTagsPanel().then((p) => excludePanel.appendChild(p));
 
     // --- Save bar ---
@@ -340,7 +354,41 @@ export function renderSettingsView(): HTMLElement {
     saveBtn.disabled = true;
     saveBar.appendChild(bottomNote);
     saveBar.appendChild(saveBtn);
-    leftCol.appendChild(saveBar);
+    content.appendChild(saveBar);
+
+    // --- Left nav ---
+    const SAVED_PAGE_KEY = "settingsPage";
+    const navButtons = new Map<string, HTMLButtonElement>();
+    function showPage(id: string) {
+      const target = pages.find((pg) => pg.id === id) ?? pages[0];
+      for (const pg of pages) pg.el.hidden = pg !== target;
+      saveBar.hidden = !target.saves;
+      for (const [bid, b] of navButtons) {
+        const on = bid === target.id;
+        b.className = `text-left text-sm px-3 py-1.5 rounded transition-colors ${on ? "bg-surface-2 text-text font-medium" : "text-muted hover:text-text hover:bg-surface-2/60"}`;
+        b.setAttribute("aria-current", on ? "page" : "false");
+      }
+      localStorage.setItem(SAVED_PAGE_KEY, target.id);
+    }
+    for (const group of [...new Set(pages.map((pg) => pg.group))]) {
+      const heading = document.createElement("div");
+      heading.className = "text-[11px] uppercase tracking-wider text-text-faint px-3 pb-1";
+      heading.textContent = group;
+      const list = document.createElement("div");
+      list.className = "flex flex-col gap-0.5";
+      for (const pg of pages.filter((p) => p.group === group)) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = pg.label;
+        b.addEventListener("click", () => showPage(pg.id));
+        navButtons.set(pg.id, b);
+        list.appendChild(b);
+      }
+      const block = document.createElement("div");
+      block.append(heading, list);
+      nav.appendChild(block);
+    }
+    showPage(localStorage.getItem(SAVED_PAGE_KEY) ?? pages[0].id);
 
     saveBtn.addEventListener("click", async () => {
       saveBtn.disabled = true;
