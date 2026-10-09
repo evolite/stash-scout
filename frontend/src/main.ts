@@ -1,5 +1,6 @@
 import { api } from "./api.js";
-import { renderNavbar, setSfwMode, type Tab } from "./components/Navbar.js";
+import { renderLoginView } from "./views/LoginView.js";
+import { renderNavbar, setNavbarAuthMode, setSfwMode, type Tab } from "./components/Navbar.js";
 import { renderBrowseView } from "./views/BrowseView.js";
 import { renderSubscribedView } from "./views/SubscribedView.js";
 import { renderPerformersView } from "./views/PerformersView.js";
@@ -125,7 +126,13 @@ function setTab(tab: Tab) {
   render();
 }
 
-render();
+const auth = await api.authStatus();
+setNavbarAuthMode(auth.mode);
+if (!auth.loggedIn) {
+  root.appendChild(renderLoginView(auth.mode, () => location.reload()));
+} else {
+  render();
+}
 
 // First-run detection reuses the same "is StashDB configured" check Settings
 // itself shows a status pill for — nothing else in this app works without
@@ -134,7 +141,7 @@ render();
 // (rather than blocking it on this fetch) since it's a one-time correction,
 // not something worth delaying every normal boot for.
 const ONBOARDING_DISMISSED_KEY = "onboardingDismissed";
-if (localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1") {
+if (auth.loggedIn && localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1") {
   const settings = await api.settings();
   if (!settings.stashdbConfigured) {
     setTab("settings");

@@ -1,4 +1,4 @@
-import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { randomBytes, createCipheriv, createDecipheriv, createHmac } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -27,6 +27,12 @@ async function getKey(): Promise<Buffer> {
     await fs.writeFile(KEY_FILE, cachedKey.toString("base64"), { mode: 0o600 });
   }
   return cachedKey;
+}
+
+// Separate HMAC key derived from the at-rest key, so session cookies and
+// stored secrets never share raw key material.
+export async function sessionKey(): Promise<Buffer> {
+  return createHmac("sha256", await getKey()).update("session").digest();
 }
 
 export async function encrypt(plaintext: string): Promise<string> {

@@ -348,6 +348,24 @@ function renderToggle(label: string, isOn: () => boolean, setOn: (on: boolean) =
 // main.ts's setTab) doesn't otherwise reach the "In Library" state into
 // SubscribedView's already-mounted sections — clicking the toggle re-renders the
 // whole app so Feed/Trending re-fetch with the new setting immediately.
+// Set once at boot by main.ts; the Logout button only exists when auth is on.
+let authMode: "off" | "local" | "oidc" = "off";
+export function setNavbarAuthMode(m: typeof authMode): void {
+  authMode = m;
+}
+
+function renderLogout(): HTMLElement {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = UTILITY_TAB_INACTIVE;
+  el.textContent = "Log out";
+  el.addEventListener("click", async () => {
+    await api.logout();
+    location.reload();
+  });
+  return el;
+}
+
 export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibraryToggle: () => void): HTMLElement {
   const nav = document.createElement("nav");
   nav.className = "flex items-center justify-between bg-navbar px-6 h-14";
@@ -371,6 +389,7 @@ export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibrar
   right.appendChild(renderToggle("In Library", isInLibraryMode, setInLibraryMode, onLibraryToggle));
   right.appendChild(renderToggle("SFW Mode", isSfwMode, setSfwMode));
   right.appendChild(renderSettingsTab(active, onSelect));
+  if (authMode !== "off") right.appendChild(renderLogout());
   nav.appendChild(right);
 
   return nav;

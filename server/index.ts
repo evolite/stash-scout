@@ -15,6 +15,8 @@ import { ignoredScenesRouter } from "./routes/ignoredScenes.js";
 import { globalExcludeTagsRouter } from "./routes/globalExcludeTags.js";
 import { settingsRouter } from "./routes/settings.js";
 import { statsRouter } from "./routes/stats.js";
+import { authRouter } from "./routes/auth.js";
+import { requireAuth } from "./auth.js";
 
 const cfg = await loadInitialConfig();
 
@@ -28,12 +30,17 @@ const whisparr = new WhisparrClient(cfg);
 
 const app = express();
 app.disable("x-powered-by");
+// One reverse-proxy hop (Cloudflare tunnel, Traefik, ...) so req.secure/protocol
+// follow X-Forwarded-Proto — needed for Secure cookies and the OIDC redirect URI.
+app.set("trust proxy", 1);
 // 5mb, not the 100kb default: a saved performer search's body carries the
 // fetched result page (dozens of performers, each with an images array), which
 // overflows the default limit and 413s — that's what made "save" fail
 // intermittently depending on result size.
 app.use(express.json({ limit: "5mb" }));
 
+app.use("/api", authRouter(cfg));
+app.use("/api", requireAuth(cfg));
 app.use("/api", scenesRouter(stashdb, cfg, localStash, whisparr));
 app.use("/api", sceneStatusRouter(cfg, localStash, whisparr));
 app.use("/api", whisparrRouter(cfg, whisparr));

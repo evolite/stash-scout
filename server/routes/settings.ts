@@ -4,6 +4,8 @@ import { isStashDBConfigured, isLocalStashConfigured, isWhisparrConfigured } fro
 import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
 import { updateConfig } from "../settingsStore.js";
+import { hashPassword } from "../auth.js";
+import { discoverOidc } from "./auth.js";
 
 const EDITABLE_FIELDS = [
   "stashdbUrl",
@@ -17,6 +19,12 @@ const EDITABLE_FIELDS = [
   "whisparrQualityProfileId",
   "cfAccessClientId",
   "cfAccessClientSecret",
+  "authMode",
+  "authUsername",
+  "oidcIssuer",
+  "oidcClientId",
+  "oidcClientSecret",
+  "oidcAllowed",
 ] as const;
 
 export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
@@ -47,6 +55,13 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
       whisparrQualityProfileId: cfg.whisparrQualityProfileId ?? null,
       cfAccessClientId: cfg.cfAccessClientId ?? "",
       cfAccessClientSecretSet: !!cfg.cfAccessClientSecret,
+      authMode: cfg.authMode,
+      authUsername: cfg.authUsername ?? "",
+      authPasswordSet: !!cfg.authPasswordHash,
+      oidcIssuer: cfg.oidcIssuer ?? "",
+      oidcClientId: cfg.oidcClientId ?? "",
+      oidcClientSecretSet: !!cfg.oidcClientSecret,
+      oidcAllowed: cfg.oidcAllowed ?? "",
     });
   });
 
@@ -54,6 +69,29 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     const patch: Record<string, unknown> = {};
     for (const field of EDITABLE_FIELDS) {
       if (field in req.body) patch[field] = req.body[field];
+    }
+    if (patch.authMode !== undefined && !["off", "local", "oidc"].includes(patch.authMode as string)) {
+      return res.status(400).json({ error: "invalid authMode" });
+    }
+    // Plain password is hashed here and never stored; blank = unchanged.
+    if (typeof req.body.authPassword === "string" && req.body.authPassword) {
+      patch.authPasswordHash = hashPassword(req.body.authPassword);
+    }
+    // Lockout guard: validate the merged result before applying, so a bad
+    // toggle can't leave nobody able to log in.
+    const next = { ...cfg, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== "" && v !== undefined)) } as AppConfig;
+    if (next.authMode === "local" && !(next.authUsername && next.authPasswordHash)) {
+      return res.status(400).json({ error: "local auth needs a username and password" });
+    }
+    if (next.authMode === "oidc") {
+      if (!(next.oidcIssuer && next.oidcClientId && next.oidcClientSecret)) {
+        return res.status(400).json({ error: "oidc needs issuer, client ID and client secret" });
+      }
+      try {
+        await discoverOidc(next);
+      } catch {
+        return res.status(400).json({ error: "OIDC discovery failed — check the issuer URL" });
+      }
     }
     await updateConfig(cfg, patch);
     res.status(204).end();

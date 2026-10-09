@@ -11,6 +11,13 @@ export interface AppConfig {
   whisparrQualityProfileId?: number;
   cfAccessClientId?: string;
   cfAccessClientSecret?: string;
+  authMode: "off" | "local" | "oidc";
+  authUsername?: string;
+  authPasswordHash?: string; // scrypt "salt:hash" (hex), never plaintext
+  oidcIssuer?: string;
+  oidcClientId?: string;
+  oidcClientSecret?: string;
+  oidcAllowed?: string; // optional: only this email/sub may log in
 }
 
 export function isStashDBConfigured(cfg: AppConfig): boolean {

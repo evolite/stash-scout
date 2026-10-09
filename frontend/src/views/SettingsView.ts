@@ -218,6 +218,38 @@ export function renderSettingsView(): HTMLElement {
     cfS.body.appendChild(cfSecret.row);
     panel.appendChild(cfS.section);
 
+    // --- Authentication ---
+    const authS = section("Authentication", "Require a login to use this app.");
+    authS.pill.remove();
+    const modeRow = document.createElement("label");
+    modeRow.className = "SettingsField";
+    const modeLabel = document.createElement("span");
+    modeLabel.textContent = "Mode";
+    const modeSel = document.createElement("select");
+    for (const [v, t] of [["off", "Off"], ["local", "Username & password"], ["oidc", "OIDC (SSO)"]]) {
+      modeSel.appendChild(new Option(t, v, false, v === cfg.authMode));
+    }
+    modeRow.append(modeLabel, modeSel);
+    const authUser = fieldRow("Username", { value: cfg.authUsername });
+    const authPass = fieldRow("Password", { type: "password", placeholder: cfg.authPasswordSet ? "(unchanged)" : "not set" });
+    const oidcIssuer = fieldRow("Issuer URL", { value: cfg.oidcIssuer, placeholder: "https://auth.example.com/realms/main" });
+    const oidcId = fieldRow("Client ID", { value: cfg.oidcClientId });
+    const oidcSecret = fieldRow("Client Secret", { type: "password", placeholder: cfg.oidcClientSecretSet ? "(unchanged)" : "not set" });
+    const oidcAllowed = fieldRow("Allowed email / sub", { value: cfg.oidcAllowed, placeholder: "blank = anyone the provider authenticates" });
+    const oidcHint = document.createElement("p");
+    oidcHint.className = "m-0 text-xs text-muted";
+    oidcHint.textContent = `Redirect URI to register: ${location.origin}/api/auth/oidc/callback`;
+    const localRows = [authUser.row, authPass.row];
+    const oidcRows = [oidcIssuer.row, oidcId.row, oidcSecret.row, oidcAllowed.row, oidcHint];
+    authS.body.append(modeRow, ...localRows, ...oidcRows);
+    const syncAuthRows = () => {
+      localRows.forEach((r) => (r.hidden = modeSel.value !== "local"));
+      oidcRows.forEach((r) => (r.hidden = modeSel.value !== "oidc"));
+    };
+    modeSel.addEventListener("change", syncAuthRows);
+    syncAuthRows();
+    panel.appendChild(authS.section);
+
     panel.querySelectorAll("input, select").forEach((input) => {
       input.addEventListener("input", markDirty);
       input.addEventListener("change", markDirty);
@@ -315,7 +347,15 @@ export function renderSettingsView(): HTMLElement {
       saveBtn.textContent = "Saving…";
       const rootFolderPath = (rootFolderRow.querySelector("select, input") as HTMLSelectElement | HTMLInputElement).value;
       const qualityProfileId = (qualityRow.querySelector("select, input") as HTMLSelectElement | HTMLInputElement).value;
+      try {
       await api.updateConfig({
+        authMode: modeSel.value,
+        authUsername: authUser.input.value,
+        authPassword: authPass.input.value,
+        oidcIssuer: oidcIssuer.input.value,
+        oidcClientId: oidcId.input.value,
+        oidcClientSecret: oidcSecret.input.value,
+        oidcAllowed: oidcAllowed.input.value,
         stashdbUrl: stashdbUrl.input.value,
         stashdbApiKey: stashdbKey.input.value,
         localStashUrl: stashGqlUrl.input.value,
@@ -328,6 +368,14 @@ export function renderSettingsView(): HTMLElement {
         cfAccessClientId: cfId.input.value,
         cfAccessClientSecret: cfSecret.input.value,
       });
+      } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save changes";
+        bottomNote.textContent = (err as Error).message;
+        return;
+      }
+      authPass.input.value = "";
+      oidcSecret.input.value = "";
       stashdbKey.input.value = "";
       stashKey.input.value = "";
       whisparrKey.input.value = "";

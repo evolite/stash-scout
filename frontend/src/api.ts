@@ -55,7 +55,12 @@ export type SavedFilter = BaseSavedFilter<SceneFilter>;
 
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, init);
-  if (!res.ok) throw new Error(`${path} failed: HTTP ${res.status}`);
+  // Session expired / auth got switched on: reload so main.ts shows the login view.
+  if (res.status === 401 && !path.startsWith("/api/auth/")) location.reload();
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null))?.error;
+    throw new Error(detail ?? `${path} failed: HTTP ${res.status}`);
+  }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -150,6 +155,14 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     }),
+  authStatus: () => req<{ mode: "off" | "local" | "oidc"; loggedIn: boolean }>(`/api/auth/status`),
+  login: (username: string, password: string) =>
+    req(`/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    }),
+  logout: () => req(`/api/auth/logout`, { method: "POST" }),
   settings: () =>
     req<{ stashdbConfigured: boolean; localStashConfigured: boolean; whisparrConfigured: boolean; whisparrFullyConfigured: boolean }>(
       `/api/settings`,
@@ -168,6 +181,13 @@ export const api = {
       whisparrQualityProfileId: number | null;
       cfAccessClientId: string;
       cfAccessClientSecretSet: boolean;
+      authMode: "off" | "local" | "oidc";
+      authUsername: string;
+      authPasswordSet: boolean;
+      oidcIssuer: string;
+      oidcClientId: string;
+      oidcClientSecretSet: boolean;
+      oidcAllowed: string;
     }>(`/api/settings/config`),
   updateConfig: (patch: Record<string, string | number | null>) =>
     req(`/api/settings/config`, {

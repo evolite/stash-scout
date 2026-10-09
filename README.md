@@ -36,6 +36,10 @@ Prefer source?
 npm install && npm run build && npm start
 ```
 
+## Login (optional)
+
+Off by default. In Settings > Authentication pick **Username & password** or **OIDC (SSO)**. For OIDC, register `<your-url>/api/auth/oidc/callback` as the redirect URI and set "Allowed email / sub" to restrict who can sign in. Locked out? Start once with `AUTH_MODE_FORCE=off`.
+
 ## Under the hood
 
 TypeScript, Vite and Tailwind on the front, a small Express server, SQLite for storage.

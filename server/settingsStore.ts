@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { encrypt, decrypt } from "./secretStore.js";
 import type { AppConfig } from "./config.js";
+import { hashPassword } from "./auth.js";
 
 interface StoredSettings {
   stashdbUrl?: string;
@@ -14,6 +15,13 @@ interface StoredSettings {
   whisparrQualityProfileId?: number;
   cfAccessClientId?: string;
   cfAccessClientSecret?: string; // encrypted
+  authMode?: AppConfig["authMode"];
+  authUsername?: string;
+  authPasswordHash?: string;
+  oidcIssuer?: string;
+  oidcClientId?: string;
+  oidcClientSecret?: string; // encrypted
+  oidcAllowed?: string;
 }
 
 function readSettings(): StoredSettings | null {
@@ -41,11 +49,18 @@ async function persist(cfg: AppConfig): Promise<void> {
     whisparrRootFolderPath: cfg.whisparrRootFolderPath,
     whisparrQualityProfileId: cfg.whisparrQualityProfileId,
     cfAccessClientId: cfg.cfAccessClientId,
+    authMode: cfg.authMode,
+    authUsername: cfg.authUsername,
+    authPasswordHash: cfg.authPasswordHash,
+    oidcIssuer: cfg.oidcIssuer,
+    oidcClientId: cfg.oidcClientId,
+    oidcAllowed: cfg.oidcAllowed,
   };
   if (cfg.stashdbApiKey) toStore.stashdbApiKey = await encrypt(cfg.stashdbApiKey);
   if (cfg.localStashApiKey) toStore.localStashApiKey = await encrypt(cfg.localStashApiKey);
   if (cfg.whisparrApiKey) toStore.whisparrApiKey = await encrypt(cfg.whisparrApiKey);
   if (cfg.cfAccessClientSecret) toStore.cfAccessClientSecret = await encrypt(cfg.cfAccessClientSecret);
+  if (cfg.oidcClientSecret) toStore.oidcClientSecret = await encrypt(cfg.oidcClientSecret);
   writeSettings(toStore);
 }
 
@@ -71,6 +86,13 @@ export async function loadInitialConfig(): Promise<AppConfig> {
       s.whisparrQualityProfileId ?? (envFallback("WHISPARR_QUALITY_PROFILE_ID") ? Number(envFallback("WHISPARR_QUALITY_PROFILE_ID")) : undefined),
     cfAccessClientId: s.cfAccessClientId ?? envFallback("CF_ACCESS_CLIENT_ID"),
     cfAccessClientSecret: s.cfAccessClientSecret ? await decrypt(s.cfAccessClientSecret) : envFallback("CF_ACCESS_CLIENT_SECRET"),
+    authMode: (envFallback("AUTH_MODE_FORCE") === "off" ? "off" : s.authMode) ?? (envFallback("AUTH_MODE") as AppConfig["authMode"] | undefined) ?? "off",
+    authUsername: s.authUsername ?? envFallback("AUTH_USERNAME"),
+    authPasswordHash: s.authPasswordHash ?? (envFallback("AUTH_PASSWORD") ? hashPassword(envFallback("AUTH_PASSWORD")!) : undefined),
+    oidcIssuer: s.oidcIssuer ?? envFallback("OIDC_ISSUER"),
+    oidcClientId: s.oidcClientId ?? envFallback("OIDC_CLIENT_ID"),
+    oidcClientSecret: s.oidcClientSecret ? await decrypt(s.oidcClientSecret) : envFallback("OIDC_CLIENT_SECRET"),
+    oidcAllowed: s.oidcAllowed ?? envFallback("OIDC_ALLOWED"),
   };
 
   // One-time migration: if this is the first boot after upgrading and .env had
