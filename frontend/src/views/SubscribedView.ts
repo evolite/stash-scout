@@ -3,6 +3,7 @@ import { isInLibraryMode } from "../components/Navbar.js";
 import { iconRefresh } from "../icons.js";
 import { renderChip } from "../components/Chip.js";
 import { renderSceneSection } from "../components/SceneSection.js";
+import { getState } from "../viewState.js";
 
 const SECTION_PER_PAGE = 16;
 
@@ -41,8 +42,11 @@ export function renderSubscribedView(): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex flex-col gap-3";
 
-  let window: Window = "week";
-  let selectedSource: string | undefined; // undefined = "All matches"
+  // Kept in viewState so Back from a performer lands on the same selections.
+  const st = getState<{ window: Window; source?: string; sort: "TRENDING" | "POPULARITY" | "RANDOM"; trendingSource?: string }>(
+    "subscribed",
+    { window: "week", sort: "TRENDING" },
+  );
 
   const feedWrap = document.createElement("div");
   const feedHeadingRow = document.createElement("div");
@@ -62,12 +66,12 @@ export function renderSubscribedView(): HTMLElement {
   for (const w of WINDOWS) {
     const el = document.createElement("button");
     el.type = "button";
-    el.className = w.id === window ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
-    el.setAttribute("aria-current", w.id === window ? "page" : "false");
+    el.className = w.id === st.window ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+    el.setAttribute("aria-current", w.id === st.window ? "page" : "false");
     el.textContent = w.label;
     el.addEventListener("click", () => {
-      if (window === w.id) return;
-      window = w.id;
+      if (st.window === w.id) return;
+      st.window = w.id;
       for (const other of Array.from(subTabs.children)) {
         other.className = other === el ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
         other.setAttribute("aria-current", other === el ? "page" : "false");
@@ -91,16 +95,16 @@ export function renderSubscribedView(): HTMLElement {
   function renderSourceChips(names: string[]) {
     sourceChipBar.innerHTML = "";
     sourceChipBar.appendChild(
-      renderChip("All matches", selectedSource === undefined, () => {
-        selectedSource = undefined;
+      renderChip("All matches", st.source === undefined, () => {
+        st.source = undefined;
         renderSourceChips(names);
         feedSection.reset();
       }),
     );
     for (const name of names) {
       sourceChipBar.appendChild(
-        renderChip(name, selectedSource === name, () => {
-          selectedSource = name;
+        renderChip(name, st.source === name, () => {
+          st.source = name;
           renderSourceChips(names);
           feedSection.reset();
         }),
@@ -113,10 +117,11 @@ export function renderSubscribedView(): HTMLElement {
   const feedSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
     fetchPage: async (page, refresh) => {
-      const result = await api.subscribedFeed(page, SECTION_PER_PAGE, window, selectedSource, isInLibraryMode(), refresh);
+      const result = await api.subscribedFeed(page, SECTION_PER_PAGE, st.window, st.source, isInLibraryMode(), refresh);
       return { ...result, count: Math.min(result.count, FEED_LIMIT), approximateCount: false };
     },
     emptyMessage: "Nothing new right now.",
+    stateKey: "feed",
     onCount: (count) => {
       pendingBadge.hidden = count === 0;
       pendingBadge.textContent = `${count} pending`;
@@ -142,8 +147,6 @@ export function renderSubscribedView(): HTMLElement {
   // ~2-month slice of StashDB's history (server-side — see
   // queryScenesRandomWindow) instead of sorting by either. Same section and
   // chip bar below either way, just a different query.
-  type TrendingSort = "TRENDING" | "POPULARITY" | "RANDOM";
-  let trendingSort: TrendingSort = "TRENDING";
   const sortToggle = document.createElement("div");
   sortToggle.className = "flex gap-1 mb-2";
   for (const s of [
@@ -153,11 +156,11 @@ export function renderSubscribedView(): HTMLElement {
   ]) {
     const el = document.createElement("button");
     el.type = "button";
-    el.className = s.id === trendingSort ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
+    el.className = s.id === st.sort ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
     el.textContent = s.label;
     el.addEventListener("click", () => {
-      if (trendingSort === s.id) return;
-      trendingSort = s.id;
+      if (st.sort === s.id) return;
+      st.sort = s.id;
       for (const other of Array.from(sortToggle.children)) {
         other.className = other === el ? SUBTAB_ACTIVE : SUBTAB_INACTIVE;
       }
@@ -172,7 +175,6 @@ export function renderSubscribedView(): HTMLElement {
   // specific saved filter (or "Favorites") narrows Trending's own
   // TRENDING-sorted query by that filter's tags/performers/studios/exclude_tags
   // instead of switching to the windowed subscribed feed Subscriptions uses.
-  let selectedTrendingSource: string | undefined; // undefined = "All matches"
   let subscribedFilters: SavedFilter[] = [];
   const trendingChipBar = document.createElement("div");
   trendingChipBar.className = "flex gap-1.5 flex-wrap mb-3";
@@ -181,24 +183,24 @@ export function renderSubscribedView(): HTMLElement {
   function renderTrendingChips() {
     trendingChipBar.innerHTML = "";
     trendingChipBar.appendChild(
-      renderChip("All", selectedTrendingSource === undefined, () => {
-        selectedTrendingSource = undefined;
+      renderChip("All", st.trendingSource === undefined, () => {
+        st.trendingSource = undefined;
         renderTrendingChips();
         trendingSection.reset();
       }),
     );
     for (const f of subscribedFilters) {
       trendingChipBar.appendChild(
-        renderChip(f.name, selectedTrendingSource === f.name, () => {
-          selectedTrendingSource = f.name;
+        renderChip(f.name, st.trendingSource === f.name, () => {
+          st.trendingSource = f.name;
           renderTrendingChips();
           trendingSection.reset();
         }),
       );
     }
     trendingChipBar.appendChild(
-      renderChip("Favorites", selectedTrendingSource === "Favorites", () => {
-        selectedTrendingSource = "Favorites";
+      renderChip("Favorites", st.trendingSource === "Favorites", () => {
+        st.trendingSource = "Favorites";
         renderTrendingChips();
         trendingSection.reset();
       }),
@@ -211,12 +213,12 @@ export function renderSubscribedView(): HTMLElement {
   const trendingSection = renderSceneSection({
     perPage: SECTION_PER_PAGE,
     fetchPage: async (page, refresh) => {
-      const chosen = subscribedFilters.find((f) => f.name === selectedTrendingSource);
+      const chosen = subscribedFilters.find((f) => f.name === st.trendingSource);
       const cf = chosen?.filter as Record<string, unknown> | undefined;
       const filter = {
         page,
         per_page: SECTION_PER_PAGE,
-        favorites: selectedTrendingSource === "Favorites" ? ("PERFORMER" as const) : undefined,
+        favorites: st.trendingSource === "Favorites" ? ("PERFORMER" as const) : undefined,
         unadded: isInLibraryMode() ? undefined : ("1" as const),
         tags: cf?.tags as string | undefined,
         tags_modifier: cf?.tags_modifier as "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES" | undefined,
@@ -225,12 +227,13 @@ export function renderSubscribedView(): HTMLElement {
         studios: cf?.studios as string | undefined,
       };
       const result =
-        trendingSort === "RANDOM"
+        st.sort === "RANDOM"
           ? await api.randomScenes(filter, refresh)
-          : await api.queryScenes({ ...filter, sort: trendingSort, direction: "DESC" }, refresh);
+          : await api.queryScenes({ ...filter, sort: st.sort, direction: "DESC" }, refresh);
       return { ...result, count: Math.min(result.count, TRENDING_LIMIT), approximateCount: false };
     },
     emptyMessage: "Nothing to show right now.",
+    stateKey: "trending",
   });
   trendingHeadingRow.appendChild(renderRefreshButton(() => trendingSection.refresh()));
   trendingWrap.appendChild(trendingSection.element);

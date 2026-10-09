@@ -4,6 +4,7 @@ import { renderChip } from "../components/Chip.js";
 import { renderSceneSection } from "../components/SceneSection.js";
 import { renderStudioSearch } from "../components/StudioSearch.js";
 import { renderStudioHeader } from "../components/EntityHeader.js";
+import { getState } from "../viewState.js";
 
 const PER_PAGE = 32;
 
@@ -28,8 +29,13 @@ export function renderStudiosView(initialId?: string): HTMLElement {
   const sectionWrap = document.createElement("div");
   container.appendChild(sectionWrap);
 
-  let studioId: string | undefined = initialId;
-  let selectedFilterName: string | undefined; // undefined = "All"
+  // Survives render() so Back from a performer restores the studio, chip and page.
+  const st = getState<{ studioId?: string; filterName?: string }>("studios", {});
+  if (initialId && initialId !== st.studioId) {
+    st.studioId = initialId;
+    st.filterName = undefined;
+  }
+  let studioId: string | undefined = st.studioId;
   let subscribedFilters: SavedFilter[] = [];
   let section: ReturnType<typeof renderSceneSection> | undefined;
 
@@ -53,16 +59,16 @@ export function renderStudiosView(initialId?: string): HTMLElement {
     label.textContent = "Subscribed filter";
     chipBar.appendChild(label);
     chipBar.appendChild(
-      renderChip("All", selectedFilterName === undefined, () => {
-        selectedFilterName = undefined;
+      renderChip("All", st.filterName === undefined, () => {
+        st.filterName = undefined;
         renderChips();
         section?.reset();
       }),
     );
     for (const f of subscribedFilters) {
       chipBar.appendChild(
-        renderChip(f.name, selectedFilterName === f.name, () => {
-          selectedFilterName = f.name;
+        renderChip(f.name, st.filterName === f.name, () => {
+          st.filterName = f.name;
           renderChips();
           section?.reset();
         }),
@@ -75,7 +81,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
     section = renderSceneSection({
       perPage: PER_PAGE,
       fetchPage: async (page, refresh) => {
-        const chosen = subscribedFilters.find((f) => f.name === selectedFilterName);
+        const chosen = subscribedFilters.find((f) => f.name === st.filterName);
         const cf = chosen?.filter as Record<string, unknown> | undefined;
         const filter: SceneFilter = {
           page,
@@ -91,12 +97,16 @@ export function renderStudiosView(initialId?: string): HTMLElement {
         return api.queryScenes(filter, refresh);
       },
       emptyMessage: "No scenes found for this studio.",
+      stateKey: `studio:${studioId}`,
     });
     sectionWrap.appendChild(section.element);
   }
 
   function loadStudio(id: string, name?: string) {
-    studioId = id;
+    if (id !== studioId) st.filterName = undefined;
+    studioId = st.studioId = id;
+    // Put the studio in the URL so Back from a performer pops to this studio.
+    if (window.location.pathname !== `/studios/${id}`) history.replaceState(null, "", `/studios/${id}`);
     renderChips();
     renderHeaderPlaceholder(name);
     api.studioDetails(id).then(

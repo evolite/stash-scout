@@ -9,6 +9,7 @@ import { renderStatsView } from "./views/StatsView.js";
 import { renderSettingsView } from "./views/SettingsView.js";
 import { renderOnboardingModal } from "./components/OnboardingModal.js";
 import { onNavigateToPerformer, onNavigateToStudio } from "./navigation.js";
+import { getReturnTab, restoreScroll, saveScroll, setReturnTab } from "./viewState.js";
 
 const root = document.getElementById("root")!;
 const TABS = new Set<Tab>(["browse", "subscribed", "performers", "studios", "stats", "settings"]);
@@ -38,16 +39,14 @@ if (deepLinkedPerformerId) {
 let pendingPerformerId: string | undefined = deepLinkedPerformerId;
 let pendingStudioId: string | undefined = deepLinkedStudioId;
 
-// The list tab to return to when the browser Back button pops a
-// /performers/<id> or /studios/<id> entry off the history stack. Views keep
-// their own state across a re-render (module-level in PerformerBrowse etc.),
-// so Back lands on the same populated grid the user left.
-let tabBeforeDetail: Tab | undefined;
+// The tab Back returns to (setReturnTab) and each view's state (getState) live in
+// viewState.ts, so Back lands on the same populated view the user left.
 
 onNavigateToPerformer((id) => {
   // Record the current tab (including "performers" itself — opening a performer
   // from the discovery grid should Back to that grid, not to some earlier tab).
-  if (activeTab !== "studios") tabBeforeDetail = activeTab;
+  setReturnTab(activeTab);
+  saveScroll();
   activeTab = "performers";
   pendingPerformerId = id;
   history.pushState(null, "", `/performers/${id}`);
@@ -55,7 +54,8 @@ onNavigateToPerformer((id) => {
 });
 
 onNavigateToStudio((id) => {
-  if (activeTab !== "performers" && activeTab !== "studios") tabBeforeDetail = activeTab;
+  if (activeTab !== "performers" && activeTab !== "studios") setReturnTab(activeTab);
+  saveScroll();
   activeTab = "studios";
   pendingStudioId = id;
   history.pushState(null, "", `/studios/${id}`);
@@ -72,9 +72,10 @@ window.addEventListener("popstate", () => {
     activeTab = "studios";
     pendingStudioId = studio;
   } else {
-    activeTab = tabBeforeDetail ?? (TABS.has(savedTab as Tab) ? (savedTab as Tab) : "subscribed");
+    activeTab = (getReturnTab() as Tab | undefined) ?? (TABS.has(savedTab as Tab) ? (savedTab as Tab) : "subscribed");
   }
   render();
+  restoreScroll();
 });
 
 // Dev-only (__DEV_INSTANCE__ is false in the build, so all of this is stripped):

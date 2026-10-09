@@ -5,6 +5,7 @@ import { renderPerformerHeader } from "./EntityHeader.js";
 import { renderSceneSection } from "./SceneSection.js";
 import { renderChip } from "./Chip.js";
 import { isInLibraryMode } from "./Navbar.js";
+import { saveScroll, setReturnTab } from "../viewState.js";
 import {
   SIDEBAR_CLASS,
   LABEL_CLASS,
@@ -402,6 +403,8 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
 
   function showDetail(id: string, name?: string) {
     detailId = id;
+    setReturnTab("performers");
+    saveScroll();
     history.pushState(null, "", `/performers/${id}`);
     renderDetail(id, name);
   }

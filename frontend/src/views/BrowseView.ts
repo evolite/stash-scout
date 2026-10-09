@@ -6,6 +6,7 @@ import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
 import { emptyState } from "../components/filterControls.js";
 import { isInLibraryMode } from "../components/Navbar.js";
+import { getState } from "../viewState.js";
 
 const PER_PAGE = 32;
 
@@ -25,10 +26,12 @@ export function renderBrowseView(): HTMLElement {
   container.appendChild(sidebarCol);
   container.appendChild(contentCol);
 
-  let filter: SceneFilter = { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
+  // Survives render() so Back from a performer restores the applied filter.
+  const st = getState<{ filter?: SceneFilter; name: string }>("browse", { name: "" });
+  let filter: SceneFilter = st.filter ?? { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
   let statuses: Record<string, SceneStatus> = {};
   let pollTimer: ReturnType<typeof setInterval> | undefined;
-  let loadedFilterName = "";
+  let loadedFilterName = st.name;
 
   function renderSidebar() {
     sidebarCol.innerHTML = "";
@@ -80,7 +83,10 @@ export function renderBrowseView(): HTMLElement {
     clearInterval(pollTimer);
     const anyDownloading = Object.values(statuses).some((s) => s.kind === "downloading");
     if (anyDownloading) {
-      pollTimer = setInterval(() => refreshStatuses(scenes), 5000);
+      pollTimer = setInterval(() => {
+        if (!container.isConnected) return clearInterval(pollTimer); // view was re-rendered away
+        void refreshStatuses(scenes);
+      }, 5000);
     }
   }
 
@@ -126,6 +132,8 @@ export function renderBrowseView(): HTMLElement {
   }
 
   async function load() {
+    st.filter = filter;
+    st.name = loadedFilterName;
     clearInterval(pollTimer);
     hidePreview();
     contentCol.innerHTML = "";
@@ -147,7 +155,8 @@ export function renderBrowseView(): HTMLElement {
   }
 
   renderSidebar();
-  contentCol.appendChild(emptyState("Set filters, then Apply", "Or restore a saved filter from the sidebar."));
+  if (st.filter) load();
+  else contentCol.appendChild(emptyState("Set filters, then Apply", "Or restore a saved filter from the sidebar."));
 
   return container;
 }

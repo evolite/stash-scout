@@ -2,6 +2,7 @@ import { api, type Scene, type SceneStatus } from "../api.js";
 import { renderSceneCard, hidePreview } from "./SceneCard.js";
 import { renderPagination } from "./Pagination.js";
 import { iconCheckCircle } from "../icons.js";
+import { getState } from "../viewState.js";
 
 function textState(message: string): HTMLElement {
   const wrap = document.createElement("div");
@@ -34,6 +35,8 @@ export function renderSceneSection(opts: {
   fetchPage: (page: number, refresh?: boolean) => Promise<{ count: number; scenes: Scene[]; approximateCount?: boolean }>;
   emptyMessage: string;
   onCount?: (count: number) => void;
+  // When set, the page cursor survives a re-render (e.g. Back from a performer).
+  stateKey?: string;
 }): { element: HTMLElement; reset: () => void; refresh: () => Promise<void> } {
   const element = document.createElement("div");
   const grid = document.createElement("div");
@@ -42,7 +45,8 @@ export function renderSceneSection(opts: {
   element.appendChild(grid);
   element.appendChild(paginationEl);
 
-  let page = 1;
+  const pageState = opts.stateKey ? getState(`page:${opts.stateKey}`, { page: 1 }) : { page: 1 };
+  let page = pageState.page;
   let statuses: Record<string, SceneStatus> = {};
   // The single source of truth for what's currently shown — status refreshes
   // (triggered by any card's Add/Monitor click) re-render from this, so an
@@ -90,6 +94,7 @@ export function renderSceneSection(opts: {
         approximate,
         onPage: (p) => {
           page = p;
+          pageState.page = p;
           load();
         },
       }),
@@ -121,6 +126,7 @@ export function renderSceneSection(opts: {
       // listed) — step back to the real last page instead of a blank grid.
       if (scenes.length === 0 && page > 1 && !approximateCount) {
         page = Math.max(1, Math.ceil(count / opts.perPage));
+        pageState.page = page;
         return load(bypassCache);
       }
 
@@ -147,7 +153,7 @@ export function renderSceneSection(opts: {
   }
 
   function reset() {
-    page = 1;
+    page = pageState.page = 1;
     load();
   }
 
