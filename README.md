@@ -1,4 +1,4 @@
-### Stash Scout
+# Stash Scout
 
 A project for personal use as i often find myself browsing StashDB for content 
 
