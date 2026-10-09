@@ -1,4 +1,4 @@
-import { api } from "./api.js";
+import { api, setSessionActive } from "./api.js";
 import { renderLoginView } from "./views/LoginView.js";
 import { renderNavbar, setNavbarAuthMode, setSfwMode, type Tab } from "./components/Navbar.js";
 import { renderBrowseView } from "./views/BrowseView.js";
@@ -128,6 +128,7 @@ function setTab(tab: Tab) {
 
 const auth = await api.authStatus();
 setNavbarAuthMode(auth.mode);
+setSessionActive(auth.loggedIn);
 if (!auth.loggedIn) {
   root.appendChild(renderLoginView(auth.mode, () => location.reload()));
 } else {

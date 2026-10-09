@@ -53,10 +53,17 @@ export interface SceneFilter {
 
 export type SavedFilter = BaseSavedFilter<SceneFilter>;
 
+let sessionActive = false;
+export function setSessionActive(on: boolean): void {
+  sessionActive = on;
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, init);
-  // Session expired / auth got switched on: reload so main.ts shows the login view.
-  if (res.status === 401 && !path.startsWith("/api/auth/")) location.reload();
+  // Session expired mid-use: reload so main.ts shows the login view. Only once
+  // main.ts has confirmed we were logged in — module-level fetches (Navbar's
+  // config load) fire at import time, before login, and would reload forever.
+  if (res.status === 401 && sessionActive && !path.startsWith("/api/auth/")) location.reload();
   if (!res.ok) {
     const detail = (await res.json().catch(() => null))?.error;
     throw new Error(detail ?? `${path} failed: HTTP ${res.status}`);
