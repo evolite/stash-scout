@@ -61,7 +61,7 @@ export function authRouter(cfg: AppConfig) {
     }
   });
 
-  router.get("/auth/oidc/callback", async (req, res) => {
+  router.get("/auth/oidc/callback", loginLimiter, async (req, res) => {
     const flow = verify<{ verifier: string; state: string; nonce: string }>(readCookie(req, OIDC_COOKIE), await sessionKey());
     if (cfg.authMode !== "oidc" || !flow) return res.status(400).send("Login expired, try again");
     try {

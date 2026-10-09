@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import type { AppConfig } from "../config.js";
 import { isStashDBConfigured, isLocalStashConfigured, isWhisparrConfigured } from "../config.js";
 import type { LocalStashClient } from "../localStashClient.js";
@@ -46,6 +47,8 @@ async function authConfigError(next: AppConfig): Promise<string | null> {
 
 export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
+  // Saving can hash a password and trigger OIDC discovery, so cap how often it can be hit.
+  const saveLimiter = rateLimit({ windowMs: 60_000, limit: 30 });
 
   router.get("/settings", (_req, res) => {
     res.json({
@@ -82,7 +85,7 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     });
   });
 
-  router.put("/settings/config", async (req, res) => {
+  router.put("/settings/config", saveLimiter, async (req, res) => {
     const patch: Record<string, unknown> = {};
     for (const field of EDITABLE_FIELDS) {
       if (field in req.body) patch[field] = req.body[field];
