@@ -13,13 +13,12 @@ Grew out of the [StashSeer](https://codeberg.org/surging9143/StashSeer) userscri
 | Add to Whisparr from the card | ❌ | ✅ | ✅ |
 | Save filters and reuse them | ❌ | ❌ | ✅ |
 | **Subscribe** to a filter and get a feed of what's new | ❌ | ❌ | ✅ |
-| Exclude tags everywhere, once | ❌ | ❌ | ✅ |
+| Exclude tags | ❌ | ❌ | ✅ |
 | Skip scenes for good, so they stop showing up | ❌ | ❌ | ✅ |
 | Trending, narrowed to what you don't own yet | ❌ | ❌ | ✅ |
-| Stats on what's monitored, downloading and ignored | ❌ | ❌ | ✅ |
-| Runs as its own app, no browser add-on | ✅ | ❌ | ✅ |
+| Stats | ❌ | ❌ | ✅ |
 
-**The short version:** build a filter once, hit Subscribe, and new matches show up in your Feed. No more re-running the same searches by hand.
+**Main Goal:** build a filter once, hit Subscribe, and new matches show up in your Feed. No more re-running the same searches by hand.
 
 ## Run it
 
@@ -30,12 +29,6 @@ docker run -d --restart unless-stopped -p 8787:8787 \
 
 Open `http://localhost:8787` and hook up StashDB, Stash and Whisparr under **Settings**. No config files to edit.
 
-Prefer source?
-
-```
-npm install && npm run build && npm start
-```
-
 ## Login (optional)
 
 Off by default. In Settings > Authentication pick **Username & password** or **OIDC (SSO)**. For OIDC, register `<your-url>/api/auth/oidc/callback` as the redirect URI and set "Allowed email / sub" to restrict who can sign in. Locked out? Start once with `AUTH_MODE_FORCE=off`.
@@ -43,3 +36,7 @@ Off by default. In Settings > Authentication pick **Username & password** or **O
 ## Under the hood
 
 TypeScript, Vite and Tailwind on the front, a small Express server, SQLite for storage.
+
+## Disclaimer
+
+Code is AI-Generated, quality gated with Sonarqube and GHQL
