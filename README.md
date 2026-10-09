@@ -28,8 +28,6 @@ Grew out of the StashSeer userscript.
 | Trending, narrowed to what you don't own yet | ❌ | ❌ | ✅ |
 | Stats | ❌ | ❌ | ✅ |
 
-**Main Goal:** build a filter once, hit Subscribe, and new matches show up in your Feed. No more re-running the same searches by hand.
-
 ## Run it
 
 ```
