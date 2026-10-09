@@ -162,10 +162,13 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
 
   const bars = document.createElement("div");
   bars.className = "absolute inset-0 flex items-end gap-[2px]";
+  const today = timeline.at(-1);
   for (const day of timeline) {
     const bar = document.createElement("div");
-    const isToday = day === timeline[timeline.length - 1];
-    bar.className = `flex-1 rounded-t-sm hover:bg-accent ${day.count === 0 ? "bg-line" : isToday ? "bg-accent" : "bg-accent/60"}`;
+    let color = "bg-accent/60";
+    if (day.count === 0) color = "bg-line";
+    else if (day === today) color = "bg-accent";
+    bar.className = `flex-1 rounded-t-sm hover:bg-accent ${color}`;
     const heightPx = Math.max(2, Math.round((day.count / maxCount) * CHART_HEIGHT_PX));
     bar.style.height = `${heightPx}px`;
     bar.title = `${formatShortDate(day.date)}: ${day.count} scene${day.count === 1 ? "" : "s"}`;
