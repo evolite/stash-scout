@@ -16,7 +16,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # QEMU-emulated arm64 builds crash mid-npm-install ("qemu: uncaught
       # target signal 4 (Illegal instruction)") on Node 22 with the default
