@@ -50,3 +50,6 @@ TypeScript, Vite and Tailwind on the front, a small Express server, SQLite for s
 ## Disclaimer
 
 Code is AI-Generated, quality gated with Sonarqube and GHQL
+
+## License 
+[MIT](https://opensource.org/license/MIT)
