@@ -82,7 +82,7 @@ app.use(
 // Rate-limited because the catch-all hits the filesystem (sendFile) on every
 // request. Generous ceiling — it only stops abuse, not normal SPA navigation.
 const pageLimiter = rateLimit({ windowMs: 60_000, limit: 300 });
-app.get("*", pageLimiter, (_req, res) =>
+app.get("/{*splat}", pageLimiter, (_req, res) =>
   res.set("Cache-Control", "no-cache").sendFile(path.join(frontendDist, "index.html")),
 );
 
