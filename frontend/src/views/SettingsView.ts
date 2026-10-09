@@ -309,6 +309,38 @@ export function renderSettingsView(): HTMLElement {
     syncAuthRows();
     addPage("System", "auth", "Authentication", authS.section, true);
 
+    // --- Backup: one-click download of the SQLite database ---
+    const backupPanel = document.createElement("div");
+    backupPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
+    const backupTitle = document.createElement("h3");
+    backupTitle.className = "m-0 text-sm font-semibold";
+    backupTitle.textContent = "Backup";
+    const backupHint = document.createElement("p");
+    backupHint.className = "m-0 text-xs text-muted";
+    backupHint.textContent =
+      "Downloads your saved filters, ignored scenes, exclude tags and settings. Stored API keys are encrypted with data/.secret-key, which is not included: restoring on this install keeps them, restoring elsewhere means re-entering them. To restore, stop the container, replace data/app.db, and start it again.";
+    const backupBtn = document.createElement("button");
+    backupBtn.type = "button";
+    backupBtn.className = "bg-black/20 text-text hover:bg-white/10 rounded px-2.5 py-1.5 text-xs self-start transition disabled:opacity-40";
+    backupBtn.textContent = "Export backup";
+    const backupNote = document.createElement("p");
+    backupNote.className = "m-0 text-xs text-amber";
+    backupBtn.addEventListener("click", async () => {
+      backupBtn.disabled = true;
+      backupBtn.textContent = "Exporting…";
+      backupNote.textContent = "";
+      try {
+        await api.downloadBackup();
+      } catch (err) {
+        backupNote.textContent = (err as Error).message;
+      } finally {
+        backupBtn.disabled = false;
+        backupBtn.textContent = "Export backup";
+      }
+    });
+    backupPanel.append(backupTitle, backupHint, backupBtn, backupNote);
+    addPage("System", "backup", "Backup", backupPanel, false);
+
     pages.forEach((pg) => pg.el.querySelectorAll("input, select").forEach((input) => {
       input.addEventListener("input", markDirty);
       input.addEventListener("change", markDirty);

@@ -1,4 +1,8 @@
 import { Router } from "express";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { db } from "../db.js";
 import rateLimit from "express-rate-limit";
 import type { AppConfig } from "../config.js";
 import { isStashDBConfigured, isLocalStashConfigured, isWhisparrConfigured } from "../config.js";
@@ -49,6 +53,23 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
   const router = Router();
   // Saving can hash a password and trigger OIDC discovery, so cap how often it can be hit.
   const saveLimiter = rateLimit({ windowMs: 60_000, limit: 30 });
+
+  // Consistent online snapshot of app.db (VACUUM INTO). Deliberately excludes
+  // data/.secret-key, so stored API keys in the export only decrypt on this install.
+  const backupLimiter = rateLimit({ windowMs: 60_000, limit: 5 });
+  router.get("/settings/backup", backupLimiter, (_req, res) => {
+    const dir = mkdtempSync(path.join(tmpdir(), "scout-backup-"));
+    const file = path.join(dir, "app.db");
+    const cleanup = () => rmSync(dir, { recursive: true, force: true });
+    try {
+      db.exec(`VACUUM INTO '${file}'`);
+    } catch (err) {
+      cleanup();
+      console.error("backup failed:", err);
+      return res.status(500).json({ error: "backup failed" });
+    }
+    res.download(file, `stash-scout-backup-${new Date().toISOString().slice(0, 10)}.db`, cleanup);
+  });
 
   router.get("/settings", (_req, res) => {
     res.json({

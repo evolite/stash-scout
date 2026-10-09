@@ -1,6 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { loadInitialConfig } from "./settingsStore.js";
 import { db } from "./db.js";
 import { StashDBClient } from "./stashdbClient.js";
@@ -30,6 +31,10 @@ const whisparr = new WhisparrClient(cfg);
 
 const app = express();
 app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.set({ "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "same-origin" });
+  next();
+});
 // One reverse-proxy hop (Cloudflare tunnel, Traefik, ...) so req.secure/protocol
 // follow X-Forwarded-Proto — needed for Secure cookies and the OIDC redirect URI.
 app.set("trust proxy", 1);
@@ -54,7 +59,8 @@ app.use("/api", statsRouter(cfg, whisparr));
 // Liveness/readiness probe for container orchestration — deliberately doesn't
 // touch StashDB/Stash/Whisparr (those are external and expected to flap); it
 // only needs to prove this process is alive and still serving requests.
-app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok" }));
+const { version } = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
+app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok", version }));
 
 // process.cwd() (project root) rather than counting ".." from this file's own
 // location — that depth differs between `tsx watch server/index.ts` (runs the
@@ -81,7 +87,8 @@ app.get("*", pageLimiter, (_req, res) =>
 );
 
 const server = app.listen(cfg.port, "0.0.0.0", () => {
-  console.log(`Stash Scout listening on http://0.0.0.0:${cfg.port}`);
+  console.log(`Stash Scout ${version} listening on http://0.0.0.0:${cfg.port}`);
+  if (cfg.authMode === "off") console.warn("Authentication is off: anyone who can reach this port has full access. Enable it in Settings > Authentication.");
 });
 
 // docker stop / a Compose or K8s redeploy sends SIGTERM and waits a grace
@@ -90,6 +97,8 @@ const server = app.listen(cfg.port, "0.0.0.0", () => {
 // connections and waits out ones already in progress before db.close().
 function shutdown(signal: string): void {
   console.log(`${signal} received, shutting down`);
+  // ponytail: don't let a hung connection run into Docker's SIGKILL grace period
+  setTimeout(() => process.exit(1), 8000).unref();
   server.close(() => {
     db.close();
     process.exit(0);

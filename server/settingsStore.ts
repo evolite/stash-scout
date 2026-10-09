@@ -64,6 +64,19 @@ async function persist(cfg: AppConfig): Promise<void> {
   writeSettings(toStore);
 }
 
+// A stored secret that no longer decrypts (DB restored without its .secret-key)
+// must not crash-loop the container — treat it as unset and let the user
+// re-enter it in Settings.
+async function readSecret(field: string, stored: string | undefined, fallback: string | undefined): Promise<string | undefined> {
+  if (!stored) return fallback;
+  try {
+    return await decrypt(stored);
+  } catch {
+    console.warn(`Could not decrypt stored ${field} (missing or different .secret-key?) — re-enter it in Settings.`);
+    return fallback;
+  }
+}
+
 // PORT stays an env var (infra concern, not something you'd edit via the app UI
 // while the app is already listening on it) — everything else configurable and
 // testable moves here.
@@ -75,23 +88,23 @@ export async function loadInitialConfig(): Promise<AppConfig> {
   const cfg: AppConfig = {
     port: Number(envFallback("PORT") ?? 8787),
     stashdbUrl: s.stashdbUrl ?? envFallback("STASHDB_URL") ?? "https://stashdb.org/graphql",
-    stashdbApiKey: s.stashdbApiKey ? await decrypt(s.stashdbApiKey) : envFallback("STASHDB_API_KEY"),
+    stashdbApiKey: await readSecret("stashdbApiKey", s.stashdbApiKey, envFallback("STASHDB_API_KEY")),
     localStashUrl: s.localStashUrl ?? envFallback("LOCAL_STASH_URL"),
-    localStashApiKey: s.localStashApiKey ? await decrypt(s.localStashApiKey) : envFallback("LOCAL_STASH_API_KEY"),
+    localStashApiKey: await readSecret("localStashApiKey", s.localStashApiKey, envFallback("LOCAL_STASH_API_KEY")),
     localStashRootUrl: s.localStashRootUrl ?? envFallback("LOCAL_STASH_ROOT_URL"),
     whisparrBaseUrl: s.whisparrBaseUrl ?? envFallback("WHISPARR_BASE_URL"),
-    whisparrApiKey: s.whisparrApiKey ? await decrypt(s.whisparrApiKey) : envFallback("WHISPARR_API_KEY"),
+    whisparrApiKey: await readSecret("whisparrApiKey", s.whisparrApiKey, envFallback("WHISPARR_API_KEY")),
     whisparrRootFolderPath: s.whisparrRootFolderPath ?? envFallback("WHISPARR_ROOT_FOLDER_PATH"),
     whisparrQualityProfileId:
       s.whisparrQualityProfileId ?? (envFallback("WHISPARR_QUALITY_PROFILE_ID") ? Number(envFallback("WHISPARR_QUALITY_PROFILE_ID")) : undefined),
     cfAccessClientId: s.cfAccessClientId ?? envFallback("CF_ACCESS_CLIENT_ID"),
-    cfAccessClientSecret: s.cfAccessClientSecret ? await decrypt(s.cfAccessClientSecret) : envFallback("CF_ACCESS_CLIENT_SECRET"),
+    cfAccessClientSecret: await readSecret("cfAccessClientSecret", s.cfAccessClientSecret, envFallback("CF_ACCESS_CLIENT_SECRET")),
     authMode: (envFallback("AUTH_MODE_FORCE") === "off" ? "off" : s.authMode) ?? (envFallback("AUTH_MODE") as AppConfig["authMode"] | undefined) ?? "off",
     authUsername: s.authUsername ?? envFallback("AUTH_USERNAME"),
     authPasswordHash: s.authPasswordHash ?? (envFallback("AUTH_PASSWORD") ? hashPassword(envFallback("AUTH_PASSWORD")!) : undefined),
     oidcIssuer: s.oidcIssuer ?? envFallback("OIDC_ISSUER"),
     oidcClientId: s.oidcClientId ?? envFallback("OIDC_CLIENT_ID"),
-    oidcClientSecret: s.oidcClientSecret ? await decrypt(s.oidcClientSecret) : envFallback("OIDC_CLIENT_SECRET"),
+    oidcClientSecret: await readSecret("oidcClientSecret", s.oidcClientSecret, envFallback("OIDC_CLIENT_SECRET")),
     oidcAllowed: s.oidcAllowed ?? envFallback("OIDC_ALLOWED"),
   };
 

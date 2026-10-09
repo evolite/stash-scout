@@ -24,6 +24,7 @@ async function getKey(): Promise<Buffer> {
     cachedKey = Buffer.from(raw.trim(), "base64");
   } catch {
     cachedKey = randomBytes(32);
+    console.log("No .secret-key found; generated a new one. Back up data/.secret-key with app.db to keep stored API keys.");
     await fs.writeFile(KEY_FILE, cachedKey.toString("base64"), { mode: 0o600 });
   }
   return cachedKey;

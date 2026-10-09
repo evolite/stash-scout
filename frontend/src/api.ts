@@ -87,7 +87,20 @@ function qs(filter: object): string {
   return params.toString();
 }
 
+// Fetches the SQLite backup and hands it to the browser as a file download.
+async function downloadBackup(): Promise<void> {
+  const res = await fetch("/api/settings/backup");
+  if (res.status === 401 && sessionActive) location.reload();
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `Backup failed: HTTP ${res.status}`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(await res.blob());
+  a.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "stash-scout-backup.db";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export const api = {
+  downloadBackup,
   queryScenes: (filter: SceneFilter, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}${hideParam()}${refresh ? "&refresh=1" : ""}`),
   // Same filter shape as queryScenes — sort/date are ignored server-side, it
