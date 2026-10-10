@@ -1,9 +1,10 @@
 import { api } from "../api.js";
 
-export type Tab = "browse" | "subscribed" | "performers" | "studios" | "stats" | "settings";
+export type Tab = "browse" | "subscribed" | "subscriptions" | "performers" | "studios" | "stats" | "settings";
 
 const LEFT_TABS: { id: Tab; label: string }[] = [
   { id: "subscribed", label: "Feed" },
+  { id: "subscriptions", label: "Subscriptions" },
   { id: "browse", label: "Scenes" },
   { id: "performers", label: "Performers" },
   { id: "studios", label: "Studios" },

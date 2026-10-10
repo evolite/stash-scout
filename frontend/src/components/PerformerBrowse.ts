@@ -322,8 +322,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     }
   }
 
-  // Collapsible "Saved searches" block pinned at the top of the sidebar (see
-  // SavedFiltersPanel for the scene-filter twin). A name restores the stored
+  // Collapsible "Saved searches" block pinned at the top of the sidebar. A name restores the stored
   // first page instantly; ✕ deletes; when one is loaded, "Update" re-runs it
   // against StashDB and overwrites the stored page.
   async function renderSavedPanel(host: HTMLElement) {

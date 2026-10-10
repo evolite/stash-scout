@@ -1,12 +1,11 @@
-import { api, type SavedFilter, type Scene, type SceneFilter, type SceneStatus } from "../api.js";
+import { api, type Scene, type SceneFilter, type SceneStatus } from "../api.js";
 import { renderFilterSidebar } from "../components/FilterSidebar.js";
-import { renderSavedFiltersPanel } from "../components/SavedFiltersPanel.js";
 import { renderSceneCard, hidePreview } from "../components/SceneCard.js";
 import { renderSkeletonGrid } from "../components/SkeletonGrid.js";
 import { renderPagination } from "../components/Pagination.js";
 import { emptyState } from "../components/filterControls.js";
-import { isInLibraryMode } from "../components/Navbar.js";
-import { getState } from "../viewState.js";
+import { isInLibraryMode, type Tab } from "../components/Navbar.js";
+import { getState, getSubscriptionMode, setSubscriptionMode } from "../viewState.js";
 
 const PER_PAGE = 32;
 
@@ -17,7 +16,7 @@ function textState(message: string): HTMLElement {
   return p;
 }
 
-export function renderBrowseView(): HTMLElement {
+export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
   const container = document.createElement("div");
   container.className = "grid gap-6 items-start grid-cols-[260px_1fr]";
 
@@ -35,9 +34,37 @@ export function renderBrowseView(): HTMLElement {
 
   function renderSidebar() {
     sidebarCol.innerHTML = "";
-    const savedHost = document.createElement("div");
-    sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter, loadedFilterName, savePreset, savedHost));
-    renderSavedFiltersPanel(savedHost, loadSavedFilter);
+    const { mode } = getSubscriptionMode();
+    if (mode !== "none") sidebarCol.appendChild(renderBuilderBanner(mode));
+    const save =
+      mode === "none"
+        ? undefined
+        : { name: loadedFilterName, label: mode === "edit" ? "Update" : "Subscribe", onSave: commitSubscription };
+    sidebarCol.appendChild(renderFilterSidebar(filter, applyFilter, save));
+  }
+
+  function renderBuilderBanner(mode: "new" | "edit"): HTMLElement {
+    const banner = document.createElement("div");
+    banner.className = "mb-3 rounded-lg border border-accent bg-accent-dim p-3 text-xs flex flex-col gap-2";
+    const title = document.createElement("div");
+    title.className = "font-semibold text-text";
+    title.textContent = mode === "edit" ? `Editing "${loadedFilterName}"` : "New subscription";
+    const help = document.createElement("div");
+    help.className = "text-muted";
+    help.textContent =
+      mode === "edit"
+        ? "Adjust the filters, then press Update. You can rename it too."
+        : "Set the filters you want to follow, name it, then press Subscribe. New matches will show up in your Feed.";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "self-start bg-transparent border-0 p-0 text-link hover:underline";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => {
+      setSubscriptionMode("none");
+      renderSidebar();
+    });
+    banner.append(title, help, cancel);
+    return banner;
   }
 
   function applyFilter(next: SceneFilter) {
@@ -45,38 +72,24 @@ export function renderBrowseView(): HTMLElement {
     load();
   }
 
-  // Loading a preset replaces the filter outright (rather than merging onto
-  // whatever's currently drafted) and re-renders the sidebar so its fields show
-  // the loaded values and can be tweaked from there.
-  function loadSavedFilter(saved: SavedFilter) {
-    filter = { per_page: PER_PAGE, sort: "DATE", direction: "DESC", ...saved.filter, page: 1 };
-    loadedFilterName = saved.name;
-    renderSidebar();
-    load();
-  }
-
-  // Matched by name, not by what's currently loaded — saving under a name
-  // that already exists overwrites that preset's content; any other name
-  // creates a new one. So editing a loaded preset and changing its name
-  // before saving forks it into a new preset instead of renaming the
-  // original, and saving under an existing name overwrites it even if
-  // nothing was loaded first.
-  async function savePreset(draft: SceneFilter, name: string) {
-    // Commit the drafted sidebar values as the live filter first — otherwise
-    // the renderSidebar() below rebuilds from the stale `filter` and the just-
-    // saved edits vanish from the UI (and a second Save would then persist the
-    // stale values back over the good save).
+  // Saves the drafted sidebar filter as a subscription ("new": same name
+  // overwrites that one; "edit": updates the one being edited, renaming if the
+  // name changed), then returns to the Subscriptions tab where it lives.
+  async function commitSubscription(draft: SceneFilter, name: string) {
+    const { mode, id: editId } = getSubscriptionMode();
     filter = { ...draft };
-    const existing = (await api.listFilters()).find((f) => f.name === name);
-    if (existing) {
-      await api.overwriteFilter(existing.id, draft);
-      loadedFilterName = existing.name;
+    if (mode === "edit" && editId) {
+      await api.overwriteFilter(editId, draft);
+      if (name !== loadedFilterName) await api.renameFilter(editId, name);
     } else {
-      const saved = await api.saveFilter(name, draft);
-      loadedFilterName = saved.name;
+      const existing = (await api.listFilters()).find((f) => f.name === name);
+      if (existing) await api.overwriteFilter(existing.id, draft);
+      const id = existing?.id ?? (await api.saveFilter(name, draft)).id;
+      await api.setFilterSubscribed(id, true);
     }
-    renderSidebar();
-    load();
+    loadedFilterName = name;
+    setSubscriptionMode("none");
+    navigate("subscriptions");
   }
 
   function schedulePollingIfDownloading(scenes: Scene[]) {

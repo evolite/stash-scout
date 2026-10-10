@@ -201,8 +201,14 @@ export function collapsible(
   return wrap;
 }
 
-// The "type a name, Save" row used by both sidebars' saved blocks.
-export function saveRow(currentName: string, placeholder: string, onSave: (name: string) => void): HTMLElement {
+// The "type a name, Save" row. `label`/`primary` let the subscription builder
+// reuse it as a "Subscribe" / "Update" button.
+export function saveRow(
+  currentName: string,
+  placeholder: string,
+  onSave: (name: string) => void,
+  opts: { label?: string; primary?: boolean } = {},
+): HTMLElement {
   const row = document.createElement("div");
   row.className = "flex items-stretch gap-2 mt-2";
   const nameInput = document.createElement("input");
@@ -211,9 +217,9 @@ export function saveRow(currentName: string, placeholder: string, onSave: (name:
   nameInput.className = "flex-1 min-w-0";
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = GHOST_BTN;
-  btn.textContent = "Save";
-  btn.title = "Saves as new, unless one with this exact name exists — then it's overwritten";
+  btn.className = opts.primary ? PRIMARY_BTN : GHOST_BTN;
+  btn.textContent = opts.label ?? "Save";
+  if (!opts.label) btn.title = "Saves as new, unless one with this exact name exists — then it's overwritten";
   const save = () => {
     const name = nameInput.value.trim();
     if (name) onSave(name);

@@ -99,14 +99,10 @@ function idPicker(
 export function renderFilterSidebar(
   current: SceneFilter,
   onApply: (filter: SceneFilter) => void,
-  presetName: string,
-  onSave: (filter: SceneFilter, name: string) => void,
-  savedBlock: HTMLElement,
+  save?: { name: string; label: string; onSave: (filter: SceneFilter, name: string) => void },
 ): HTMLElement {
   const aside = document.createElement("aside");
   aside.className = SIDEBAR_CLASS;
-
-  aside.appendChild(savedBlock);
 
   const draft: SceneFilter = { ...current };
 
@@ -221,7 +217,14 @@ export function renderFilterSidebar(
   aside.appendChild(sortLabel);
 
   aside.appendChild(applyButton(() => onApply({ ...draft, page: 1 })));
-  aside.appendChild(saveRow(presetName, "Name this preset", (name) => onSave({ ...draft, page: 1 }, name)));
+  if (save) {
+    aside.appendChild(
+      saveRow(save.name, "Name this subscription", (name) => save.onSave({ ...draft, page: 1 }, name), {
+        label: save.label,
+        primary: true,
+      }),
+    );
+  }
 
   return aside;
 }

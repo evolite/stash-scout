@@ -3,6 +3,7 @@ import { renderLoginView } from "./views/LoginView.js";
 import { renderNavbar, setNavbarAuthMode, setSfwMode, type Tab } from "./components/Navbar.js";
 import { renderBrowseView } from "./views/BrowseView.js";
 import { renderSubscribedView } from "./views/SubscribedView.js";
+import { renderSubscriptionsView } from "./views/SubscriptionsView.js";
 import { renderPerformersView } from "./views/PerformersView.js";
 import { renderStudiosView } from "./views/StudiosView.js";
 import { renderStatsView } from "./views/StatsView.js";
@@ -12,7 +13,7 @@ import { onNavigateToPerformer, onNavigateToStudio } from "./navigation.js";
 import { getReturnTab, restoreScroll, saveScroll, setReturnTab } from "./viewState.js";
 
 const root = document.getElementById("root")!;
-const TABS = new Set<Tab>(["browse", "subscribed", "performers", "studios", "stats", "settings"]);
+const TABS = new Set<Tab>(["browse", "subscribed", "subscriptions", "performers", "studios", "stats", "settings"]);
 const savedTab = localStorage.getItem("activeTab");
 
 // A request for /performers/<id> (typed, bookmarked, or linked from
@@ -103,8 +104,9 @@ function render() {
   content.className = "px-6 py-8";
   root.appendChild(content);
 
-  if (activeTab === "browse") content.appendChild(renderBrowseView());
+  if (activeTab === "browse") content.appendChild(renderBrowseView(setTab));
   else if (activeTab === "subscribed") content.appendChild(renderSubscribedView());
+  else if (activeTab === "subscriptions") content.appendChild(renderSubscriptionsView(setTab));
   else if (activeTab === "performers") {
     content.appendChild(renderPerformersView(pendingPerformerId));
     pendingPerformerId = undefined;

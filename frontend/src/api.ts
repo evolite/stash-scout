@@ -163,6 +163,12 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscribed }),
     }),
+  renameFilter: (id: string, name: string) =>
+    req<SavedFilter>(`/api/filters/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
   overwriteFilter: (id: string, filter: SceneFilter) =>
     req<SavedFilter>(`/api/filters/${id}`, {
       method: "PATCH",

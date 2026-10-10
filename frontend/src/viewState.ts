@@ -32,3 +32,14 @@ export function restoreScroll(): void {
   };
   requestAnimationFrame(tick);
 }
+
+// Scenes filter-builder mode, set by the Subscriptions tab: "new" saves the
+// drafted filter as a subscription, "edit" updates the subscription `id`.
+// Outside these modes Scenes is a plain browser with no save controls.
+export type SubscriptionMode = { mode: "none" | "new" | "edit"; id?: string };
+const subscriptionMode = getState<SubscriptionMode>("subscriptionMode", { mode: "none" });
+export const getSubscriptionMode = (): Readonly<SubscriptionMode> => subscriptionMode;
+export function setSubscriptionMode(mode: SubscriptionMode["mode"], id?: string): void {
+  subscriptionMode.mode = mode;
+  subscriptionMode.id = id;
+}
