@@ -60,3 +60,31 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # Keeps the committed CHANGELOG.md current. Notes are generated from the tag
+  # (not from main's tip, which may have moved on) and committed back to main.
+  # Tag-triggered only, so the push can't retrigger this workflow.
+  changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --tag ${{ github.ref_name }} -o ${{ runner.temp }}/CHANGELOG.md
+
+      - name: Commit changelog to main
+        run: |
+          git fetch origin main
+          git checkout -f -B main origin/main
+          cp "${{ runner.temp }}/CHANGELOG.md" CHANGELOG.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "chore(release): update changelog for ${{ github.ref_name }}"
+          git push origin HEAD:main
