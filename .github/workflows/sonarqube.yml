@@ -28,6 +28,14 @@ jobs:
         with:
           fetch-depth: 0 # full history for accurate new-code / blame data
 
+      # The gate's "new code" period is "previous version", so Sonar needs the
+      # project version on every analysis to know where a release starts.
+      - name: Read version
+        id: ver
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Analyze with SonarQube
         if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
         uses: SonarSource/sonarqube-scan-action@v8.3.0
+        with:
+          args: -Dsonar.projectVersion=${{ steps.ver.outputs.version }}
