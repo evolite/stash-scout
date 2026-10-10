@@ -1,0 +1,38 @@
+# Runs a SonarQube analysis on GitHub and lets the SonarQube server publish its
+# findings into GitHub Code Scanning (needs SonarQube Developer Edition+ with a
+# GitHub DevOps-platform binding: Administration > DevOps platforms > GitHub).
+# Project key and sources come from sonar-project.properties.
+#
+# Repo secrets required (Settings > Secrets and variables > Actions):
+#   SONAR_TOKEN     token from SonarQube (My account > Security)
+#   SONAR_HOST_URL  e.g. https://sonar.slashdir.net
+# Until both exist the scan step is skipped, so the workflow stays green.
+name: SonarQube analysis
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read # lets SonarQube decorate PRs with analysis results
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history for accurate new-code / blame data
+
+      - name: Analyze with SonarQube
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        uses: SonarSource/sonarqube-scan-action@v8.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # PR information
