@@ -16,6 +16,7 @@ import { ignoredScenesRouter } from "./routes/ignoredScenes.js";
 import { globalExcludeTagsRouter } from "./routes/globalExcludeTags.js";
 import { settingsRouter } from "./routes/settings.js";
 import { statsRouter } from "./routes/stats.js";
+import { versionRouter } from "./routes/version.js";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth } from "./auth.js";
 
@@ -61,6 +62,7 @@ app.use("/api", statsRouter(cfg, whisparr));
 // only needs to prove this process is alive and still serving requests.
 const { version } = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
 app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok", version }));
+app.use("/api", versionRouter(version));
 
 // process.cwd() (project root) rather than counting ".." from this file's own
 // location — that depth differs between `tsx watch server/index.ts` (runs the

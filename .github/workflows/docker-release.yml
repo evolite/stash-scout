@@ -17,6 +17,15 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # git-cliff needs the tag history
+
+      # Bake this release's notes (feat/fix only, see cliff.toml) into the image;
+      # the app shows them under Settings > Version & changelog.
+      - uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --tag ${{ github.ref_name }} -o CHANGELOG.md
 
       # QEMU-emulated arm64 builds crash mid-npm-install ("qemu: uncaught
       # target signal 4 (Illegal instruction)") on Node 22 with the default

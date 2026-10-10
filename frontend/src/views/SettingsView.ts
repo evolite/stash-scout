@@ -11,6 +11,7 @@ import {
   setHideStraightScenes,
 } from "../genderPrefs.js";
 import { renderExcludeTagsPanel } from "../components/ExcludeTagsPanel.js";
+import { renderAboutPanel } from "../components/AboutPanel.js";
 
 function statusPill(ok: boolean | null): HTMLElement {
   const pill = document.createElement("span");
@@ -340,6 +341,7 @@ export function renderSettingsView(): HTMLElement {
     });
     backupPanel.append(backupTitle, backupHint, backupBtn, backupNote);
     addPage("System", "backup", "Backup", backupPanel, false);
+    addPage("System", "about", "Version & changelog", renderAboutPanel(), false);
 
     pages.forEach((pg) => pg.el.querySelectorAll("input, select").forEach((input) => {
       input.addEventListener("input", markDirty);

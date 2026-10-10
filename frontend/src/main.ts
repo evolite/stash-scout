@@ -9,6 +9,7 @@ import { renderStudiosView } from "./views/StudiosView.js";
 import { renderStatsView } from "./views/StatsView.js";
 import { renderSettingsView } from "./views/SettingsView.js";
 import { renderOnboardingModal } from "./components/OnboardingModal.js";
+import { maybeShowUpdateModal } from "./components/UpdateModal.js";
 import { onNavigateToPerformer, onNavigateToStudio } from "./navigation.js";
 import { getReturnTab, restoreScroll, saveScroll, setReturnTab } from "./viewState.js";
 
@@ -154,3 +155,6 @@ if (auth.loggedIn && localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1") {
     );
   }
 }
+
+// Fire-and-forget: a slow or unreachable GitHub must never delay the app.
+if (auth.loggedIn) void maybeShowUpdateModal();

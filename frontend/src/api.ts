@@ -2,6 +2,16 @@ import type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetai
 import { hideParam } from "./genderPrefs.js";
 export type { Scene, SceneStatus, GlobalExcludeTag, StatsSummary, PerformerDetails, PerformerResult, StudioDetails, SavedPerformerSearch };
 
+export interface VersionInfo {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  url: string;
+  checkEnabled: boolean;
+  checkedAt: number | null;
+  error?: string;
+}
+
 export type PerformerSearchSummary = Omit<SavedPerformerSearch, "results"> & { resultCount: number };
 export type PerformerQueryResult = { count: number; performers: PerformerResult[]; approximateCount?: boolean };
 
@@ -224,6 +234,8 @@ export const api = {
   whisparrOptions: () =>
     req<{ rootFolders: { id: number; path: string }[]; qualityProfiles: { id: number; name: string }[] }>(`/api/whisparr/options`),
   stats: () => req<StatsSummary>(`/api/stats`),
+  version: (refresh = false) => req<VersionInfo>(`/api/version${refresh ? "?refresh=1" : ""}`),
+  changelog: () => req<{ markdown: string }>(`/api/changelog`),
   listGlobalExcludeTags: () => req<GlobalExcludeTag[]>(`/api/global-exclude-tags`),
   addGlobalExcludeTag: (id: string, name: string) =>
     req<GlobalExcludeTag[]>(`/api/global-exclude-tags`, {

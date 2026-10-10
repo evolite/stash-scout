@@ -6,3 +6,4 @@ data
 .git
 .claude
 *.md
+!CHANGELOG.md
