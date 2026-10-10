@@ -1,6 +1,6 @@
-# Runs a SonarQube analysis on GitHub and lets the SonarQube server publish its
-# findings into GitHub Code Scanning (needs SonarQube Developer Edition+ with a
-# GitHub DevOps-platform binding: Administration > DevOps platforms > GitHub).
+# Runs a SonarQube analysis of main on every push (this replaced the Forgejo
+# sonar workflow, so there is a single scanner). Community Edition: no PR
+# analysis or Code Scanning publishing, hence no pull_request trigger.
 # Project key and sources come from sonar-project.properties.
 #
 # Repo secrets required (Settings > Secrets and variables > Actions):
@@ -12,13 +12,10 @@ name: SonarQube analysis
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read # lets SonarQube decorate PRs with analysis results
 
 jobs:
   analysis:
@@ -34,5 +31,3 @@ jobs:
       - name: Analyze with SonarQube
         if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
         uses: SonarSource/sonarqube-scan-action@v8.3.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # PR information
