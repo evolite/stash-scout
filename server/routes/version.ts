@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -40,6 +41,8 @@ async function fetchLatestVersion(): Promise<string | null> {
 // version" does. Set DISABLE_UPDATE_CHECK=1 to skip that lookup entirely.
 export function versionRouter(current: string) {
   const router = Router();
+  // Generous: the UI hits each of these once per page load; this only stops abuse.
+  const limiter = rateLimit({ windowMs: 60_000, limit: 120 });
   const checkEnabled = process.env.DISABLE_UPDATE_CHECK !== "1";
   let latest: string | null = null;
   let checkedAt: number | null = null;
@@ -61,7 +64,7 @@ export function versionRouter(current: string) {
     }
   }
 
-  router.get("/version", async (req, res) => {
+  router.get("/version", limiter, async (req, res) => {
     await refresh(req.query.refresh === "1");
     res.json({
       current,
@@ -74,7 +77,7 @@ export function versionRouter(current: string) {
     });
   });
 
-  router.get("/changelog", async (_req, res) => {
+  router.get("/changelog", limiter, async (_req, res) => {
     try {
       res.json({ markdown: await readFile(path.join(process.cwd(), "CHANGELOG.md"), "utf8") });
     } catch {
