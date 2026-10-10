@@ -30,7 +30,8 @@ async function fetchLatestVersion(): Promise<string | null> {
   });
   if (!res.ok) throw new Error(`GitHub tags: HTTP ${res.status}`);
   const tags = ((await res.json()) as { name: string }[]).map((t) => t.name).filter((n) => /^v\d+\.\d+\.\d+$/.test(n));
-  return tags.sort((x, y) => compareVersions(y, x))[0]?.replace(/^v/, "") ?? null;
+  const newest = tags.reduce<string | null>((best, t) => (best === null || compareVersions(t, best) > 0 ? t : best), null);
+  return newest?.replace(/^v/, "") ?? null;
 }
 
 // Version comes from package.json (injected); the changelog is CHANGELOG.md in
