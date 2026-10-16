@@ -13,7 +13,10 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   return e;
 }
 
-const tip = (e: HTMLElement, text: string) => ((e.title = text), e);
+function tip(e: HTMLElement, text: string): HTMLElement {
+  e.title = text;
+  return e;
+}
 
 const count = (csv?: string) => (csv ? csv.split(",").filter(Boolean).length : 0);
 
@@ -41,7 +44,9 @@ const ICONS = {
 // 28px icon button; `on` (when given) makes it a toggle: blue icon (bell also filled) when on, grey when off.
 function iconBtn(kind: keyof typeof ICONS, title: string, onClick: () => void, opts: { on?: boolean; danger?: boolean } = {}): HTMLElement {
   const toggleable = opts.on !== undefined;
-  const color = `bg-transparent hover:bg-surface-3 ${opts.on ? "text-accent" : `text-muted ${opts.danger ? "hover:text-danger" : "hover:text-text"}`}`;
+  const hoverText = opts.danger ? "hover:text-danger" : "hover:text-text";
+  const tint = opts.on ? "text-accent" : `text-muted ${hoverText}`;
+  const color = `bg-transparent hover:bg-surface-3 ${tint}`;
   const b = el("button", `grid place-items-center shrink-0 w-7 h-7 rounded-md border-0 p-0 transition-colors ${color}`);
   b.title = title;
   b.setAttribute("aria-label", title);
