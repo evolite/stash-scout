@@ -94,6 +94,8 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
       whisparrApiKeySet: !!cfg.whisparrApiKey,
       whisparrRootFolderPath: cfg.whisparrRootFolderPath ?? "",
       whisparrQualityProfileId: cfg.whisparrQualityProfileId ?? null,
+      favoritesSubscribed: cfg.favoritesSubscribed ?? true,
+      favoritesAutoAdd: cfg.favoritesAutoAdd ?? false,
       cfAccessClientId: cfg.cfAccessClientId ?? "",
       cfAccessClientSecretSet: !!cfg.cfAccessClientSecret,
       authMode: cfg.authMode,
@@ -124,6 +126,20 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     const authError = await authConfigError(next);
     if (authError) return res.status(400).json({ error: authError });
     await updateConfig(cfg, patch);
+    res.status(204).end();
+  });
+
+  // Single-purpose toggle for the Subscriptions tab's Favorites pseudo-row, so
+  // flipping it there doesn't have to round-trip the whole config form above.
+  router.put("/settings/favorites-auto-add", saveLimiter, async (req, res) => {
+    if (typeof req.body.enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
+    await updateConfig(cfg, { favoritesAutoAdd: req.body.enabled });
+    res.status(204).end();
+  });
+
+  router.put("/settings/favorites-subscribed", saveLimiter, async (req, res) => {
+    if (typeof req.body.enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
+    await updateConfig(cfg, { favoritesSubscribed: req.body.enabled });
     res.status(204).end();
   });
 

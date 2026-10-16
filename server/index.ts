@@ -19,6 +19,7 @@ import { statsRouter } from "./routes/stats.js";
 import { versionRouter } from "./routes/version.js";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth } from "./auth.js";
+import { startAutoAdd } from "./autoAdd.js";
 
 const cfg = await loadInitialConfig();
 
@@ -92,6 +93,7 @@ const server = app.listen(cfg.port, "0.0.0.0", () => {
   console.log(`Stash Scout ${version} listening on http://0.0.0.0:${cfg.port}`);
   if (cfg.authMode === "off") console.warn("Authentication is off: anyone who can reach this port has full access. Enable it in Settings > Authentication.");
 });
+startAutoAdd(cfg, { stashdb, localStash, whisparr });
 
 // docker stop / a Compose or K8s redeploy sends SIGTERM and waits a grace
 // period before SIGKILL — without this, in-flight requests get cut off mid-

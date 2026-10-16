@@ -17,7 +17,8 @@ const SCHEMA = `
     name TEXT NOT NULL,
     created_at TEXT NOT NULL,
     filter TEXT NOT NULL,
-    watched INTEGER NOT NULL DEFAULT 0 -- column keeps its old name; the app calls it "subscribed"
+    watched INTEGER NOT NULL DEFAULT 0, -- column keeps its old name; the app calls it "subscribed"
+    auto_add INTEGER NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS global_exclude_tags (
     id TEXT PRIMARY KEY,
@@ -102,6 +103,19 @@ function migrateFromJson(db: DatabaseSync, dataDir: string): void {
 export function openDb(dataDir: string): DatabaseSync {
   const db = new DatabaseSync(path.join(dataDir, "app.db"));
   db.exec(SCHEMA);
+  // No migration system in this project (SCHEMA is CREATE IF NOT EXISTS only),
+  // so the first-ever column add is a guarded ALTER: duplicate-column error
+  // means it's already there (including fresh DBs, where SCHEMA just made it).
+  try {
+    db.exec("ALTER TABLE filters ADD COLUMN auto_add INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // column already exists
+  }
+  try {
+    db.exec("ALTER TABLE filters ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // column already exists
+  }
   migrateFromJson(db, dataDir);
   return db;
 }
@@ -109,7 +123,7 @@ export function openDb(dataDir: string): DatabaseSync {
 export const db = openDb(REAL_DATA_DIR);
 
 export function filterRowToSavedFilter(row: any): SavedFilter {
-  return { id: row.id, name: row.name, createdAt: row.created_at, filter: JSON.parse(row.filter), subscribed: !!row.watched };
+  return { id: row.id, name: row.name, createdAt: row.created_at, filter: JSON.parse(row.filter), subscribed: !!row.watched, autoAdd: !!row.auto_add };
 }
 
 export function performerSearchRowTo(row: any): SavedPerformerSearch {
@@ -138,6 +152,9 @@ function demo(): void {
 
   const testDb = openDb(tmp);
   assert.equal((testDb.prepare("SELECT COUNT(*) as c FROM filters").get() as { c: number }).c, 1);
+  // The guarded ALTER must be a harmless no-op on a fresh DB (SCHEMA already
+  // added the column) and default existing rows to autoAdd off.
+  assert.equal(filterRowToSavedFilter(testDb.prepare("SELECT * FROM filters").get()).autoAdd, false);
   assert.equal((testDb.prepare("SELECT COUNT(*) as c FROM global_exclude_tags").get() as { c: number }).c, 1);
   assert.equal((testDb.prepare("SELECT COUNT(*) as c FROM ignored_scenes").get() as { c: number }).c, 1);
   assert.equal(

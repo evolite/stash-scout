@@ -98,6 +98,7 @@ export interface SavedFilter<F = Record<string, unknown>> {
   createdAt: string;
   filter: F;
   subscribed: boolean;
+  autoAdd: boolean; // hourly job adds this filter's new scenes to Whisparr
 }
 
 // A named performer search: the filter params plus the fetched result list, so

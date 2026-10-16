@@ -13,6 +13,8 @@ interface StoredSettings {
   whisparrApiKey?: string; // encrypted
   whisparrRootFolderPath?: string;
   whisparrQualityProfileId?: number;
+  favoritesSubscribed?: boolean;
+  favoritesAutoAdd?: boolean;
   cfAccessClientId?: string;
   cfAccessClientSecret?: string; // encrypted
   authMode?: AppConfig["authMode"];
@@ -48,6 +50,8 @@ async function persist(cfg: AppConfig): Promise<void> {
     whisparrBaseUrl: cfg.whisparrBaseUrl,
     whisparrRootFolderPath: cfg.whisparrRootFolderPath,
     whisparrQualityProfileId: cfg.whisparrQualityProfileId,
+    favoritesSubscribed: cfg.favoritesSubscribed,
+    favoritesAutoAdd: cfg.favoritesAutoAdd,
     cfAccessClientId: cfg.cfAccessClientId,
     authMode: cfg.authMode,
     authUsername: cfg.authUsername,
@@ -97,6 +101,8 @@ export async function loadInitialConfig(): Promise<AppConfig> {
     whisparrRootFolderPath: s.whisparrRootFolderPath ?? envFallback("WHISPARR_ROOT_FOLDER_PATH"),
     whisparrQualityProfileId:
       s.whisparrQualityProfileId ?? (envFallback("WHISPARR_QUALITY_PROFILE_ID") ? Number(envFallback("WHISPARR_QUALITY_PROFILE_ID")) : undefined),
+    favoritesSubscribed: s.favoritesSubscribed ?? true,
+    favoritesAutoAdd: s.favoritesAutoAdd ?? (envFallback("FAVORITES_AUTO_ADD") === "true"),
     cfAccessClientId: s.cfAccessClientId ?? envFallback("CF_ACCESS_CLIENT_ID"),
     cfAccessClientSecret: await readSecret("cfAccessClientSecret", s.cfAccessClientSecret, envFallback("CF_ACCESS_CLIENT_SECRET")),
     authMode: (envFallback("AUTH_MODE_FORCE") === "off" ? "off" : s.authMode) ?? (envFallback("AUTH_MODE") as AppConfig["authMode"] | undefined) ?? "off",

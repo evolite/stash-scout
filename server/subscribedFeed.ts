@@ -27,7 +27,7 @@ export function getIgnoredIds(): Set<string> {
 // deduped, unadded-only" result, just rendered differently.
 export async function getSubscribedFeed(
   deps: { stashdb: StashDBClient; cfg: AppConfig; localStash: LocalStashClient; whisparr: WhisparrClient },
-  opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean; hide?: Orientation[] },
+  opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean; hide?: Orientation[]; autoAddOnly?: boolean },
 ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
   const { stashdb, cfg, localStash, whisparr } = deps;
   const { page, perPage, refresh = false } = opts;
@@ -36,7 +36,18 @@ export async function getSubscribedFeed(
   // instead, reshuffling on every fresh page-1 visit (see queryMergedFeed).
   const randomize = opts.window === "month" || opts.window === "year";
 
-  const subscribedFilters = (db.prepare("SELECT * FROM filters WHERE watched = 1").all() as any[]).map(filterRowToSavedFilter);
+  // autoAddOnly (the hourly Whisparr job) narrows the merge to sources the user
+  // opted in: filters flagged auto_add, and Favorites only when its own
+  // setting is on. With nothing opted in there's no feed at all — don't touch
+  // StashDB.
+  const subscribedFilters = (
+    db.prepare(`SELECT * FROM filters WHERE watched = 1${opts.autoAddOnly ? " AND auto_add = 1" : ""}`).all() as any[]
+  ).map(filterRowToSavedFilter);
+  const useFavorites = cfg.favoritesSubscribed !== false && (!opts.autoAddOnly || !!cfg.favoritesAutoAdd);
+  // Nothing active (no subscribed filters, Favorites off) → empty feed, no StashDB call.
+  if (subscribedFilters.length === 0 && !useFavorites) {
+    return { count: 0, scenes: [], approximateCount: false };
+  }
   const globalExcludes = getGlobalExcludeIds();
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let sources = [
@@ -45,11 +56,15 @@ export async function getSubscribedFeed(
       input.date = { value: cutoff, modifier: "GREATER_THAN" };
       return { input, excludeTagIds: mergeExcludeIds(excludeTagIds, globalExcludes), label: f.name };
     }),
-    {
-      input: { favorites: "PERFORMER" as const, date: { value: cutoff, modifier: "GREATER_THAN" as const } },
-      excludeTagIds: globalExcludes,
-      label: "Favorites",
-    },
+    ...(useFavorites
+      ? [
+          {
+            input: { favorites: "PERFORMER" as const, date: { value: cutoff, modifier: "GREATER_THAN" as const } },
+            excludeTagIds: globalExcludes,
+            label: "Favorites",
+          },
+        ]
+      : []),
   ];
   // The Subscriptions filter-name chip bar narrows to a single source's matches
   // instead of the full merge — "all" (or no source) keeps every source active.
@@ -63,6 +78,8 @@ export async function getSubscribedFeed(
     cutoff,
     globalExcludes,
     source: opts.source ?? "all",
+    autoAddOnly: !!opts.autoAddOnly,
+    useFavorites,
     filters: subscribedFilters.map((f) => ({ id: f.id, filter: f.filter })),
   });
   const ignoredIds = getIgnoredIds();

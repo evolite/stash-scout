@@ -4,8 +4,6 @@ import { PRIMARY_BTN } from "../components/filterControls.js";
 import { getState, setSubscriptionMode } from "../viewState.js";
 
 const CARD = "bg-surface border border-line rounded-lg";
-const SECTION_LABEL = "m-0 text-[11px] font-medium uppercase tracking-wider text-text-faint";
-const LINK_BTN = "bg-transparent border-0 p-0 text-xs text-muted hover:text-text";
 const CHIP = "rounded-full bg-surface-3 px-2 py-0.5 text-[11px] text-muted";
 
 function el(tag: string, className: string, text?: string): HTMLElement {
@@ -14,6 +12,8 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   if (text !== undefined) e.textContent = text;
   return e;
 }
+
+const tip = (e: HTMLElement, text: string) => ((e.title = text), e);
 
 const count = (csv?: string) => (csv ? csv.split(",").filter(Boolean).length : 0);
 
@@ -32,24 +32,54 @@ function summarise(f: SceneFilter): string[] {
   return out.length ? out : ["all scenes"];
 }
 
-function toggle(on: boolean, onChange: (next: boolean) => void): HTMLElement {
-  const btn = el(
-    "button",
-    `relative shrink-0 w-9 h-5 rounded-full border-0 p-0 transition-colors ${on ? "bg-accent" : "bg-surface-3"}`,
-  );
-  btn.setAttribute("role", "switch");
-  btn.setAttribute("aria-checked", String(on));
-  btn.title = on ? "Active — click to pause" : "Paused — click to resume";
-  const knob = el("span", "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform");
-  knob.style.transform = on ? "translateX(16px)" : "";
-  btn.appendChild(knob);
-  btn.addEventListener("click", () => onChange(!on));
-  return btn;
+const ICONS = {
+  bell: "M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0",
+  download: "M12 3v12M7 10l5 5 5-5M5 21h14",
+  del: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6",
+};
+
+// 28px icon button; `on` (when given) makes it a toggle: blue icon (bell also filled) when on, grey when off.
+function iconBtn(kind: keyof typeof ICONS, title: string, onClick: () => void, opts: { on?: boolean; danger?: boolean } = {}): HTMLElement {
+  const toggleable = opts.on !== undefined;
+  const color = `bg-transparent hover:bg-surface-3 ${opts.on ? "text-accent" : `text-muted ${opts.danger ? "hover:text-danger" : "hover:text-text"}`}`;
+  const b = el("button", `grid place-items-center shrink-0 w-7 h-7 rounded-md border-0 p-0 transition-colors ${color}`);
+  b.title = title;
+  b.setAttribute("aria-label", title);
+  if (toggleable) b.setAttribute("aria-pressed", String(opts.on));
+  b.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="${opts.on && kind === "bell" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ICONS[kind]}"/></svg>`;
+  b.addEventListener("click", onClick);
+  return b;
 }
+
+const SUBSCRIBE_TIP = (on: boolean) =>
+  on ? "Subscribed — new scenes appear in the Feed tab. Click to pause." : "Paused — click to subscribe and show new scenes in the Feed tab.";
+const MONITOR_TIP = (on: boolean) =>
+  `Auto-monitor ${on ? "ON" : "OFF"} — every hour, new scenes (last 7 days, max 25) are added to Whisparr and monitored for download. Only runs while subscribed. Click to turn ${on ? "off" : "on"}.`;
 
 export function renderSubscriptionsView(navigate: (tab: Tab) => void): HTMLElement {
   const container = el("div", "flex flex-col gap-5 max-w-3xl");
   const body = el("div", "flex flex-col gap-5");
+
+  // Subscribe (bell) + auto-monitor (download) toggles, shared by filter rows and Favorites.
+  function toggles(
+    subscribed: boolean,
+    autoMonitor: boolean,
+    setSubscribed: (n: boolean) => Promise<unknown>,
+    setAutoMonitor: (n: boolean) => Promise<unknown>,
+  ): HTMLElement[] {
+    const go = (set: (n: boolean) => Promise<unknown>, next: boolean) => async () => {
+      await set(next);
+      await refresh();
+    };
+    return [
+      iconBtn("bell", SUBSCRIBE_TIP(subscribed), go(setSubscribed, !subscribed), { on: subscribed }),
+      iconBtn("download", MONITOR_TIP(autoMonitor), go(setAutoMonitor, !autoMonitor), { on: autoMonitor }),
+    ];
+  }
+
+  // Active rows get an accent edge + tinted background.
+  const rowClass = (active: boolean) =>
+    `${CARD} px-3 py-3 flex items-start gap-3 border-l-4 ${active ? "border-l-accent bg-accent/5" : "border-l-transparent opacity-80"}`;
 
   function startNew() {
     const st = getState<{ filter?: SceneFilter; name: string }>("browse", { name: "" });
@@ -67,100 +97,116 @@ export function renderSubscriptionsView(navigate: (tab: Tab) => void): HTMLEleme
   }
 
   function card(f: SavedFilter): HTMLElement {
-    const row = el("div", `${CARD} px-4 py-3 flex items-center gap-4`);
+    const row = el("div", rowClass(f.subscribed));
+    row.dataset.id = f.id;
+    const grip = el("span", "shrink-0 cursor-grab text-text-faint hover:text-text select-none leading-none mt-0.5", "⠿");
+    grip.dataset.grip = "";
+    grip.title = "Drag to reorder";
     const info = el("div", "flex-1 min-w-0 flex flex-col gap-1.5");
     const name = el("button", "self-start max-w-full truncate bg-transparent border-0 p-0 text-left text-sm font-semibold text-text hover:text-link", f.name);
-    name.title = "Edit this subscription";
+    name.title = "Click to edit this subscription's filters and name";
     name.addEventListener("click", () => edit(f));
     const chips = el("div", "flex flex-wrap gap-1.5");
-    for (const s of summarise(f.filter)) chips.appendChild(el("span", CHIP, s));
+    for (const s of summarise(f.filter)) chips.appendChild(tip(el("span", CHIP, s), "Filter criteria saved with this subscription — click the name to see or change them."));
     info.append(name, chips);
 
-    const editBtn = el("button", LINK_BTN, "Edit");
-    editBtn.addEventListener("click", () => edit(f));
-
-    const rename = el("button", LINK_BTN, "Rename");
-    rename.addEventListener("click", () => {
-      const input = document.createElement("input");
-      input.value = f.name;
-      input.className = "text-sm";
-      name.replaceWith(input);
-      input.focus();
-      input.select();
-      let done = false;
-      const finish = async (save: boolean) => {
-        if (done) return;
-        done = true;
-        const next = input.value.trim();
-        if (save && next && next !== f.name) await api.renameFilter(f.id, next);
-        await refresh();
-      };
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") void finish(true);
-        if (e.key === "Escape") void finish(false);
-      });
-      input.addEventListener("blur", () => void finish(true));
-    });
-
-    const del = el("button", LINK_BTN, "Delete");
-    del.addEventListener("click", async () => {
+    const del = iconBtn("del", "Delete this subscription", async () => {
       if (!confirm(`Delete "${f.name}"?`)) return;
       await api.deleteFilter(f.id);
       await refresh();
-    });
+    }, { danger: true });
 
-    const actions = el("div", "flex items-center gap-3");
-    actions.append(editBtn, rename, del, toggle(f.subscribed, async (next) => {
-      await api.setFilterSubscribed(f.id, next);
-      await refresh();
-    }));
-    row.append(info, actions);
+    row.append(
+      grip,
+      info,
+      ...toggles(f.subscribed, f.autoAdd, (n) => api.setFilterSubscribed(f.id, n), (n) => api.setFilterAutoAdd(f.id, n)),
+      del,
+    );
     return row;
   }
 
-  function section(title: string, filters: SavedFilter[]): HTMLElement {
-    const s = el("section", "flex flex-col gap-2");
-    s.appendChild(el("h4", SECTION_LABEL, `${title} · ${filters.length}`));
-    for (const f of filters) s.appendChild(card(f));
-    return s;
+  // Favorites is a synthetic feed source, not a filters row — a pinned pseudo-row
+  // whose two switches are server settings.
+  function favoritesCard(subscribed: boolean, autoAdd: boolean): HTMLElement {
+    const row = el("div", rowClass(subscribed));
+    const info = el("div", "flex-1 min-w-0 flex flex-col gap-1.5");
+    info.appendChild(tip(el("span", "self-start text-sm font-semibold", "Favorites"), "Built-in source: new scenes from performers you've favorited on StashDB. Not a saved search, so it can't be edited or deleted."));
+    const chips = el("div", "flex flex-wrap gap-1.5");
+    chips.appendChild(el("span", CHIP, "new scenes from your StashDB favorite performers"));
+    info.appendChild(chips);
+    row.append(
+      el("span", "shrink-0 w-3"), // aligns with the drag grip on filter rows
+      info,
+      ...toggles(subscribed, autoAdd, (n) => api.setFavoritesSubscribed(n), (n) => api.setFavoritesAutoAdd(n)),
+      el("span", "shrink-0 w-7"), // aligns with the delete button on filter rows
+    );
+    return row;
+  }
+
+  // Native drag-and-drop on the grip handle; saves the DOM order on drop.
+  function enableReorder(cards: HTMLElement) {
+    let dragged: HTMLElement | null = null;
+    cards.addEventListener("dragover", (e) => {
+      if (!dragged) return;
+      e.preventDefault();
+      const after = [...cards.children].filter((c) => c !== dragged).find((c) => {
+        const r = c.getBoundingClientRect();
+        return e.clientY < r.top + r.height / 2;
+      });
+      cards.insertBefore(dragged, after ?? null);
+    });
+    cards.addEventListener("drop", (e) => e.preventDefault());
+    for (const c of cards.children as unknown as Iterable<HTMLElement>) {
+      const grip = c.querySelector<HTMLElement>("[data-grip]")!;
+      grip.addEventListener("mousedown", () => (c.draggable = true));
+      c.addEventListener("dragstart", (e) => {
+        dragged = c;
+        e.dataTransfer!.effectAllowed = "move";
+        c.classList.add("opacity-50");
+      });
+      c.addEventListener("dragend", async () => {
+        c.draggable = false;
+        c.classList.remove("opacity-50");
+        dragged = null;
+        await api.reorderFilters([...cards.children].map((x) => (x as HTMLElement).dataset.id!));
+      });
+    }
   }
 
   async function refresh() {
     let filters: SavedFilter[];
+    let favoritesSubscribed: boolean;
+    let favoritesAutoAdd: boolean;
     try {
-      filters = await api.listFilters();
+      [filters, { favoritesSubscribed, favoritesAutoAdd }] = await Promise.all([api.listFilters(), api.getConfig()]);
     } catch (err) {
       body.replaceChildren(el("p", "text-danger text-sm", `Couldn't load subscriptions: ${(err as Error).message}`));
       return;
     }
     body.replaceChildren();
-    const subscribed = filters.filter((f) => f.subscribed);
-    const saved = filters.filter((f) => !f.subscribed);
-
+    const list = el("div", "flex flex-col gap-2");
+    list.append(favoritesCard(favoritesSubscribed, favoritesAutoAdd));
+    const cards = el("div", "flex flex-col gap-2");
+    for (const f of filters) cards.appendChild(card(f));
+    enableReorder(cards);
+    list.appendChild(cards);
+    body.appendChild(list);
     if (filters.length === 0) {
-      const empty = el("div", "flex flex-col items-center gap-3 rounded-lg border border-dashed border-line py-14 px-4 text-center");
-      empty.appendChild(el("p", "m-0 text-sm font-medium", "No subscriptions yet"));
+      const empty = el("div", "flex flex-col items-center gap-3 rounded-lg border border-dashed border-line py-10 px-4 text-center");
+      empty.appendChild(el("p", "m-0 text-sm font-medium", "No saved searches yet"));
       empty.appendChild(el("p", "m-0 text-sm text-muted", "Follow a search and its new scenes will appear in your Feed."));
       const btn = el("button", PRIMARY_BTN, "New subscription");
       btn.addEventListener("click", startNew);
       empty.appendChild(btn);
       body.appendChild(empty);
-      return;
-    }
-    if (subscribed.length) body.appendChild(section("Active", subscribed));
-    else body.appendChild(el("p", "text-muted text-sm", "Nothing active. Resume a paused search below, or add a new one."));
-    if (saved.length) {
-      const s = section("Paused", saved);
-      s.classList.add("opacity-80");
-      body.appendChild(s);
     }
   }
 
   const header = el("div", "flex items-start justify-between gap-4 flex-wrap");
   const titles = el("div", "flex flex-col gap-1");
   titles.appendChild(el("h3", "m-0 text-base font-semibold", "Subscriptions"));
-  titles.appendChild(el("p", "m-0 text-sm text-muted", "Your saved searches. Active ones feed new scenes into the Feed tab."));
-  const add = el("button", PRIMARY_BTN, "+ New subscription");
+  titles.appendChild(el("p", "m-0 text-sm text-muted", "Your saved searches. Subscribed ones feed new scenes into the Feed tab."));
+  const add = tip(el("button", PRIMARY_BTN, "+ New subscription"), "Open Browse and build a search to subscribe to");
   add.addEventListener("click", startNew);
   header.append(titles, add);
 

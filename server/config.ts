@@ -9,6 +9,8 @@ export interface AppConfig {
   whisparrApiKey?: string;
   whisparrRootFolderPath?: string;
   whisparrQualityProfileId?: number;
+  favoritesSubscribed?: boolean; // Favorites feed source on/off (default on)
+  favoritesAutoAdd?: boolean; // hourly job also adds new releases from StashDB favorite performers
   cfAccessClientId?: string;
   cfAccessClientSecret?: string;
   authMode: "off" | "local" | "oidc";

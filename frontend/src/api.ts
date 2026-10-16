@@ -160,6 +160,12 @@ export const api = {
       body: JSON.stringify({ monitored }),
     }),
   listFilters: () => req<SavedFilter[]>(`/api/filters`),
+  reorderFilters: (ids: string[]) =>
+    req(`/api/filters/order`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    }),
   saveFilter: (name: string, filter: SceneFilter) =>
     req<SavedFilter>(`/api/filters`, {
       method: "POST",
@@ -172,6 +178,24 @@ export const api = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscribed }),
+    }),
+  setFilterAutoAdd: (id: string, autoAdd: boolean) =>
+    req<SavedFilter>(`/api/filters/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoAdd }),
+    }),
+  setFavoritesSubscribed: (enabled: boolean) =>
+    req(`/api/settings/favorites-subscribed`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }),
+  setFavoritesAutoAdd: (enabled: boolean) =>
+    req(`/api/settings/favorites-auto-add`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
     }),
   renameFilter: (id: string, name: string) =>
     req<SavedFilter>(`/api/filters/${id}`, {
@@ -215,6 +239,8 @@ export const api = {
       whisparrApiKeySet: boolean;
       whisparrRootFolderPath: string;
       whisparrQualityProfileId: number | null;
+      favoritesSubscribed: boolean;
+      favoritesAutoAdd: boolean;
       cfAccessClientId: string;
       cfAccessClientSecretSet: boolean;
       authMode: "off" | "local" | "oidc";

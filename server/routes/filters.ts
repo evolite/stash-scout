@@ -7,8 +7,17 @@ export function filtersRouter() {
   const router = Router();
 
   router.get("/filters", (_req, res) => {
-    const rows = db.prepare("SELECT * FROM filters ORDER BY created_at").all();
+    const rows = db.prepare("SELECT * FROM filters ORDER BY position, created_at").all();
     res.json(rows.map(rowToFilter));
+  });
+
+  // Body: { ids: string[] } in the desired order. Position is the array index.
+  router.put("/filters/order", (req, res) => {
+    const ids = req.body.ids;
+    if (!Array.isArray(ids) || !ids.every((i) => typeof i === "string")) return void res.status(400).json({ error: "ids must be a string array" });
+    const set = db.prepare("UPDATE filters SET position = ? WHERE id = ?");
+    ids.forEach((id, i) => set.run(i + 1, id));
+    res.status(204).end();
   });
 
   router.post("/filters", (req, res) => {
@@ -18,8 +27,9 @@ export function filtersRouter() {
       createdAt: new Date().toISOString(),
       filter: req.body.filter ?? {},
       subscribed: false,
+      autoAdd: false,
     };
-    db.prepare("INSERT INTO filters (id, name, created_at, filter, watched) VALUES (?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO filters (id, name, created_at, filter, watched, auto_add, position) VALUES (?, ?, ?, ?, ?, 0, (SELECT COALESCE(MAX(position), 0) + 1 FROM filters))").run(
       entry.id,
       entry.name,
       entry.createdAt,
@@ -34,12 +44,14 @@ export function filtersRouter() {
     if (!row) return void res.status(404).end();
     const entry = rowToFilter(row);
     if (typeof req.body.subscribed === "boolean") entry.subscribed = req.body.subscribed;
+    if (typeof req.body.autoAdd === "boolean") entry.autoAdd = req.body.autoAdd;
     if (req.body.filter && typeof req.body.filter === "object") entry.filter = req.body.filter;
     if (typeof req.body.name === "string" && req.body.name.trim()) entry.name = req.body.name.trim();
-    db.prepare("UPDATE filters SET name = ?, filter = ?, watched = ? WHERE id = ?").run(
+    db.prepare("UPDATE filters SET name = ?, filter = ?, watched = ?, auto_add = ? WHERE id = ?").run(
       entry.name,
       JSON.stringify(entry.filter),
       entry.subscribed ? 1 : 0,
+      entry.autoAdd ? 1 : 0,
       entry.id,
     );
     res.json(entry);
