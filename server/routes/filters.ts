@@ -16,7 +16,14 @@ export function filtersRouter() {
     const ids = req.body.ids;
     if (!Array.isArray(ids) || !ids.every((i) => typeof i === "string")) return void res.status(400).json({ error: "ids must be a string array" });
     const set = db.prepare("UPDATE filters SET position = ? WHERE id = ?");
-    ids.forEach((id, i) => set.run(i + 1, id));
+    db.exec("BEGIN");
+    try {
+      ids.forEach((id, i) => set.run(i + 1, id));
+      db.exec("COMMIT");
+    } catch (err) {
+      db.exec("ROLLBACK");
+      throw err;
+    }
     res.status(204).end();
   });
 

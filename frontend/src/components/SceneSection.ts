@@ -56,15 +56,32 @@ export function renderSceneSection(opts: {
   // already-ignored cards right back.
   let currentScenes: Scene[] = [];
 
+  // Bumped per load(): a slower earlier page/status response must not paint over a newer one.
+  let seq = 0;
+  const cards = new Map<string, HTMLElement>();
+
+  function buildCard(scene: Scene): HTMLElement {
+    const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id), () => {
+      currentScenes = currentScenes.filter((s) => s.id !== scene.id);
+      cards.delete(scene.id);
+      card.remove();
+    });
+    cards.set(scene.id, card);
+    return card;
+  }
+
   function renderGrid() {
     hidePreview();
-    grid.innerHTML = "";
+    cards.clear();
+    grid.replaceChildren(...currentScenes.map(buildCard));
+  }
+
+  // A status change only needs the affected cards rebuilt, not the whole grid.
+  function patchCards(ids: Set<string>) {
+    if (ids.size === 0) return;
+    hidePreview();
     for (const scene of currentScenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id), () => {
-        currentScenes = currentScenes.filter((s) => s.id !== scene.id);
-        card.remove();
-      });
-      grid.appendChild(card);
+      if (ids.has(scene.id)) cards.get(scene.id)?.replaceWith(buildCard(scene));
     }
   }
 
@@ -74,14 +91,22 @@ export function renderSceneSection(opts: {
   // Stash lookups per scene, and re-running it on every single click was what
   // made "adding something" feel slow (16 cards' worth of lookups per click).
   async function refreshOneStatus(id: string) {
+    const my = seq;
     const result = await api.sceneStatuses([id]);
+    if (my !== seq) return;
     statuses = { ...statuses, ...result };
-    renderGrid();
+    patchCards(new Set([id]));
   }
 
   async function refreshStatuses() {
-    statuses = await api.sceneStatuses(currentScenes.map((s) => s.id));
-    renderGrid();
+    const my = seq;
+    const ids = currentScenes.map((s) => s.id);
+    if (ids.length === 0) return;
+    const next = await api.sceneStatuses(ids);
+    if (my !== seq) return;
+    const changed = new Set(ids.filter((id) => JSON.stringify(next[id]) !== JSON.stringify(statuses[id])));
+    statuses = next;
+    patchCards(changed);
   }
 
   function updatePagination(count: number, approximate: boolean) {
@@ -110,6 +135,7 @@ export function renderSceneSection(opts: {
   // failed fetch (a transient StashDB error, say) leaves the grid pulsing
   // forever with no way to clear it.
   async function load(bypassCache = false) {
+    const mine = ++seq;
     const isFirstLoad = grid.children.length === 0;
     if (isFirstLoad) {
       grid.replaceChildren(renderSpinner());
@@ -119,6 +145,7 @@ export function renderSceneSection(opts: {
 
     try {
       const { count, scenes, approximateCount } = await opts.fetchPage(page, bypassCache);
+      if (mine !== seq) return;
       statuses = {};
       currentScenes = scenes;
 
@@ -148,7 +175,7 @@ export function renderSceneSection(opts: {
         void opts.fetchPage(page + 1).catch(() => {});
       }
     } finally {
-      grid.classList.remove("animate-breathe", "pointer-events-none");
+      if (mine === seq) grid.classList.remove("animate-breathe", "pointer-events-none");
     }
   }
 

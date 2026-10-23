@@ -16,7 +16,14 @@ export const GENDERS = [
 const KEY = "shownGenders";
 const DEFAULT_SHOWN = ["FEMALE"];
 
+// Memoized: isGenderShown runs per performer per card on every grid render.
+let shownCache: Set<string> | undefined;
+
 export function getShownGenders(): Set<string> {
+  return new Set((shownCache ??= readShownGenders()));
+}
+
+function readShownGenders(): Set<string> {
   const raw = localStorage.getItem(KEY);
   if (!raw) return new Set(DEFAULT_SHOWN);
   try {
@@ -31,12 +38,13 @@ export function setGenderShown(gender: string, shown: boolean): void {
   const current = getShownGenders();
   if (shown) current.add(gender);
   else current.delete(gender);
+  shownCache = current;
   localStorage.setItem(KEY, JSON.stringify([...current]));
 }
 
 export function isGenderShown(gender: string | null): boolean {
   if (gender === null) return true;
-  return getShownGenders().has(gender);
+  return (shownCache ??= readShownGenders()).has(gender);
 }
 
 const HIDE_GAY_KEY = "hideGayScenes";

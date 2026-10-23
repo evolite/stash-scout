@@ -103,9 +103,19 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
     }
   }
 
+  // Bumped per load(): a slower earlier response must not paint over a newer one.
+  let seq = 0;
+  const cards = new Map<string, HTMLElement>();
+
   async function refreshStatuses(scenes: Scene[]) {
-    statuses = await api.sceneStatuses(scenes.map((s) => s.id));
-    renderGrid(scenes);
+    const my = seq;
+    const ids = scenes.map((s) => s.id);
+    if (ids.length === 0) return;
+    const next = await api.sceneStatuses(ids);
+    if (my !== seq) return;
+    const changed = new Set(ids.filter((id) => JSON.stringify(next[id]) !== JSON.stringify(statuses[id])));
+    statuses = next;
+    patchCards(scenes, changed);
     schedulePollingIfDownloading(scenes);
   }
 
@@ -113,24 +123,39 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
   // visible card's — re-running the full batch on every click was fanning out
   // to up to 2 sequential local Stash lookups per scene on the whole page.
   async function refreshOneStatus(id: string, scenes: Scene[]) {
+    const my = seq;
     const result = await api.sceneStatuses([id]);
+    if (my !== seq) return;
     statuses = { ...statuses, ...result };
-    renderGrid(scenes);
+    patchCards(scenes, new Set([id]));
     schedulePollingIfDownloading(scenes);
+  }
+
+  function buildCard(scene: Scene, scenes: Scene[]): HTMLElement {
+    const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id, scenes), () => {
+      scenes.splice(scenes.indexOf(scene), 1);
+      cards.delete(scene.id);
+      hidePreview();
+      card.remove();
+    });
+    cards.set(scene.id, card);
+    return card;
   }
 
   function renderGrid(scenes: Scene[]) {
     const grid = contentCol.querySelector(".SceneGrid");
     if (!grid) return;
     hidePreview();
-    grid.innerHTML = "";
+    cards.clear();
+    grid.replaceChildren(...scenes.map((s) => buildCard(s, scenes)));
+  }
+
+  // A status change only needs the affected cards rebuilt, not the whole grid.
+  function patchCards(scenes: Scene[], ids: Set<string>) {
+    if (ids.size === 0) return;
+    hidePreview();
     for (const scene of scenes) {
-      const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id, scenes), () => {
-        scenes.splice(scenes.indexOf(scene), 1);
-        hidePreview();
-        card.remove();
-      });
-      grid.appendChild(card);
+      if (ids.has(scene.id)) cards.get(scene.id)?.replaceWith(buildCard(scene, scenes));
     }
   }
 
@@ -145,6 +170,7 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
   }
 
   async function load() {
+    const mine = ++seq;
     st.filter = filter;
     st.name = loadedFilterName;
     clearInterval(pollTimer);
@@ -153,6 +179,7 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
     contentCol.appendChild(renderSkeletonGrid());
     try {
       const { count, scenes, approximateCount } = await api.queryScenes({ ...filter, unadded: isInLibraryMode() ? undefined : "1" });
+      if (mine !== seq) return;
       statuses = {};
       contentCol.innerHTML = "";
       const grid = document.createElement("div");
@@ -162,6 +189,7 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
       renderGrid(scenes);
       refreshStatuses(scenes);
     } catch (err) {
+      if (mine !== seq) return;
       contentCol.innerHTML = "";
       contentCol.appendChild(textState(`Failed to load scenes: ${(err as Error).message}`));
     }

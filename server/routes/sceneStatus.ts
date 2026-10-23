@@ -14,7 +14,7 @@ export function sceneStatusRouter(cfg: AppConfig, localStash: LocalStashClient, 
 
   // Batched status lookup for a whole grid page: /api/scenes/status?ids=a,b,c
   router.get("/scenes/status", async (req, res) => {
-    const ids = String(req.query.ids ?? "").split(",").filter(Boolean).slice(0, MAX_STATUS_IDS);
+    const ids = [...new Set(String(req.query.ids ?? "").split(",").filter(Boolean))].slice(0, MAX_STATUS_IDS);
     const entries = await Promise.all(
       ids.map(async (id) => [id, await getSceneStatus(cfg, id, { localStash, whisparr })] as const),
     );

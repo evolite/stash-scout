@@ -43,6 +43,8 @@ async function gql<T>(url: string, apiKey: string, query: string, variables: unk
 // caches (EXCLUDE_CACHE_TTL_MS / MERGED_FEED_TTL_MS) for consistency.
 const SCENE_ID_CACHE_TTL_MS = 5 * 60_000;
 const SCENE_ID_CACHE_MAX_ENTRIES = 2000;
+const NOT_FOUND_TTL_MS = 30_000;
+const BATCH_MAX = 50;
 const sceneIdCache = new Map<string, { at: number; promise: Promise<string | null> }>();
 
 // Ported from StashSeer's getLocalStashSceneIdByStashId: try URL match first,
@@ -59,53 +61,50 @@ export class LocalStashClient {
       sceneIdCache.delete(stashId);
       throw err;
     });
-    sceneIdCache.set(stashId, { at: Date.now(), promise });
+    const entry = { at: Date.now(), promise };
+    sceneIdCache.set(stashId, entry);
+    // A scene just scanned into Stash shouldn't read "not added" for the full TTL.
+    void promise.then((id) => {
+      if (id === null) entry.at -= SCENE_ID_CACHE_TTL_MS - NOT_FOUND_TTL_MS;
+    });
     capMap(sceneIdCache, SCENE_ID_CACHE_MAX_ENTRIES);
     return promise;
   }
 
-  private async lookupSceneIdByStashId(stashId: string): Promise<string | null> {
-    const url = this.cfg.localStashUrl!;
-    const apiKey = this.cfg.localStashApiKey!;
+  // Lookups issued in the same tick (a grid page's Promise.all) are flushed as
+  // one request with aliased findScenes, instead of 1-2 round trips per scene.
+  private pending: { stashId: string; resolve: (id: string | null) => void }[] = [];
 
-    try {
-      const byUrl = await gql<{ findScenes: { scenes: { id: string }[] } }>(
-        url,
-        apiKey,
-        `query ($scene_filter: SceneFilterType) {
-          findScenes(scene_filter: $scene_filter) { scenes { id } }
-        }`,
-        {
-          scene_filter: {
-            url: { modifier: "EQUALS", value: `https://stashdb.org/scenes/${stashId}` },
-          },
-        },
-        this.cfg,
-      );
-      const found = byUrl.findScenes.scenes[0]?.id;
-      if (found) return found;
-    } catch {
-      // fall through to stash_id_endpoint lookup
-    }
+  private lookupSceneIdByStashId(stashId: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      if (this.pending.push({ stashId, resolve }) === 1) queueMicrotask(() => this.flush());
+    });
+  }
 
+  private flush() {
+    const batch = this.pending.splice(0);
+    for (let i = 0; i < batch.length; i += BATCH_MAX) void this.lookupBatch(batch.slice(i, i + BATCH_MAX));
+  }
+
+  // URL match first, then stash_id_endpoint (see StashSeer note above) — both
+  // aliased per scene; the URL hit wins when both match.
+  private async lookupBatch(batch: { stashId: string; resolve: (id: string | null) => void }[]) {
+    const defs: string[] = [];
+    const fields: string[] = [];
+    const variables: Record<string, unknown> = {};
+    batch.forEach(({ stashId }, i) => {
+      defs.push(`$u${i}: SceneFilterType, $s${i}: SceneFilterType`);
+      fields.push(`u${i}: findScenes(scene_filter: $u${i}) { scenes { id } } s${i}: findScenes(scene_filter: $s${i}) { scenes { id } }`);
+      variables[`u${i}`] = { url: { modifier: "EQUALS", value: `https://stashdb.org/scenes/${stashId}` } };
+      variables[`s${i}`] = { stash_id_endpoint: { endpoint: "", modifier: "EQUALS", stash_id: stashId } };
+    });
+    let data: Record<string, { scenes: { id: string }[] }> | undefined;
     try {
-      const byStashId = await gql<{ findScenes: { scenes: { id: string }[] } }>(
-        url,
-        apiKey,
-        `query ($scene_filter: SceneFilterType) {
-          findScenes(scene_filter: $scene_filter) { scenes { id } }
-        }`,
-        {
-          scene_filter: {
-            stash_id_endpoint: { endpoint: "", modifier: "EQUALS", stash_id: stashId },
-          },
-        },
-        this.cfg,
-      );
-      return byStashId.findScenes.scenes[0]?.id ?? null;
+      data = await gql(this.cfg.localStashUrl!, this.cfg.localStashApiKey!, `query (${defs.join(", ")}) { ${fields.join(" ")} }`, variables, this.cfg);
     } catch {
-      return null;
+      // unreachable/erroring Stash: treat as not found, as the per-scene lookup did
     }
+    batch.forEach(({ resolve }, i) => resolve(data?.[`u${i}`]?.scenes[0]?.id ?? data?.[`s${i}`]?.scenes[0]?.id ?? null));
   }
 
   async testConnection(): Promise<boolean> {

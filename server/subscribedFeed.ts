@@ -90,6 +90,9 @@ export async function getSubscribedFeed(
   // internal calls would wipe out progress made by the previous call.
   const reseed = (randomize && page === 1) || refresh;
   let pendingReset = reseed;
+  // One-shot like pendingReset: bypassing on every internal round would wipe
+  // the merged-feed cursors each time and re-walk every source from page 1.
+  let pendingBypass = refresh;
   const unadded = opts.unadded !== false;
   return fetchFilteredPage(
     cfg,
@@ -97,9 +100,11 @@ export async function getSubscribedFeed(
     (rawPage, pp) => {
       const reset = pendingReset;
       pendingReset = false;
+      const bypassCache = pendingBypass;
+      pendingBypass = false;
       // Ignored scenes are dropped by fetchFilteredPage instead — filtering
       // them here would shift raw page boundaries under its cursor.
-      return stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, new Set(), { randomize, reset, bypassCache: refresh });
+      return stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, new Set(), { randomize, reset, bypassCache });
     },
     page,
     perPage,

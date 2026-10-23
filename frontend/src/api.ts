@@ -68,7 +68,25 @@ export function setSessionActive(on: boolean): void {
   sessionActive = on;
 }
 
+// Read-only endpoints that every view re-requests on mount (filters, config,
+// stats badge...). Concurrent + recent calls share one request; any mutation
+// (non-GET) drops everything. Callers get a clone, so they can't corrupt the cache.
+const getCache = new Map<string, { at: number; promise: Promise<unknown> }>();
+function cachedGet<T>(path: string, ttlMs = 30_000): Promise<T> {
+  let hit = getCache.get(path);
+  if (!hit || Date.now() - hit.at > ttlMs) {
+    const promise = req<T>(path).catch((err) => {
+      getCache.delete(path);
+      throw err;
+    });
+    hit = { at: Date.now(), promise };
+    getCache.set(path, hit);
+  }
+  return hit.promise.then((v) => structuredClone(v) as T);
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (init.method && init.method !== "GET") getCache.clear();
   const res = await fetch(path, init);
   // Session expired mid-use: reload so main.ts shows the login view. Only once
   // main.ts has confirmed we were logged in — module-level fetches (Navbar's
@@ -159,7 +177,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ monitored }),
     }),
-  listFilters: () => req<SavedFilter[]>(`/api/filters`),
+  listFilters: () => cachedGet<SavedFilter[]>(`/api/filters`),
   reorderFilters: (ids: string[]) =>
     req(`/api/filters/order`, {
       method: "PUT",
@@ -224,12 +242,12 @@ export const api = {
     }),
   logout: () => req(`/api/auth/logout`, { method: "POST" }),
   settings: () =>
-    req<{ stashdbConfigured: boolean; localStashConfigured: boolean; whisparrConfigured: boolean; whisparrFullyConfigured: boolean }>(
+    cachedGet<{ stashdbConfigured: boolean; localStashConfigured: boolean; whisparrConfigured: boolean; whisparrFullyConfigured: boolean }>(
       `/api/settings`,
     ),
   testSettings: () => req<{ stashdb: boolean; localStash: boolean; whisparr: boolean }>(`/api/settings/test`),
   getConfig: () =>
-    req<{
+    cachedGet<{
       stashdbUrl: string;
       stashdbApiKeySet: boolean;
       localStashUrl: string;
@@ -259,10 +277,10 @@ export const api = {
     }),
   whisparrOptions: () =>
     req<{ rootFolders: { id: number; path: string }[]; qualityProfiles: { id: number; name: string }[] }>(`/api/whisparr/options`),
-  stats: () => req<StatsSummary>(`/api/stats`),
+  stats: () => cachedGet<StatsSummary>(`/api/stats`, 5_000),
   version: (refresh = false) => req<VersionInfo>(`/api/version${refresh ? "?refresh=1" : ""}`),
   changelog: () => req<{ markdown: string }>(`/api/changelog`),
-  listGlobalExcludeTags: () => req<GlobalExcludeTag[]>(`/api/global-exclude-tags`),
+  listGlobalExcludeTags: () => cachedGet<GlobalExcludeTag[]>(`/api/global-exclude-tags`),
   addGlobalExcludeTag: (id: string, name: string) =>
     req<GlobalExcludeTag[]>(`/api/global-exclude-tags`, {
       method: "POST",

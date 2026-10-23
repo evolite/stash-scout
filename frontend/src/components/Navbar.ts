@@ -141,11 +141,14 @@ void loadNavbarConfig();
 // this is switched on. Read by SubscribedView.ts when building its queries.
 const IN_LIBRARY_KEY = "inLibraryMode";
 
+// Read once per grid render by every card — memoized so it isn't a localStorage hit per card.
+let inLibraryCache: boolean | undefined;
 export function isInLibraryMode(): boolean {
-  return localStorage.getItem(IN_LIBRARY_KEY) === "1";
+  return (inLibraryCache ??= localStorage.getItem(IN_LIBRARY_KEY) === "1");
 }
 
 function setInLibraryMode(on: boolean): void {
+  inLibraryCache = on;
   localStorage.setItem(IN_LIBRARY_KEY, on ? "1" : "0");
 }
 
@@ -217,7 +220,8 @@ function refreshBadgeVisibility(): void {
 
 async function refreshDownloadingBadges(): Promise<void> {
   const badge = currentBadge;
-  if (!badge) return;
+  // No Whisparr → badge is hidden; hidden tab → nobody is looking. Skip the (slow) /api/stats proxy call.
+  if (!badge || !whisparrBaseUrl || document.hidden) return;
   try {
     const stats = await api.stats();
     const label = badge.querySelector<HTMLElement>(".js-dl-label")!;

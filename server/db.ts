@@ -102,6 +102,8 @@ function migrateFromJson(db: DatabaseSync, dataDir: string): void {
 
 export function openDb(dataDir: string): DatabaseSync {
   const db = new DatabaseSync(path.join(dataDir, "app.db"));
+  // WAL: writers don't block readers and small writes skip the per-commit fsync of the rollback journal.
+  db.exec("PRAGMA journal_mode = WAL");
   db.exec(SCHEMA);
   // No migration system in this project (SCHEMA is CREATE IF NOT EXISTS only),
   // so the first-ever column add is a guarded ALTER: duplicate-column error

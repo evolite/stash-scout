@@ -30,6 +30,10 @@ const FETCH_TIMEOUT_MS = 15_000;
 export class WhisparrClient {
   private movieListCache?: { fetchedAt: number; promise: Promise<WhisparrScene[]> };
   private queueCache?: { fetchedAt: number; promise: Promise<WhisparrQueueItem[]> };
+  // O(1) lookups per scene instead of a linear scan of the whole library; rebuilt
+  // only when the underlying array changes.
+  private movieIndex?: { list: WhisparrScene[]; byKey: Map<string, WhisparrScene>; byId: Map<number, WhisparrScene> };
+  private queueIndex?: { list: WhisparrQueueItem[]; byMovieId: Map<number, WhisparrQueueItem> };
 
   constructor(private readonly cfg: AppConfig) {}
 
@@ -72,8 +76,36 @@ export class WhisparrClient {
   }
 
   async getSceneByStashId(stashId: string): Promise<WhisparrScene | null> {
+    return (await this.getMovieIndex()).byKey.get(stashId) ?? null;
+  }
+
+  private async getMovieIndex() {
     const list = await this.getMovieList();
-    return list.find((m) => m.stashId === stashId || m.foreignId === stashId) ?? null;
+    if (this.movieIndex?.list !== list) {
+      const byKey = new Map<string, WhisparrScene>();
+      const byId = new Map<number, WhisparrScene>();
+      for (const m of list) {
+        // first match wins, as the old list.find did
+        if (m.stashId && !byKey.has(m.stashId)) byKey.set(m.stashId, m);
+        if (m.foreignId && !byKey.has(m.foreignId)) byKey.set(m.foreignId, m);
+        byId.set(m.id, m);
+      }
+      this.movieIndex = { list, byKey, byId };
+    }
+    return this.movieIndex;
+  }
+
+  // Swap the mutated movie into the cached list so the next status check
+  // doesn't re-download the whole /movie library.
+  private async patchMovie(movie: WhisparrScene) {
+    const cache = this.movieListCache;
+    if (!cache) return;
+    const list = await cache.promise.catch(() => undefined);
+    if (!list || this.movieListCache !== cache) return;
+    const i = list.findIndex((m) => m.id === movie.id);
+    if (i >= 0) list[i] = movie;
+    else list.push(movie);
+    this.movieIndex = undefined;
   }
 
   private getQueue(): Promise<WhisparrQueueItem[]> {
@@ -93,7 +125,12 @@ export class WhisparrClient {
 
   async getQueueForMovie(movieId: number): Promise<WhisparrQueueItem | null> {
     const queue = await this.getQueue();
-    return queue.find((q) => q.movieId === movieId) ?? null;
+    if (this.queueIndex?.list !== queue) {
+      const byMovieId = new Map<number, WhisparrQueueItem>();
+      for (const q of queue) if (!byMovieId.has(q.movieId)) byMovieId.set(q.movieId, q);
+      this.queueIndex = { list: queue, byMovieId };
+    }
+    return this.queueIndex.byMovieId.get(movieId) ?? null;
   }
 
   // For the stats dashboard's bulk classification — reuses the same cached
@@ -105,14 +142,13 @@ export class WhisparrClient {
   }
 
   async setMonitored(movieId: number, monitored: boolean): Promise<WhisparrScene> {
-    const list = await this.getMovieList();
-    const movie = list.find((m) => m.id === movieId);
+    const movie = (await this.getMovieIndex()).byId.get(movieId);
     if (!movie) throw new Error(`Whisparr movie ${movieId} not found`);
     const updated = await this.request<WhisparrScene>(`/movie/${movieId}`, {
       method: "PUT",
       body: JSON.stringify({ ...movie, monitored }),
     });
-    this.movieListCache = undefined;
+    await this.patchMovie(updated);
     return updated;
   }
 
@@ -131,7 +167,7 @@ export class WhisparrClient {
       addOptions: { monitor: "none", searchForMovie: true },
     };
     const result = await this.request<WhisparrScene>("/movie", { method: "POST", body: JSON.stringify(body) });
-    this.movieListCache = undefined;
+    await this.patchMovie(result);
     return result;
   }
 
