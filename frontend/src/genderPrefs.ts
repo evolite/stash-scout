@@ -20,7 +20,8 @@ const DEFAULT_SHOWN = ["FEMALE"];
 let shownCache: Set<string> | undefined;
 
 export function getShownGenders(): Set<string> {
-  return new Set((shownCache ??= readShownGenders()));
+  shownCache ??= readShownGenders();
+  return new Set(shownCache);
 }
 
 function readShownGenders(): Set<string> {
@@ -44,7 +45,8 @@ export function setGenderShown(gender: string, shown: boolean): void {
 
 export function isGenderShown(gender: string | null): boolean {
   if (gender === null) return true;
-  return (shownCache ??= readShownGenders()).has(gender);
+  shownCache ??= readShownGenders();
+  return shownCache.has(gender);
 }
 
 const HIDE_GAY_KEY = "hideGayScenes";

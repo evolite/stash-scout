@@ -144,7 +144,8 @@ const IN_LIBRARY_KEY = "inLibraryMode";
 // Read once per grid render by every card — memoized so it isn't a localStorage hit per card.
 let inLibraryCache: boolean | undefined;
 export function isInLibraryMode(): boolean {
-  return (inLibraryCache ??= localStorage.getItem(IN_LIBRARY_KEY) === "1");
+  inLibraryCache ??= localStorage.getItem(IN_LIBRARY_KEY) === "1";
+  return inLibraryCache;
 }
 
 function setInLibraryMode(on: boolean): void {

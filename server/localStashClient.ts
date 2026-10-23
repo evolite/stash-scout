@@ -73,7 +73,7 @@ export class LocalStashClient {
 
   // Lookups issued in the same tick (a grid page's Promise.all) are flushed as
   // one request with aliased findScenes, instead of 1-2 round trips per scene.
-  private pending: { stashId: string; resolve: (id: string | null) => void }[] = [];
+  private readonly pending: { stashId: string; resolve: (id: string | null) => void }[] = [];
 
   private lookupSceneIdByStashId(stashId: string): Promise<string | null> {
     return new Promise((resolve) => {
