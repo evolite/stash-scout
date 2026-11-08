@@ -378,7 +378,7 @@ export class StashDBClient {
       entry.performers.length < MAX_CACHED_PERFORMERS &&
       scannedThisRequest < PERFORMER_SCAN_BUDGET
     ) {
-      const { performers } = await this.rawQueryPerformers(
+      const { performers } = await this.rawQueryPerformers( // NOSONAR: next page depends on this one (internalPage/exhausted)
         { ...input, page: entry.internalPage, per_page: MAX_PER_PAGE },
         bypassCache,
       );
@@ -426,7 +426,7 @@ export class StashDBClient {
     const excludeSet = new Set(excludeTagIds);
 
     for (let fetched = 0; entry.scenes.length < skip + perPage && !entry.exhausted && fetched < SCENE_SCAN_BUDGET; fetched++) {
-      const { scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache);
+      const { scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache); // NOSONAR: next page depends on this one (internalPage/exhausted)
       for (const scene of scenes) {
         if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
       }
@@ -495,7 +495,7 @@ export class StashDBClient {
     const excludeSet = new Set(excludeTagIds);
 
     for (let fetched = 0; entry.scenes.length < skip + perPage && !entry.exhausted && fetched < SCENE_SCAN_BUDGET; fetched++) {
-      await this.advanceRandomWindowEntry(entry, baseInput, excludeSet, opts.bypassCache);
+      await this.advanceRandomWindowEntry(entry, baseInput, excludeSet, opts.bypassCache); // NOSONAR: next page depends on this one (internalPage/exhausted)
     }
 
     return {
@@ -578,7 +578,7 @@ export class StashDBClient {
       // still caps actual dispatch, this just stops each source's round-trip
       // latency from stacking. Each advance does its await then a synchronous
       // dedup-and-append, so concurrent sources can't interleave a duplicate.
-      await Promise.all(
+      await Promise.all( // NOSONAR: each merge round depends on the previous round's cursors
         sources.map((src, i) => this.advanceMergedFeedSource(entry!, src, entry!.cursors[i], opts)),
       );
       entry.exhaustedAll = entry.cursors.every((c) => c.exhausted);

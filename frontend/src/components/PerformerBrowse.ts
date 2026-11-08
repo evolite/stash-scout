@@ -241,7 +241,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     loadedName = "";
     leaveDetail();
     renderSidebarCol();
-    load();
+    void load();
   }
 
   // A sidebar action (apply / load saved search) while viewing a performer
@@ -302,7 +302,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
         approximate: !!result.approximateCount,
         onPage: (page) => {
           filter = { ...filter, page };
-          load();
+          void load();
         },
       }),
     );
@@ -514,7 +514,7 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     }
 
     mountSection();
-    api.listFilters().then((filters) => {
+    void api.listFilters().then((filters) => {
       if (detailId !== id) return;
       subscribedFilters = filters.filter((f) => f.subscribed);
       renderChips();

@@ -130,7 +130,7 @@ async function loadNavbarConfig(): Promise<void> {
     whisparrBaseUrl = cfg.whisparrBaseUrl ?? "";
     refreshStashLinks();
     refreshBadgeVisibility();
-    refreshDownloadingBadges();
+    void refreshDownloadingBadges();
   } catch {
     // leave both empty — links just won't render
   }
@@ -278,7 +278,7 @@ function renderDownloadingBadge(): HTMLElement {
 
   currentBadge = badge;
   refreshBadgeVisibility();
-  refreshDownloadingBadges();
+  void refreshDownloadingBadges();
   return badge;
 }
 

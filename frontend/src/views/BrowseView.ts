@@ -69,7 +69,7 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
 
   function applyFilter(next: SceneFilter) {
     filter = { ...filter, ...next };
-    load();
+    void load();
   }
 
   // Saves the drafted sidebar filter as a subscription ("new": same name
@@ -187,7 +187,7 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
       contentCol.appendChild(grid);
       contentCol.appendChild(buildPagination(count, !!approximateCount));
       renderGrid(scenes);
-      refreshStatuses(scenes);
+      void refreshStatuses(scenes);
     } catch (err) {
       if (mine !== seq) return;
       contentCol.innerHTML = "";
@@ -196,7 +196,7 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
   }
 
   renderSidebar();
-  if (st.filter) load();
+  if (st.filter) void load();
   else contentCol.appendChild(emptyState("Set filters, then Apply", "Or restore a saved filter from the sidebar."));
 
   return container;

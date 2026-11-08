@@ -120,7 +120,7 @@ export function renderSceneSection(opts: {
         onPage: (p) => {
           page = p;
           pageState.page = p;
-          load();
+          void load();
         },
       }),
     );
@@ -166,7 +166,7 @@ export function renderSceneSection(opts: {
       }
       updatePagination(count, !!approximateCount);
       renderGrid();
-      refreshStatuses();
+      void refreshStatuses();
 
       // Warm the next page into the server-side cache so clicking "→" renders
       // instantly. Fire-and-forget; errors are irrelevant (it's a prefetch).
@@ -181,13 +181,13 @@ export function renderSceneSection(opts: {
 
   function reset() {
     page = pageState.page = 1;
-    load();
+    void load();
   }
 
   async function refresh() {
     await load(true);
   }
 
-  load();
+  void load();
   return { element, reset, refresh };
 }

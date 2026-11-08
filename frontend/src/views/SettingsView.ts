@@ -420,7 +420,7 @@ export function renderSettingsView(): HTMLElement {
     excludeTitle.title = "Hidden everywhere scenes are fetched — Scenes and the Feed — instead of adding the same exclude to every saved filter.";
     excludePanel.append(excludeTitle);
     addPage("Browsing", "exclude", "Global Exclusion Filters", excludePanel, false);
-    renderExcludeTagsPanel().then((p) => excludePanel.appendChild(p));
+    void renderExcludeTagsPanel().then((p) => excludePanel.appendChild(p));
 
     // --- Save bar ---
     const saveBar = document.createElement("div");
@@ -491,6 +491,6 @@ export function renderSettingsView(): HTMLElement {
     });
   }
 
-  render();
+  void render();
   return container;
 }

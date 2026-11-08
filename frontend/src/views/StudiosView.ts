@@ -120,7 +120,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
 
   searchRow.appendChild(renderStudioSearch((id, name) => loadStudio(id, name)));
 
-  api.listFilters().then((filters) => {
+  void api.listFilters().then((filters) => {
     subscribedFilters = filters.filter((f) => f.subscribed);
     renderChips();
   });

@@ -245,7 +245,7 @@ export function renderSubscribedView(): HTMLElement {
   // named-filter chip click does, and those chips don't exist to click until
   // this resolves anyway) — reloading on arrival was a guaranteed-redundant
   // re-fetch of what trendingSection's own initial load() already got.
-  api.listFilters().then((filters) => {
+  void api.listFilters().then((filters) => {
     subscribedFilters = filters.filter((f) => f.subscribed);
     const names = subscribedFilters.map((f) => f.name);
     names.push("Favorites");

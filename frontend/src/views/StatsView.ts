@@ -243,7 +243,7 @@ export function renderStatsView(): HTMLElement {
   }
 
   headingRow.appendChild(renderRefreshButton(() => load()));
-  load();
+  void load();
 
   return container;
 }

@@ -29,7 +29,7 @@ function idPicker(
     : [];
 
   if (initial) {
-    byIds(initial.split(",")).then((resolved) => {
+    void byIds(initial.split(",")).then((resolved) => {
       const byId = new Map(resolved.map((t) => [t.id, t.name]));
       selected = selected.map((t) => ({ id: t.id, name: byId.get(t.id) ?? t.name }));
       renderChips();

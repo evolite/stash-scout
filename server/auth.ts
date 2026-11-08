@@ -66,7 +66,7 @@ export function requireAuth(cfg: AppConfig) {
   };
 }
 
-async function demo(): Promise<void> {
+function demo(): void {
   const h = hashPassword("hunter2");
   assert(verifyPassword("hunter2", h));
   assert(!verifyPassword("hunter3", h));
@@ -79,4 +79,4 @@ async function demo(): Promise<void> {
   assert.equal(verify(sign({ sub: "me" }, -1, key), key), null);
   console.log("auth ok");
 }
-if (import.meta.url === `file://${process.argv[1]}`) await demo();
+if (import.meta.url === `file://${process.argv[1]}`) demo();

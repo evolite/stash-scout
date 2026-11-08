@@ -40,7 +40,7 @@ export function startAutoAdd(
       for (const scene of scenes) {
         if ((failures.get(scene.id) ?? 0) >= MAX_FAILURES) continue;
         try {
-          await deps.whisparr.addScene(scene.id);
+          await deps.whisparr.addScene(scene.id); // NOSONAR: sequential on purpose, one add at a time against Whisparr
           console.log(`auto-monitor: "${scene.title ?? scene.id}" → Whisparr`);
         } catch (err) {
           failures.set(scene.id, (failures.get(scene.id) ?? 0) + 1);
