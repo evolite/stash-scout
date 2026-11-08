@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  title: Add scene to Whisparr
+  participant U as User
+  participant UI as Web UI
+  participant API as Express API
+  participant WH as Whisparr
+  participant LS as Local Stash
+
+  U->>UI: click Add
+  UI->>+API: POST whisparr scenes
+  alt Whisparr not configured
+    API-->>UI: 400 error
+  else configured
+    API->>+WH: POST /movie
+    Note right of WH: monitored, searchForMovie
+    WH-->>-API: movie created
+    API->>API: patch movie cache
+    API-->>-UI: 200 movie
+  end
+  UI->>+API: GET scenes status
+  API->>LS: find scene by stashId
+  API->>WH: movie and queue lookup
+  API-->>-UI: downloading or monitored

@@ -1,0 +1,30 @@
+flowchart TD
+  search["Search scenes: tags, performers, studios"]
+  excl["Global exclude tags applied"]
+  results["Scene grid with status"]
+  save["Save filter"]
+  sub["Subscribe to filter"]
+  auto{"Auto-add enabled?"}
+  feed["Feed: new unadded scenes"]
+  skip["Skip scene"]
+  add["Add to Whisparr"]
+  hourly["Hourly job adds scene"]
+  dl["Whisparr searches and downloads"]
+  scan["Stash scan matches scene"]
+  done["Status: in Stash"]
+  ignored[("ignored_scenes")]
+  search --> excl
+  excl --> results
+  results --> save
+  results --> add
+  save --> sub
+  sub --> auto
+  auto -->|yes| hourly
+  auto -->|no| feed
+  feed --> add
+  feed --> skip
+  skip --> ignored
+  hourly --> dl
+  add --> dl
+  dl --> scan
+  scan --> done

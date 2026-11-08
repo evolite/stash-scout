@@ -19,3 +19,7 @@ what ships is the Docker release build. A build-time flag keeps them apart:
   in the shipped bundle. Keep it that way: gate new dev-only code on
   `__DEV_INSTANCE__`, and don't use Tailwind classes for it (the scanner would ship
   the utilities in release CSS) — use inline styles or `dev.css`.
+
+## UIGraph
+
+If your change adds or changes API endpoints, database schemas, calls to other services, or a flow shown in a diagram, read `.uigraph/AGENTS.md` and follow it.

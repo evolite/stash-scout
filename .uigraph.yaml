@@ -1,0 +1,221 @@
+version: 1
+
+service:
+  name: Stash Scout
+  category: Web App
+  description: Browse StashDB with saved filters, subscriptions and global tag excludes, then add scenes to Whisparr and track them into local Stash.
+  repository:
+    provider: github
+    url: https://github.com/evolite/stash-scout
+  ownership:
+    team: evolite
+  labels:
+    - typescript
+    - express
+    - sqlite
+
+apis:
+  - name: stash-scout-api
+    type: openapi
+    path: .uigraph/openapi/stash-scout-api.yaml
+
+dependencies:
+  - name: stashdb-graphql
+    service: StashDB
+    direction: downstream
+    criticality: hard
+    type: graphql
+    description: Scene, performer, studio and tag queries.
+  - name: local-stash-graphql
+    service: Local Stash
+    direction: downstream
+    criticality: soft
+    type: graphql
+    description: Looks up whether a StashDB scene is already in the library.
+  - name: whisparr-api
+    service: Whisparr
+    direction: downstream
+    criticality: soft
+    type: http
+    description: Adds scenes, toggles monitoring, reads movie list and download queue.
+  - name: oidc-provider
+    service: OIDC Provider
+    direction: downstream
+    criticality: soft
+    type: http
+    description: Optional SSO login (authMode oidc).
+  - name: github-tags
+    service: GitHub API
+    direction: downstream
+    criticality: soft
+    type: http
+    description: Update check against repository tags.
+
+architectureDiagrams:
+  - name: System Context
+    path: .uigraph/diagrams/system-context/system-context.mmd
+    contextPath: .uigraph/diagrams/system-context/context.json
+  - name: User Journey
+    path: .uigraph/diagrams/user-journey/user-journey.mmd
+  - name: Add Scene to Whisparr
+    path: .uigraph/diagrams/add-scene-to-whisparr/add-scene-to-whisparr.mmd
+  - name: Release Pipeline
+    path: .uigraph/diagrams/release-pipeline/release-pipeline.mmd
+
+databases:
+  - name: app
+    dialect: sqlite
+    dbType: SQLite
+    schemaPath: .uigraph/db/stash-scout.sql
+
+docs:
+  - name: README
+    path: README.md
+    fileType: markdown
+    description: What Stash Scout is, how to run it, login options.
+
+maps:
+  - name: Stash Scout UI
+    description: Main tabs, with the API operations and diagrams behind them. Screenshots taken with SFW Mode on.
+    frames:
+      - name: Feed
+        description: Charts and the merged feed of new releases.
+        imagePath: .uigraph/maps/feed.png
+        focalPoints:
+          - name: Scene card
+            x: 403.84615384615387
+            y: 694.7843911764505
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: getSceneStatuses
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: addSceneToWhisparr
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: ignoreScene
+              - componentId: component_backend-flow-diagram
+                serviceName: Stash Scout
+                architectureDiagramName: Add Scene to Whisparr
+          - name: Feed source chips
+            x: 487.76223776223776
+            y: 63.665510057569385
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: getSubscribedFeed
+              - componentId: component_backend-flow-diagram
+                serviceName: Stash Scout
+                architectureDiagramName: User Journey
+      - name: Subscriptions
+        description: Saved filters; bell subscribes a filter to the Feed.
+        imagePath: .uigraph/maps/subscriptions.png
+        focalPoints:
+          - name: Filter list
+            x: 400
+            y: 260
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: listFilters
+          - name: Subscribe bell
+            x: 685
+            y: 263
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: updateFilter
+      - name: Scenes
+        description: Browse StashDB with filters and tag excludes.
+        imagePath: .uigraph/maps/scenes.png
+        focalPoints:
+          - name: Apply filters
+            x: 154
+            y: 650
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: listScenes
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: getSceneStatuses
+          - name: Exclude tags
+            x: 154
+            y: 331
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: listGlobalExcludeTags
+      - name: Performers
+        description: Attribute-filtered performer discovery.
+        imagePath: .uigraph/maps/performers.png
+        focalPoints:
+          - name: Discovery filters
+            x: 154
+            y: 300
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: discoverPerformers
+          - name: Saved searches
+            x: 154
+            y: 119
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: listPerformerSearches
+      - name: Studios
+        description: Search a studio and browse its scenes.
+        imagePath: .uigraph/maps/studios.png
+        focalPoints:
+          - name: Studio search
+            x: 215
+            y: 105
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: searchStudios
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: getStudioDetails
+      - name: Stats
+        description: Whisparr breakdown and 30-day additions.
+        imagePath: .uigraph/maps/stats.png
+        focalPoints:
+          - name: Whisparr totals
+            x: 640
+            y: 220
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: getStats
+      - name: Settings
+        description: Connections, auth, backup, global exclusion filters.
+        imagePath: .uigraph/maps/settings.png
+        focalPoints:
+          - name: Save changes
+            x: 775
+            y: 270
+            components:
+              - componentId: component_api-contract
+                serviceName: Stash Scout
+                apiGroupName: stash-scout-api
+                operationId: saveSettingsConfig
+              - componentId: component_support-kb-troubleshooting
+                serviceName: Stash Scout
+                docName: README

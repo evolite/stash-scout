@@ -1,0 +1,9 @@
+{
+  "nodes": {
+    "stashdb": { "name": "StashDB", "data": { "Endpoint": { "type": "Text Input", "value": "https://stashdb.org/graphql (stashdbUrl)" } } },
+    "stash": { "name": "Local Stash", "data": { "Protocol": { "type": "Text Input", "value": "GraphQL with ApiKey header" } } },
+    "whisparr": { "name": "Whisparr", "data": { "Protocol": { "type": "Text Input", "value": "REST /movie, /queue, /rootfolder" } } },
+    "sqlite": { "name": "SQLite app.db", "data": { "Location": { "type": "Text Input", "value": "data/app.db" } } },
+    "autoadd": { "name": "Hourly auto-add job", "data": { "Interval": { "type": "Text Input", "value": "60 minutes, first run after 60 s" } } }
+  }
+}

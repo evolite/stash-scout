@@ -1,0 +1,344 @@
+openapi: 3.0.3
+info:
+  title: Stash Scout API
+  version: 0.15.1
+  description: JSON API served by the Express server under /api, plus the /healthz probe. Every /api route except /api/auth/* requires a session cookie when authMode is not "off".
+servers:
+  - url: http://localhost:8787
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      summary: Liveness probe
+      responses:
+        "200": { description: Process is alive, content: { application/json: { schema: { type: object, properties: { status: { type: string }, version: { type: string } } } } } }
+  /api/auth/status:
+    get:
+      operationId: getAuthStatus
+      summary: Current auth mode and login state
+      responses:
+        "200": { description: Auth status }
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: Local username/password login
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [username, password], properties: { username: { type: string }, password: { type: string } } } } }
+      responses:
+        "204": { description: Session cookie set }
+        "400": { description: Bad request }
+        "401": { description: Invalid credentials }
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: Clear the session cookie
+      responses:
+        "204": { description: Logged out }
+  /api/auth/oidc/login:
+    get:
+      operationId: oidcLogin
+      summary: Redirect to the OIDC provider
+      responses:
+        "302": { description: Redirect to provider }
+        "400": { description: OIDC not enabled }
+        "502": { description: Provider unreachable or misconfigured }
+  /api/auth/oidc/callback:
+    get:
+      operationId: oidcCallback
+      summary: OIDC authorization-code callback
+      responses:
+        "302": { description: Session started, redirect to app }
+        "400": { description: Login expired }
+        "401": { description: Login failed }
+        "403": { description: Account not allowed }
+  /api/scenes:
+    get:
+      operationId: listScenes
+      summary: Browse StashDB scenes with tag excludes and optional post-filters
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 25 } }
+        - { name: refresh, in: query, schema: { type: string }, description: "1 or true bypasses the source cache" }
+        - { name: unadded, in: query, schema: { type: string }, description: "1 hides scenes already in Stash or Whisparr" }
+        - { name: max_duration, in: query, schema: { type: integer }, description: Maximum duration in seconds }
+        - { name: hide, in: query, schema: { type: string }, description: "Comma list of gay, lesbian, straight" }
+      responses:
+        "200": { description: Page of scenes, content: { application/json: { schema: { $ref: "#/components/schemas/ScenePage" } } } }
+        "502": { description: StashDB error }
+  /api/scenes/random:
+    get:
+      operationId: listRandomScenes
+      summary: Random slice of StashDB history
+      responses:
+        "200": { description: Page of scenes, content: { application/json: { schema: { $ref: "#/components/schemas/ScenePage" } } } }
+        "502": { description: StashDB error }
+  /api/scenes/status:
+    get:
+      operationId: getSceneStatuses
+      summary: Batched library/Whisparr status for scene ids
+      parameters:
+        - { name: ids, in: query, required: true, schema: { type: string }, description: Comma-separated StashDB scene ids (max 100) }
+      responses:
+        "200": { description: Map of scene id to status, content: { application/json: { schema: { type: object, additionalProperties: { $ref: "#/components/schemas/SceneStatus" } } } } }
+  /api/subscribed-feed:
+    get:
+      operationId: getSubscribedFeed
+      summary: Merged feed of subscribed filters and Favorites
+      parameters:
+        - { name: window, in: query, schema: { type: string, enum: [week, month, year], default: week } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 25 } }
+        - { name: source, in: query, schema: { type: string }, description: Filter name or "all" }
+        - { name: unadded, in: query, schema: { type: string }, description: '"0" includes already-added scenes' }
+        - { name: refresh, in: query, schema: { type: string } }
+        - { name: hide, in: query, schema: { type: string } }
+      responses:
+        "200": { description: Page of scenes, content: { application/json: { schema: { $ref: "#/components/schemas/ScenePage" } } } }
+        "502": { description: StashDB error }
+  /api/tags/search:
+    get:
+      operationId: searchTags
+      summary: Search StashDB tags
+      parameters: [{ name: term, in: query, schema: { type: string } }]
+      responses: { "200": { description: Matching tags }, "502": { description: StashDB error } }
+  /api/tags/byIds:
+    get:
+      operationId: getTagsByIds
+      summary: Resolve tag ids
+      parameters: [{ name: ids, in: query, schema: { type: string } }]
+      responses: { "200": { description: Tags }, "502": { description: StashDB error } }
+  /api/performers:
+    get:
+      operationId: discoverPerformers
+      summary: Attribute-filtered performer discovery
+      responses: { "200": { description: Performer results }, "502": { description: StashDB error } }
+  /api/performers/search:
+    get:
+      operationId: searchPerformers
+      summary: Search StashDB performers by name
+      parameters: [{ name: term, in: query, schema: { type: string } }]
+      responses: { "200": { description: Matching performers }, "502": { description: StashDB error } }
+  /api/performers/byIds:
+    get:
+      operationId: getPerformersByIds
+      summary: Resolve performer ids
+      parameters: [{ name: ids, in: query, schema: { type: string } }]
+      responses: { "200": { description: Performers }, "502": { description: StashDB error } }
+  /api/performers/{id}/details:
+    get:
+      operationId: getPerformerDetails
+      summary: Performer detail view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Performer details }, "502": { description: StashDB error } }
+  /api/studios/search:
+    get:
+      operationId: searchStudios
+      summary: Search StashDB studios
+      parameters: [{ name: term, in: query, schema: { type: string } }]
+      responses: { "200": { description: Matching studios }, "502": { description: StashDB error } }
+  /api/studios/byIds:
+    get:
+      operationId: getStudiosByIds
+      summary: Resolve studio ids
+      parameters: [{ name: ids, in: query, schema: { type: string } }]
+      responses: { "200": { description: Studios }, "502": { description: StashDB error } }
+  /api/studios/{id}/details:
+    get:
+      operationId: getStudioDetails
+      summary: Studio detail view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Studio details }, "502": { description: StashDB error } }
+  /api/whisparr/scenes/{stashId}:
+    post:
+      operationId: addSceneToWhisparr
+      summary: Add a StashDB scene to Whisparr (monitored, search on add)
+      parameters: [{ name: stashId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Whisparr movie created }
+        "400": { description: Whisparr not configured }
+        "502": { description: Whisparr error }
+  /api/whisparr/scenes/{movieId}/monitor:
+    post:
+      operationId: setWhisparrMonitored
+      summary: Toggle monitoring of a Whisparr movie
+      parameters: [{ name: movieId, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { monitored: { type: boolean } } } } }
+      responses:
+        "200": { description: Updated movie }
+        "400": { description: Whisparr not configured }
+        "502": { description: Whisparr error }
+  /api/whisparr/options:
+    get:
+      operationId: getWhisparrOptions
+      summary: Root folders and quality profiles
+      responses:
+        "200": { description: Options for the Settings pickers }
+        "400": { description: Whisparr not configured }
+        "502": { description: Whisparr error }
+  /api/filters:
+    get:
+      operationId: listFilters
+      summary: Saved filters
+      responses: { "200": { description: Saved filters } }
+    post:
+      operationId: createFilter
+      summary: Save a filter
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { name: { type: string }, filter: { type: object } } } } }
+      responses: { "201": { description: Created filter } }
+  /api/filters/order:
+    put:
+      operationId: reorderFilters
+      summary: Persist filter order
+      requestBody:
+        content: { application/json: { schema: { type: object, required: [ids], properties: { ids: { type: array, items: { type: string } } } } } }
+      responses: { "204": { description: Reordered }, "400": { description: ids must be a string array } }
+  /api/filters/{id}:
+    patch:
+      operationId: updateFilter
+      summary: Rename, edit, subscribe, or enable auto-add on a filter
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { name: { type: string }, filter: { type: object }, subscribed: { type: boolean }, autoAdd: { type: boolean } } } } }
+      responses: { "200": { description: Updated filter }, "404": { description: Not found } }
+    delete:
+      operationId: deleteFilter
+      summary: Delete a saved filter
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "204": { description: Deleted } }
+  /api/performer-searches:
+    get:
+      operationId: listPerformerSearches
+      summary: Saved performer searches
+      responses: { "200": { description: Saved searches } }
+    post:
+      operationId: createPerformerSearch
+      summary: Save a performer search with its results
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { name: { type: string }, filter: { type: object }, results: { type: object } } } } }
+      responses: { "201": { description: Created search } }
+  /api/performer-searches/{id}:
+    get:
+      operationId: getPerformerSearch
+      summary: One saved performer search
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Saved search }, "404": { description: Not found } }
+    patch:
+      operationId: updatePerformerSearch
+      summary: Update a saved performer search
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Updated search }, "404": { description: Not found } }
+    delete:
+      operationId: deletePerformerSearch
+      summary: Delete a saved performer search
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "204": { description: Deleted } }
+  /api/ignored-scenes:
+    post:
+      operationId: ignoreScene
+      summary: Skip a scene so it stops appearing
+      requestBody:
+        content: { application/json: { schema: { type: object, required: [id], properties: { id: { type: string } } } } }
+      responses: { "204": { description: Ignored } }
+  /api/global-exclude-tags:
+    get:
+      operationId: listGlobalExcludeTags
+      summary: Tags excluded everywhere
+      responses: { "200": { description: Excluded tags } }
+    post:
+      operationId: addGlobalExcludeTag
+      summary: Exclude a tag globally
+      requestBody:
+        content: { application/json: { schema: { type: object, required: [id], properties: { id: { type: string }, name: { type: string } } } } }
+      responses: { "201": { description: Updated list } }
+  /api/global-exclude-tags/{id}:
+    delete:
+      operationId: removeGlobalExcludeTag
+      summary: Stop excluding a tag
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "204": { description: Removed } }
+  /api/settings:
+    get:
+      operationId: getSettings
+      summary: Which integrations are configured
+      responses: { "200": { description: Settings summary } }
+  /api/settings/config:
+    get:
+      operationId: getSettingsConfig
+      summary: Editable configuration (secrets masked)
+      responses: { "200": { description: Configuration } }
+    put:
+      operationId: saveSettingsConfig
+      summary: Save configuration; applies without restart
+      responses: { "204": { description: Saved }, "400": { description: Invalid auth settings } }
+  /api/settings/favorites-auto-add:
+    put:
+      operationId: setFavoritesAutoAdd
+      summary: Let the hourly job add new releases from favorite performers
+      requestBody:
+        content: { application/json: { schema: { type: object, required: [enabled], properties: { enabled: { type: boolean } } } } }
+      responses: { "204": { description: Saved }, "400": { description: enabled must be a boolean } }
+  /api/settings/favorites-subscribed:
+    put:
+      operationId: setFavoritesSubscribed
+      summary: Include Favorites in the Subscribed feed
+      requestBody:
+        content: { application/json: { schema: { type: object, required: [enabled], properties: { enabled: { type: boolean } } } } }
+      responses: { "204": { description: Saved }, "400": { description: enabled must be a boolean } }
+  /api/settings/test:
+    get:
+      operationId: testConnections
+      summary: Test StashDB, Stash and Whisparr connectivity
+      responses: { "200": { description: Per-service result } }
+  /api/settings/backup:
+    get:
+      operationId: downloadBackup
+      summary: Download a backup of the data directory
+      responses: { "200": { description: Backup file }, "500": { description: Backup failed } }
+  /api/stats:
+    get:
+      operationId: getStats
+      summary: Library and Whisparr statistics
+      responses: { "200": { description: Stats } }
+  /api/version:
+    get:
+      operationId: getVersion
+      summary: Running version and latest GitHub tag
+      responses: { "200": { description: Version info } }
+  /api/changelog:
+    get:
+      operationId: getChangelog
+      summary: Release notes baked into the image
+      responses: { "200": { description: Changelog } }
+components:
+  schemas:
+    ScenePage:
+      type: object
+      properties:
+        count: { type: integer }
+        approximateCount: { type: boolean }
+        scenes: { type: array, items: { $ref: "#/components/schemas/Scene" } }
+    Scene:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string, nullable: true }
+        release_date: { type: string, nullable: true }
+        duration: { type: integer, nullable: true }
+        studio: { type: object, nullable: true, properties: { id: { type: string }, name: { type: string } } }
+        tags: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string } } } }
+        images: { type: array, items: { type: object, properties: { id: { type: string }, url: { type: string }, width: { type: integer }, height: { type: integer } } } }
+        performers: { type: array, items: { type: object } }
+        sourceLabel: { type: string, description: Saved filter or Favorites that surfaced the scene }
+    SceneStatus:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [not-configured, not-added, in-stash, monitored, downloading, previously-added] }
+        localSceneId: { type: string }
+        localUrl: { type: string }
+        movieId: { type: integer }
+        whisparrConfigured: { type: boolean }
+        queue: { type: object, properties: { size: { type: number }, sizeleft: { type: number }, status: { type: string } } }

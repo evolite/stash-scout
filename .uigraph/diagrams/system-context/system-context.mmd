@@ -1,0 +1,25 @@
+flowchart LR
+  user["User (browser)"]
+  oidc["OIDC provider"]
+  github["GitHub API"]
+  stashdb["StashDB"]
+  stash["Local Stash"]
+  whisparr["Whisparr"]
+  subgraph scout["Stash Scout container"]
+    ui["Web UI (Vite SPA)"]
+    api["Express API :8787"]
+    autoadd["Hourly auto-add job"]
+    sqlite[("SQLite app.db")]
+  end
+  user --> ui
+  ui --> api
+  user --> oidc
+  api --> oidc
+  api --> sqlite
+  autoadd --> sqlite
+  api --> stashdb
+  api --> stash
+  api --> whisparr
+  autoadd --> stashdb
+  autoadd --> whisparr
+  api --> github

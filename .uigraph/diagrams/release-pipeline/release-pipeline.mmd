@@ -1,0 +1,19 @@
+flowchart LR
+  dev["Developer"]
+  tag["Push tag vX.Y.Z"]
+  main["Push to main"]
+  sonar["SonarQube analysis"]
+  subgraph release["Docker release workflow"]
+    cliff["git-cliff notes"]
+    build["Buildx amd64 + arm64"]
+    ghcr[("ghcr.io image")]
+    changelog["Commit CHANGELOG.md"]
+  end
+  dev --> tag
+  dev --> main
+  main --> sonar
+  tag --> cliff
+  cliff --> build
+  build --> ghcr
+  tag --> changelog
+  changelog --> main
