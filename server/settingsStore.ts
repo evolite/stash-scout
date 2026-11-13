@@ -15,6 +15,8 @@ interface StoredSettings {
   whisparrQualityProfileId?: number;
   favoritesSubscribed?: boolean;
   favoritesAutoAdd?: boolean;
+  extraHeaders?: string; // encrypted
+  // Legacy Cloudflare Access fields — only read to migrate into extraHeaders.
   cfAccessClientId?: string;
   cfAccessClientSecret?: string; // encrypted
   authMode?: AppConfig["authMode"];
@@ -52,7 +54,6 @@ async function persist(cfg: AppConfig): Promise<void> {
     whisparrQualityProfileId: cfg.whisparrQualityProfileId,
     favoritesSubscribed: cfg.favoritesSubscribed,
     favoritesAutoAdd: cfg.favoritesAutoAdd,
-    cfAccessClientId: cfg.cfAccessClientId,
     authMode: cfg.authMode,
     authUsername: cfg.authUsername,
     authPasswordHash: cfg.authPasswordHash,
@@ -63,7 +64,7 @@ async function persist(cfg: AppConfig): Promise<void> {
   if (cfg.stashdbApiKey) toStore.stashdbApiKey = await encrypt(cfg.stashdbApiKey);
   if (cfg.localStashApiKey) toStore.localStashApiKey = await encrypt(cfg.localStashApiKey);
   if (cfg.whisparrApiKey) toStore.whisparrApiKey = await encrypt(cfg.whisparrApiKey);
-  if (cfg.cfAccessClientSecret) toStore.cfAccessClientSecret = await encrypt(cfg.cfAccessClientSecret);
+  if (cfg.extraHeaders) toStore.extraHeaders = await encrypt(cfg.extraHeaders);
   if (cfg.oidcClientSecret) toStore.oidcClientSecret = await encrypt(cfg.oidcClientSecret);
   writeSettings(toStore);
 }
@@ -103,8 +104,7 @@ export async function loadInitialConfig(): Promise<AppConfig> {
       s.whisparrQualityProfileId ?? (envFallback("WHISPARR_QUALITY_PROFILE_ID") ? Number(envFallback("WHISPARR_QUALITY_PROFILE_ID")) : undefined),
     favoritesSubscribed: s.favoritesSubscribed ?? true,
     favoritesAutoAdd: s.favoritesAutoAdd ?? (envFallback("FAVORITES_AUTO_ADD") === "true"),
-    cfAccessClientId: s.cfAccessClientId ?? envFallback("CF_ACCESS_CLIENT_ID"),
-    cfAccessClientSecret: await readSecret("cfAccessClientSecret", s.cfAccessClientSecret, envFallback("CF_ACCESS_CLIENT_SECRET")),
+    extraHeaders: await readSecret("extraHeaders", s.extraHeaders, undefined),
     authMode: (envFallback("AUTH_MODE_FORCE") === "off" ? "off" : s.authMode) ?? (envFallback("AUTH_MODE") as AppConfig["authMode"] | undefined) ?? "off",
     authUsername: s.authUsername ?? envFallback("AUTH_USERNAME"),
     authPasswordHash: s.authPasswordHash ?? (envFallback("AUTH_PASSWORD") ? hashPassword(envFallback("AUTH_PASSWORD")!) : undefined),
@@ -117,7 +117,18 @@ export async function loadInitialConfig(): Promise<AppConfig> {
   // One-time migration: if this is the first boot after upgrading and .env had
   // values, persist them encrypted now so future boots don't depend on .env —
   // from here on the Settings UI is the source of truth.
-  if (isFirstBoot) await persist(cfg);
+  // Migrate the old Cloudflare Access fields (stored or .env) into extraHeaders.
+  let migrated = false;
+  if (!s.extraHeaders) {
+    const cfId = s.cfAccessClientId ?? envFallback("CF_ACCESS_CLIENT_ID");
+    const cfSecret = await readSecret("cfAccessClientSecret", s.cfAccessClientSecret, envFallback("CF_ACCESS_CLIENT_SECRET"));
+    if (cfId && cfSecret) {
+      cfg.extraHeaders = `CF-Access-Client-Id: ${cfId}\nCF-Access-Client-Secret: ${cfSecret}`;
+      migrated = true;
+    }
+  }
+
+  if (isFirstBoot || migrated) await persist(cfg);
 
   return cfg;
 }

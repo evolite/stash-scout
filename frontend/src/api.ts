@@ -259,8 +259,7 @@ export const api = {
       whisparrQualityProfileId: number | null;
       favoritesSubscribed: boolean;
       favoritesAutoAdd: boolean;
-      cfAccessClientId: string;
-      cfAccessClientSecretSet: boolean;
+      extraHeaderNames: string[];
       authMode: "off" | "local" | "oidc";
       authUsername: string;
       authPasswordSet: boolean;
@@ -269,7 +268,7 @@ export const api = {
       oidcClientSecretSet: boolean;
       oidcAllowed: string;
     }>(`/api/settings/config`),
-  updateConfig: (patch: Record<string, string | number | null>) =>
+  updateConfig: (patch: Record<string, unknown>) =>
     req(`/api/settings/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

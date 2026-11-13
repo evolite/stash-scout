@@ -1,4 +1,4 @@
-import type { AppConfig } from "./config.js";
+import { extraHeaders, type AppConfig } from "./config.js";
 
 export interface WhisparrScene {
   id: number;
@@ -41,12 +41,8 @@ export class WhisparrClient {
     let base = this.cfg.whisparrBaseUrl!;
     while (base.endsWith("/")) base = base.slice(0, -1);
     const url = `${base}/api/v3${path}`;
-    const headers = new Headers(init.headers);
+    const headers = new Headers({ ...extraHeaders(this.cfg), ...Object.fromEntries(new Headers(init.headers)) });
     headers.set("X-Api-Key", this.cfg.whisparrApiKey!);
-    if (this.cfg.cfAccessClientId && this.cfg.cfAccessClientSecret) {
-      headers.set("CF-Access-Client-Id", this.cfg.cfAccessClientId);
-      headers.set("CF-Access-Client-Secret", this.cfg.cfAccessClientSecret);
-    }
     if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
     const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`Whisparr ${init.method ?? "GET"} ${path} failed: HTTP ${res.status}`);

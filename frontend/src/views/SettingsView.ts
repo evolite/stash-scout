@@ -261,14 +261,54 @@ export function renderSettingsView(): HTMLElement {
     whisparrS.body.appendChild(loadOptionsBtn);
     addPage("Connections", "whisparr", "Whisparr", whisparrS.section, true);
 
-    // --- Cloudflare Access ---
-    const cfS = section("Cloudflare Access", "Only if Stash/Whisparr sit behind it.");
-    cfS.pill.remove(); // no independent connection test — shared by Stash/Whisparr's own status
-    const cfId = fieldRow("Client ID", { value: cfg.cfAccessClientId });
-    const cfSecret = fieldRow("Client Secret", { type: "password", placeholder: cfg.cfAccessClientSecretSet ? "(unchanged)" : "not set" });
-    cfS.body.appendChild(cfId.row);
-    cfS.body.appendChild(cfSecret.row);
-    addPage("Connections", "cloudflare", "Cloudflare Access", cfS.section, true);
+    // --- Custom headers ---
+    // Values are secrets: only names come back from the server, so a saved
+    // header's value box stays blank ("(unchanged)") and blank = keep it.
+    const headersS = section("Custom headers", "Sent with every Stash/Whisparr request, e.g. for an auth proxy.");
+    headersS.pill.remove(); // no independent connection test — shared by Stash/Whisparr's own status
+    const headerRows = document.createElement("div");
+    headerRows.className = "flex flex-col gap-2";
+    function addHeaderRow(name = "", saved = false) {
+      const row = document.createElement("div");
+      row.className = "flex gap-2 items-center";
+      const nameIn = document.createElement("input");
+      nameIn.className = "flex-1 min-w-0 text-xs px-2 py-1";
+      nameIn.placeholder = "Header name";
+      nameIn.value = name;
+      nameIn.setAttribute("aria-label", "Header name");
+      const valueIn = document.createElement("input");
+      valueIn.type = "password";
+      valueIn.className = "flex-1 min-w-0 text-xs px-2 py-1";
+      valueIn.placeholder = saved ? "(unchanged)" : "Secret";
+      valueIn.title = SECRET_HINT;
+      valueIn.setAttribute("aria-label", "Header value");
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "text-muted hover:text-text px-1.5 text-sm";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "Remove header");
+      remove.addEventListener("click", () => {
+        row.remove();
+        markDirty();
+      });
+      for (const el of [nameIn, valueIn]) el.addEventListener("input", markDirty);
+      row.append(nameIn, valueIn, remove);
+      headerRows.appendChild(row);
+    }
+    const readHeaderRows = () =>
+      [...headerRows.children].map((row) => {
+        const [n, v] = row.querySelectorAll("input");
+        return { name: n.value.trim(), value: v.value, row };
+      }).filter((h) => h.name || h.value);
+    for (const n of cfg.extraHeaderNames) addHeaderRow(n, true);
+    if (!cfg.extraHeaderNames.length) addHeaderRow();
+    const addHeaderBtn = document.createElement("button");
+    addHeaderBtn.type = "button";
+    addHeaderBtn.className = "bg-black/20 text-text hover:bg-white/10 rounded px-2.5 py-1.5 text-xs self-start transition";
+    addHeaderBtn.textContent = "Add another";
+    addHeaderBtn.addEventListener("click", () => addHeaderRow());
+    headersS.body.append(headerRows, addHeaderBtn);
+    addPage("Connections", "headers", "Custom headers", headersS.section, true);
 
     // --- Authentication ---
     const authS = section("Authentication", "Require a login to use this app.");
@@ -343,7 +383,7 @@ export function renderSettingsView(): HTMLElement {
     addPage("System", "backup", "Backup", backupPanel, false);
     addPage("System", "about", "Version & changelog", renderAboutPanel(), false);
 
-    pages.forEach((pg) => pg.el.querySelectorAll("input, select").forEach((input) => {
+    pages.forEach((pg) => pg.el.querySelectorAll("input, select, textarea").forEach((input) => {
       input.addEventListener("input", markDirty);
       input.addEventListener("change", markDirty);
     }));
@@ -460,8 +500,7 @@ export function renderSettingsView(): HTMLElement {
         whisparrApiKey: whisparrKey.input.value,
         whisparrRootFolderPath: rootFolderPath,
         whisparrQualityProfileId: qualityProfileId ? Number(qualityProfileId) : null,
-        cfAccessClientId: cfId.input.value,
-        cfAccessClientSecret: cfSecret.input.value,
+        extraHeaders: readHeaderRows().map(({ name, value }) => ({ name, value })),
       });
       } catch (err) {
         saveBtn.disabled = false;
@@ -474,7 +513,11 @@ export function renderSettingsView(): HTMLElement {
       stashdbKey.input.value = "";
       stashKey.input.value = "";
       whisparrKey.input.value = "";
-      cfSecret.input.value = "";
+      for (const { row } of readHeaderRows()) {
+        const v = row.querySelectorAll("input")[1];
+        v.value = "";
+        v.placeholder = "(unchanged)";
+      }
       dirty = false;
       saveBtn.textContent = "Save changes";
       bottomNote.textContent = "Saved ✓";

@@ -272,7 +272,7 @@ paths:
     put:
       operationId: saveSettingsConfig
       summary: Save configuration; applies without restart
-      responses: { "204": { description: Saved }, "400": { description: Invalid auth settings } }
+      responses: { "204": { description: Saved }, "400": { description: Invalid auth or custom header settings } }
   /api/settings/favorites-auto-add:
     put:
       operationId: setFavoritesAutoAdd

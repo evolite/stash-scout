@@ -1,4 +1,4 @@
-import type { AppConfig } from "./config.js";
+import { extraHeaders, type AppConfig } from "./config.js";
 import { capMap } from "./cacheUtil.js";
 
 // A hung/unresponsive local Stash otherwise leaves fetch() pending
@@ -6,11 +6,8 @@ import { capMap } from "./cacheUtil.js";
 const FETCH_TIMEOUT_MS = 15_000;
 
 async function gql<T>(url: string, apiKey: string, query: string, variables: unknown, cfg: AppConfig): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json", ApiKey: apiKey };
-  if (cfg.cfAccessClientId && cfg.cfAccessClientSecret) {
-    headers["CF-Access-Client-Id"] = cfg.cfAccessClientId;
-    headers["CF-Access-Client-Secret"] = cfg.cfAccessClientSecret;
-  }
+  // Custom headers first so they can't override the API key / content type.
+  const headers: Record<string, string> = { ...extraHeaders(cfg), "Content-Type": "application/json", ApiKey: apiKey };
   const res = await fetch(url, {
     method: "POST",
     headers,

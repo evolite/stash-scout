@@ -5,7 +5,7 @@ import path from "node:path";
 import { db } from "../db.js";
 import rateLimit from "express-rate-limit";
 import type { AppConfig } from "../config.js";
-import { isStashDBConfigured, isLocalStashConfigured, isWhisparrConfigured } from "../config.js";
+import { isStashDBConfigured, isLocalStashConfigured, isWhisparrConfigured, extraHeaders, HEADER_NAME } from "../config.js";
 import type { LocalStashClient } from "../localStashClient.js";
 import type { WhisparrClient } from "../whisparrClient.js";
 import { updateConfig } from "../settingsStore.js";
@@ -22,8 +22,7 @@ const EDITABLE_FIELDS = [
   "whisparrApiKey",
   "whisparrRootFolderPath",
   "whisparrQualityProfileId",
-  "cfAccessClientId",
-  "cfAccessClientSecret",
+  "extraHeaders",
   "authMode",
   "authUsername",
   "oidcIssuer",
@@ -96,8 +95,7 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
       whisparrQualityProfileId: cfg.whisparrQualityProfileId ?? null,
       favoritesSubscribed: cfg.favoritesSubscribed ?? true,
       favoritesAutoAdd: cfg.favoritesAutoAdd ?? false,
-      cfAccessClientId: cfg.cfAccessClientId ?? "",
-      cfAccessClientSecretSet: !!cfg.cfAccessClientSecret,
+      extraHeaderNames: Object.keys(extraHeaders(cfg)),
       authMode: cfg.authMode,
       authUsername: cfg.authUsername ?? "",
       authPasswordSet: !!cfg.authPasswordHash,
@@ -112,6 +110,22 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     const patch: Record<string, unknown> = {};
     for (const field of EDITABLE_FIELDS) {
       if (field in req.body) patch[field] = req.body[field];
+    }
+    // extraHeaders arrives as [{ name, value }]; a blank value keeps that
+    // header's saved secret. Stored as a "Name: value" per line block.
+    if (patch.extraHeaders !== undefined) {
+      if (!Array.isArray(patch.extraHeaders)) return res.status(400).json({ error: "invalid extraHeaders" });
+      const saved = extraHeaders(cfg);
+      const lines: string[] = [];
+      for (const h of patch.extraHeaders as { name?: unknown; value?: unknown }[]) {
+        const name = String(h?.name ?? "").trim();
+        const value = String(h?.value ?? "").trim() || saved[name];
+        if (!HEADER_NAME.test(name)) return res.status(400).json({ error: `invalid header name "${name}"` });
+        if (!value) return res.status(400).json({ error: `header "${name}" needs a value` });
+        if (/[\r\n]/.test(value)) return res.status(400).json({ error: `header "${name}" value can't contain line breaks` });
+        lines.push(`${name}: ${value}`);
+      }
+      patch.extraHeaders = lines.length ? lines.join("\n") : null; // empty list = clear
     }
     if (patch.authMode !== undefined && !["off", "local", "oidc"].includes(patch.authMode as string)) {
       return res.status(400).json({ error: "invalid authMode" });
