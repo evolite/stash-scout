@@ -15,7 +15,6 @@ export interface SceneQueryInput {
   tags?: { value: string[]; modifier: SetModifier };
   performers?: { value: string[]; modifier: SetModifier };
   studios?: { value: string[]; modifier: SetModifier };
-  parentStudio?: string;
   date?: { value: string; modifier: "EQUALS" | "GREATER_THAN" | "LESS_THAN" };
   favorites?: "PERFORMER" | "STUDIO" | "ALL";
   page: number;
@@ -289,9 +288,13 @@ export class StashDBClient {
   constructor(private readonly cfg: AppConfig) {}
 
   async queryScenes(input: Partial<SceneQueryInput>, bypassCache = false): Promise<{ count: number; scenes: Scene[] }> {
+    const studios = input.studios?.modifier === "INCLUDES"
+      ? { ...input.studios, value: await this.withSubStudios(input.studios.value) }
+      : input.studios;
     const variables = {
       input: {
         ...input,
+        studios,
         page: input.page ?? 1,
         per_page: Math.min(input.per_page ?? 25, MAX_PER_PAGE),
         sort: input.sort ?? "DATE",
@@ -639,18 +642,18 @@ export class StashDBClient {
   // request via aliases, rather than one lookup call per id. Capped — the id
   // list comes straight from a query string, and one aliased field per id
   // would otherwise let an arbitrarily long list balloon the GraphQL query.
-  private async findByIds(queryName: string, ids: string[]): Promise<{ id: string; name: string }[]> {
+  private async findByIds<T = { id: string; name: string }>(queryName: string, ids: string[], selection = "id name"): Promise<T[]> {
     if (ids.length === 0) return [];
     const capped = ids.slice(0, MAX_LOOKUP_IDS);
     const variables: Record<string, string> = {};
     const fields = capped
       .map((id, i) => {
         variables[`id${i}`] = id;
-        return `t${i}: ${queryName}(id: $id${i}) { id name }`;
+        return `t${i}: ${queryName}(id: $id${i}) { ${selection} }`;
       })
       .join("\n");
     const argsDecl = capped.map((_, i) => `$id${i}: ID!`).join(", ");
-    const data = await gql<Record<string, { id: string; name: string } | null>>(
+    const data = await gql<Record<string, T | null>>(
       this.cfg.stashdbUrl,
       this.cfg.stashdbApiKey,
       `query (${argsDecl}) { ${fields} }`,
@@ -658,7 +661,18 @@ export class StashDBClient {
       false,
       30 * 60_000, // id -> name; effectively immutable
     );
-    return Object.values(data).filter((t): t is { id: string; name: string } => t !== null);
+    return Object.values(data).filter((t): t is T => t !== null);
+  }
+
+  // Picked studios plus their sub-studios, so a network covers its whole lineup.
+  // ponytail: one level deep and capped at 500 sub-studios per network; recurse/page if StashDB nests deeper.
+  private async withSubStudios(ids: string[]): Promise<string[]> {
+    const found = await this.findByIds<{ sub_studios: { studios: { id: string }[] } }>(
+      "findStudio",
+      ids,
+      "sub_studios(input: { per_page: 500 }) { studios { id } }",
+    );
+    return [...new Set([...ids, ...found.flatMap((s) => s.sub_studios.studios.map((c) => c.id))])];
   }
 
   findTags(text: string): Promise<{ id: string; name: string }[]> {

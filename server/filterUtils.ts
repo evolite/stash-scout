@@ -16,13 +16,8 @@ export function parseStashFilter(q: Record<string, unknown>): { input: Partial<S
     input.performers = { value: q.performers.split(","), modifier: "INCLUDES_ALL" };
   }
   if (typeof q.studios === "string" && q.studios) {
-    const ids = q.studios.split(",");
-    // One studio -> parentStudio, which StashDB matches as the scene's studio *or*
-    // its parent, so picking a network also pulls in its sub-studios (a leaf
-    // studio gives the same results as before).
-    // ponytail: multi-studio picks don't expand networks; resolve child_studios if wanted.
-    if (ids.length === 1) input.parentStudio = ids[0];
-    else input.studios = { value: ids, modifier: "INCLUDES" };
+    // Networks are expanded to their sub-studios in StashDBClient.queryScenes.
+    input.studios = { value: q.studios.split(","), modifier: "INCLUDES" };
   }
   if (typeof q.date === "string" && q.date) {
     input.date = { value: q.date, modifier: (q.date_modifier as any) || "EQUALS" };
