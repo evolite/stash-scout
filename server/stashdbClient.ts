@@ -673,8 +673,20 @@ export class StashDBClient {
   findPerformersByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
     return this.findByIds("findPerformer", ids);
   }
-  findStudios(text: string): Promise<{ id: string; name: string }[]> {
-    return this.search("searchStudio", text);
+  // searchStudio is whole-word only ("brazz" finds nothing), so use
+  // queryStudios' LIKE match on the name instead.
+  async findStudios(text: string): Promise<{ id: string; name: string }[]> {
+    const data = await gql<{ queryStudios: { studios: { id: string; name: string }[] } }>(
+      this.cfg.stashdbUrl,
+      this.cfg.stashdbApiKey,
+      `query ($input: StudioQueryInput!) {
+        queryStudios(input: $input) { studios { id name } }
+      }`,
+      { input: { name: text, per_page: 10, sort: "NAME", direction: "ASC" } },
+      false,
+      5 * 60_000,
+    );
+    return data.queryStudios.studios;
   }
   findStudiosByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
     return this.findByIds("findStudio", ids);
