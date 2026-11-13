@@ -15,6 +15,7 @@ export interface SceneQueryInput {
   tags?: { value: string[]; modifier: SetModifier };
   performers?: { value: string[]; modifier: SetModifier };
   studios?: { value: string[]; modifier: SetModifier };
+  parentStudio?: string;
   date?: { value: string; modifier: "EQUALS" | "GREATER_THAN" | "LESS_THAN" };
   favorites?: "PERFORMER" | "STUDIO" | "ALL";
   page: number;
