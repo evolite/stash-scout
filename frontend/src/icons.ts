@@ -50,3 +50,7 @@ export function iconPlay(): SVGSVGElement {
   el.appendChild(p);
   return el;
 }
+
+export function iconUndo(): SVGSVGElement {
+  return svg(["M6 3L3 6l3 3", "M3 6h6.5a3.5 3.5 0 0 1 0 7H6"], "0 0 16 16", 16);
+}

@@ -1,4 +1,5 @@
 import { api } from "../api.js";
+import { iconUndo } from "../icons.js";
 
 export type Tab = "browse" | "subscribed" | "subscriptions" | "performers" | "studios" | "stats" | "settings";
 
@@ -372,6 +373,20 @@ function renderLogout(): HTMLElement {
   return el;
 }
 
+function renderUndoSkip(rerender: () => void): HTMLElement {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = UTILITY_TAB_INACTIVE;
+  el.title = "Undo skip: bring back the most recently skipped scene";
+  el.setAttribute("aria-label", "Undo skip");
+  el.appendChild(iconUndo());
+  el.addEventListener("click", async () => {
+    await api.undoLastSkip();
+    rerender();
+  });
+  return el;
+}
+
 export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibraryToggle: () => void): HTMLElement {
   const nav = document.createElement("nav");
   nav.className = "flex items-center justify-between bg-navbar px-6 h-14";
@@ -394,6 +409,7 @@ export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibrar
   right.appendChild(renderDownloadingBadge());
   right.appendChild(renderToggle("In Library", isInLibraryMode, setInLibraryMode, onLibraryToggle));
   right.appendChild(renderToggle("SFW Mode", isSfwMode, setSfwMode));
+  right.appendChild(renderUndoSkip(onLibraryToggle)); // onLibraryToggle is main.ts's full render()
   right.appendChild(renderSettingsTab(active, onSelect));
   if (authMode !== "off") right.appendChild(renderLogout());
   nav.appendChild(right);
