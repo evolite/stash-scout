@@ -2,8 +2,6 @@ import { api } from "../api.js";
 
 const DISMISSED_KEY = "dismissedUpdate";
 
-// Appended to <body> (like OnboardingModal) so root's full re-renders don't
-// remove it. "Later" remembers the version, so it only nags again for a newer one.
 export async function maybeShowUpdateModal(): Promise<void> {
   let info;
   try {
@@ -15,7 +13,7 @@ export async function maybeShowUpdateModal(): Promise<void> {
   try {
     if (localStorage.getItem(DISMISSED_KEY) === info.latest) return;
   } catch {
-    /* storage blocked: just show it */
+    /* ignore */
   }
   const latest = info.latest;
 

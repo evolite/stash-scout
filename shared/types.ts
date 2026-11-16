@@ -1,7 +1,3 @@
-// Single source of truth for types shared between server/ and frontend/src/api.ts.
-// Server-only shapes (SceneQueryInput) and frontend-only shapes (SceneFilter, the
-// wire query-string format) live where they're used, not here — they aren't duplicates.
-
 export interface Scene {
   id: string;
   title: string | null;
@@ -11,8 +7,6 @@ export interface Scene {
   tags: { id: string; name: string }[];
   images: { id: string; url: string; width: number; height: number }[];
   performers: { performer: { id: string; name: string; gender: string | null }; as: string | null }[];
-  // Set only by queryMergedFeed — which saved filter (or "Favorites") first
-  // surfaced this scene, shown as a sash on the scene card in the Subscribed feed.
   sourceLabel?: string;
 }
 
@@ -22,7 +16,6 @@ export interface StashImage {
   height: number;
 }
 
-// Detail views for the Performers / Studios tabs — the object you looked up.
 export interface PerformerDetails {
   id: string;
   name: string;
@@ -48,8 +41,6 @@ export interface PerformerDetails {
   urls: { url: string; site: { name: string } | null }[];
 }
 
-// One row in the "Discover performers" attribute-filter results grid — a subset
-// of PerformerDetails plus what queryPerformers returns per performer.
 export interface PerformerResult {
   id: string;
   name: string;
@@ -67,7 +58,6 @@ export interface PerformerResult {
   career_end_year: number | null;
   scene_count: number;
   images: StashImage[];
-  // Used for client-side tattoo/piercing keyword filtering (StashDB won't).
   tattoos?: { location: string | null; description: string | null }[];
   piercings?: { location: string | null; description: string | null }[];
 }
@@ -81,8 +71,6 @@ export interface StudioDetails {
   urls: { url: string; site: { name: string } | null }[];
 }
 
-// Ported from StashSeer's checkIfAvailable/handleDownloadFlow state machine
-// (stashseer.js ~1292-1600), collapsed into one server-side status lookup.
 export type SceneStatus =
   | { kind: "not-configured" }
   | { kind: "in-stash"; localSceneId: string; localUrl: string }
@@ -98,12 +86,9 @@ export interface SavedFilter<F = Record<string, unknown>> {
   createdAt: string;
   filter: F;
   subscribed: boolean;
-  autoAdd: boolean; // hourly job adds this filter's new scenes to Whisparr
+  autoAdd: boolean;
 }
 
-// A named performer search: the filter params plus the fetched result list, so
-// it can be restored without re-querying StashDB. `results` is the raw
-// { count, performers, approximateCount } response for the first page.
 export interface SavedPerformerSearch {
   id: string;
   name: string;
@@ -125,17 +110,12 @@ export interface IgnoredScene {
 }
 
 export interface StatsSummary {
-  // Whisparr library breakdown — mutually exclusive buckets (except
-  // monitoredTotal, which is a cross-cutting count of everything with the
-  // monitored flag set). All zero when Whisparr isn't configured.
   totalInWhisparr: number;
-  downloaded: number; // has a file
-  downloading: number; // in the download queue, no file yet
-  wanted: number; // monitored, no file, not downloading
-  unmonitored: number; // no file, not monitored (added then unmonitored)
+  downloaded: number;
+  downloading: number;
+  wanted: number;
+  unmonitored: number;
   monitoredTotal: number;
-  // Aggregate percent complete (0-100) across all queued items, by bytes;
-  // null when nothing is downloading or Whisparr didn't report sizes.
   downloadProgress: number | null;
   ignoredCount: number;
   savedFiltersCount: number;

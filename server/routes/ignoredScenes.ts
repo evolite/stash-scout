@@ -10,8 +10,6 @@ export function ignoredScenesRouter() {
     res.status(204).end();
   });
 
-  // Undo for the Skip button. Feeds filter ignored ids on read, so the scene
-  // reappears on the next fetch without any cache busting.
   router.delete("/ignored-scenes/latest", (_req, res) => {
     db.prepare("DELETE FROM ignored_scenes WHERE id = (SELECT id FROM ignored_scenes ORDER BY ignored_at DESC LIMIT 1)").run();
     res.status(204).end();

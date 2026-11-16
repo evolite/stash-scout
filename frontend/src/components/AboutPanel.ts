@@ -7,8 +7,6 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   return e;
 }
 
-// Renders the git-cliff CHANGELOG.md format: "## [x.y.z] - date", "### Group",
-// "- item". Anything else (title, intro text) is ignored.
 export function renderChangelog(markdown: string): HTMLElement {
   const wrap = el("div", "flex flex-col gap-4");
   let list: HTMLElement | null = null;

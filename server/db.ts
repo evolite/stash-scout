@@ -5,10 +5,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { SavedFilter, GlobalExcludeTag, IgnoredScene, SavedPerformerSearch } from "../shared/types.js";
 
-// process.cwd() rather than a path relative to this file's own location — see
-// the same reasoning in index.ts's frontendDist (dev's tsx-run-from-source vs
-// the compiled dist-server/server/ nesting resolve to different depths, but
-// both are always launched with cwd = project root).
 const REAL_DATA_DIR = path.join(process.cwd(), "data");
 
 const SCHEMA = `
@@ -51,27 +47,16 @@ function readJsonSync<T>(dataDir: string, file: string, fallback: T): T {
   }
 }
 
-// ponytail: node:sqlite's DatabaseSync is synchronous, so a request handler's
-// read-modify-write against these tables no longer interleaves with another
-// handler's mid-flight write the way two overlapping readJson/writeJson calls
-// on the same file could — that race is what's actually fixed here. This does
-// NOT add multi-process/multi-replica write safety (SQLite still serializes
-// writers), but this app is explicitly single-instance, so that was never the
-// risk. If this ever becomes multi-instance, that's the thing to revisit.
 function migrateFromJson(db: DatabaseSync, dataDir: string): void {
   const legacyFiles = ["filters.json", "global-exclude-tags.json", "ignored-scenes.json", "settings.json"];
   const anyLegacy = legacyFiles.some((f) => existsSync(path.join(dataDir, f)));
   if (!anyLegacy) return;
 
-  // OR IGNORE (rather than plain INSERT) so re-running against a DB that
-  // already has some rows migrated — e.g. a partial legacy-file state left
-  // behind by an interrupted previous migration — is a safe no-op per row
-  // instead of crashing the whole boot on a UNIQUE constraint violation.
   db.exec("BEGIN");
   try {
     const filters = readJsonSync<SavedFilter[]>(dataDir, "filters.json", []);
     const insertFilter = db.prepare("INSERT OR IGNORE INTO filters (id, name, created_at, filter, watched) VALUES (?, ?, ?, ?, ?)");
-    for (const f of filters) insertFilter.run(f.id, f.name, f.createdAt, JSON.stringify(f.filter), ((f as { watched?: boolean }).watched ?? f.subscribed) ? 1 : 0); // legacy JSON files say "watched"
+    for (const f of filters) insertFilter.run(f.id, f.name, f.createdAt, JSON.stringify(f.filter), ((f as { watched?: boolean }).watched ?? f.subscribed) ? 1 : 0);
 
     const excludeTags = readJsonSync<GlobalExcludeTag[]>(dataDir, "global-exclude-tags.json", []);
     const insertExcludeTag = db.prepare("INSERT OR IGNORE INTO global_exclude_tags (id, name, added_at) VALUES (?, ?, ?)");
@@ -92,8 +77,6 @@ function migrateFromJson(db: DatabaseSync, dataDir: string): void {
     throw err;
   }
 
-  // Renamed (not deleted) so a bad migration doesn't destroy the only copy of
-  // real user data — same posture as the existing .env-to-encrypted-store migration.
   for (const f of legacyFiles) {
     const full = path.join(dataDir, f);
     if (existsSync(full)) renameSync(full, `${full}.bak`);
@@ -102,21 +85,17 @@ function migrateFromJson(db: DatabaseSync, dataDir: string): void {
 
 export function openDb(dataDir: string): DatabaseSync {
   const db = new DatabaseSync(path.join(dataDir, "app.db"));
-  // WAL: writers don't block readers and small writes skip the per-commit fsync of the rollback journal.
   db.exec("PRAGMA journal_mode = WAL");
   db.exec(SCHEMA);
-  // No migration system in this project (SCHEMA is CREATE IF NOT EXISTS only),
-  // so the first-ever column add is a guarded ALTER: duplicate-column error
-  // means it's already there (including fresh DBs, where SCHEMA just made it).
   try {
     db.exec("ALTER TABLE filters ADD COLUMN auto_add INTEGER NOT NULL DEFAULT 0");
   } catch {
-    // column already exists
+    /* ignore */
   }
   try {
     db.exec("ALTER TABLE filters ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
   } catch {
-    // column already exists
+    /* ignore */
   }
   migrateFromJson(db, dataDir);
   return db;
@@ -139,9 +118,6 @@ export function performerSearchRowTo(row: any): SavedPerformerSearch {
   };
 }
 
-// ponytail: no test framework in this project — this is the one runnable
-// self-check for the migration logic, since it touches real user data on
-// upgrade and is easy to silently get wrong. Run with `tsx server/db.ts`.
 function demo(): void {
   const tmp = mkdtempSync(path.join(tmpdir(), "stash-scout-db-test-"));
   writeFileSync(
@@ -154,8 +130,6 @@ function demo(): void {
 
   const testDb = openDb(tmp);
   assert.equal((testDb.prepare("SELECT COUNT(*) as c FROM filters").get() as { c: number }).c, 1);
-  // The guarded ALTER must be a harmless no-op on a fresh DB (SCHEMA already
-  // added the column) and default existing rows to autoAdd off.
   assert.equal(filterRowToSavedFilter(testDb.prepare("SELECT * FROM filters").get()).autoAdd, false);
   assert.equal((testDb.prepare("SELECT COUNT(*) as c FROM global_exclude_tags").get() as { c: number }).c, 1);
   assert.equal((testDb.prepare("SELECT COUNT(*) as c FROM ignored_scenes").get() as { c: number }).c, 1);
@@ -167,14 +141,10 @@ function demo(): void {
   assert.ok(existsSync(path.join(tmp, "filters.json.bak")));
   testDb.close();
 
-  // Second open against the same dir must not re-run the migration (files already renamed).
   const reopened = openDb(tmp);
   assert.equal((reopened.prepare("SELECT COUNT(*) as c FROM filters").get() as { c: number }).c, 1);
   reopened.close();
 
-  // A stray leftover legacy file (e.g. re-created by a stale process after a
-  // real migration already ran) must not crash the next boot — OR IGNORE means
-  // the already-migrated row is skipped rather than raising a UNIQUE error.
   writeFileSync(path.join(tmp, "settings.json"), JSON.stringify({ stashdbUrl: "https://stray" }));
   const reopenedAgain = openDb(tmp);
   assert.equal(

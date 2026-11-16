@@ -12,9 +12,6 @@ function textState(message: string): HTMLElement {
   return wrap;
 }
 
-// Only shown on a section's very first load, when there's no prior content to
-// keep on screen — a small centered spinner instead of placeholder cards that
-// just get thrown away once real data lands.
 function renderSpinnerIcon(): HTMLElement {
   const spinner = document.createElement("div");
   spinner.className = "w-6 h-6 rounded-full border-2 border-muted/30 border-t-accent animate-spin";
@@ -28,14 +25,11 @@ function renderSpinner(): HTMLElement {
   return wrap;
 }
 
-// A self-contained paginated scene grid — used by Feed/Trending (SubscribedView)
-// and the Performers tab, each with their own page cursor and status polling.
 export function renderSceneSection(opts: {
   perPage: number;
   fetchPage: (page: number, refresh?: boolean) => Promise<{ count: number; scenes: Scene[]; approximateCount?: boolean }>;
   emptyMessage: string;
   onCount?: (count: number) => void;
-  // When set, the page cursor survives a re-render (e.g. Back from a performer).
   stateKey?: string;
 }): { element: HTMLElement; reset: () => void; refresh: () => Promise<void> } {
   const element = document.createElement("div");
@@ -48,15 +42,8 @@ export function renderSceneSection(opts: {
   const pageState = opts.stateKey ? getState(`page:${opts.stateKey}`, { page: 1 }) : { page: 1 };
   let page = pageState.page;
   let statuses: Record<string, SceneStatus> = {};
-  // The single source of truth for what's currently shown — status refreshes
-  // (triggered by any card's Add/Monitor click) re-render from this, so an
-  // ignored scene needs to actually leave this list, not just its DOM node.
-  // Removing only the node let a later refreshStatuses() call (which closed
-  // over the original fetch's full array) redraw the whole grid and bring
-  // already-ignored cards right back.
   let currentScenes: Scene[] = [];
 
-  // Bumped per load(): a slower earlier page/status response must not paint over a newer one.
   let seq = 0;
   const cards = new Map<string, HTMLElement>();
 
@@ -76,7 +63,6 @@ export function renderSceneSection(opts: {
     grid.replaceChildren(...currentScenes.map(buildCard));
   }
 
-  // A status change only needs the affected cards rebuilt, not the whole grid.
   function patchCards(ids: Set<string>) {
     if (ids.size === 0) return;
     hidePreview();
@@ -85,11 +71,6 @@ export function renderSceneSection(opts: {
     }
   }
 
-  // A card action (Add/Monitor/Unmonitor) only needs its own scene's status
-  // re-checked, not a full re-fetch of every visible card's status — that
-  // full-page-wide `sceneStatuses` call fans out to up to 2 sequential local
-  // Stash lookups per scene, and re-running it on every single click was what
-  // made "adding something" feel slow (16 cards' worth of lookups per click).
   async function refreshOneStatus(id: string) {
     const my = seq;
     const result = await api.sceneStatuses([id]);
@@ -127,13 +108,6 @@ export function renderSceneSection(opts: {
     opts.onCount?.(count);
   }
 
-  // First load has nothing on screen yet, so show a spinner. Every later load
-  // (pagination, window switch, refresh) keeps the current cards visible,
-  // just breathing (a slow pulse), instead of tearing them out for
-  // placeholders that would only get thrown away a moment later once the
-  // real results land. The try/finally is load-bearing — without it, a
-  // failed fetch (a transient StashDB error, say) leaves the grid pulsing
-  // forever with no way to clear it.
   async function load(bypassCache = false) {
     const mine = ++seq;
     const isFirstLoad = grid.children.length === 0;
@@ -149,8 +123,6 @@ export function renderSceneSection(opts: {
       statuses = {};
       currentScenes = scenes;
 
-      // Past the confirmed end (e.g. the list shrank since the page was
-      // listed) — step back to the real last page instead of a blank grid.
       if (scenes.length === 0 && page > 1 && !approximateCount) {
         page = Math.max(1, Math.ceil(count / opts.perPage));
         pageState.page = page;
@@ -168,8 +140,6 @@ export function renderSceneSection(opts: {
       renderGrid();
       void refreshStatuses();
 
-      // Warm the next page into the server-side cache so clicking "→" renders
-      // instantly. Fire-and-forget; errors are irrelevant (it's a prefetch).
       const hasNextPage = approximateCount || page * opts.perPage < count;
       if (!bypassCache && hasNextPage) {
         void opts.fetchPage(page + 1).catch(() => {});

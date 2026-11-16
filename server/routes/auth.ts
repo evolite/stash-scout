@@ -26,7 +26,6 @@ export function authRouter(cfg: AppConfig) {
     if (cfg.authMode !== "local" || typeof username !== "string" || typeof password !== "string") {
       return res.status(400).json({ error: "bad request" });
     }
-    // Always run scrypt, even for a wrong username, so timing doesn't reveal which was wrong.
     const passOk = verifyPassword(password, cfg.authPasswordHash);
     if (username !== cfg.authUsername || !passOk) return res.status(401).json({ error: "invalid credentials" });
     await startSession(req, res, username);

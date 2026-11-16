@@ -17,24 +17,20 @@ export type PerformerQueryResult = { count: number; performers: PerformerResult[
 
 type NumMod = "GREATER_THAN" | "LESS_THAN" | "EQUALS";
 
-// Flat wire shape for the "Discover performers" filter — same string-serialized
-// style as SceneFilter. gender/ethnicity/country/age/birth_year/is_favorite are
-// filtered by StashDB; eye_color/hair_color/height/cup_size/tattoos/piercings
-// are filtered server-side by paging StashDB's results (it ignores those).
 export interface PerformerFilter {
   name?: string;
   gender?: string;
   ethnicity?: string;
   country?: string;
   birth_year?: number;
-  birth_year_modifier?: "GREATER_THAN" | "LESS_THAN"; // after / before
+  birth_year_modifier?: "GREATER_THAN" | "LESS_THAN";
   is_favorite?: "1";
   eye_color?: string;
   hair_color?: string;
   height?: number;
   height_modifier?: NumMod;
   cup_size?: string;
-  cup_size_modifier?: NumMod; // GREATER_THAN = larger/equal, LESS_THAN = smaller/equal
+  cup_size_modifier?: NumMod;
   tattoos?: "yes" | "no";
   piercings?: "yes" | "no";
   sort?: string;
@@ -45,9 +41,9 @@ export interface PerformerFilter {
 
 export interface SceneFilter {
   text?: string;
-  tags?: string; // comma-separated ids
+  tags?: string;
   tags_modifier?: "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES";
-  exclude_tags?: string; // comma-separated ids, applied server-side alongside `tags`
+  exclude_tags?: string;
   performers?: string;
   studios?: string;
   date?: string;
@@ -68,9 +64,6 @@ export function setSessionActive(on: boolean): void {
   sessionActive = on;
 }
 
-// Read-only endpoints that every view re-requests on mount (filters, config,
-// stats badge...). Concurrent + recent calls share one request; any mutation
-// (non-GET) drops everything. Callers get a clone, so they can't corrupt the cache.
 const getCache = new Map<string, { at: number; promise: Promise<unknown> }>();
 function cachedGet<T>(path: string, ttlMs = 30_000): Promise<T> {
   let hit = getCache.get(path);
@@ -88,9 +81,6 @@ function cachedGet<T>(path: string, ttlMs = 30_000): Promise<T> {
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.method && init.method !== "GET") getCache.clear();
   const res = await fetch(path, init);
-  // Session expired mid-use: reload so main.ts shows the login view. Only once
-  // main.ts has confirmed we were logged in — module-level fetches (Navbar's
-  // config load) fire at import time, before login, and would reload forever.
   if (res.status === 401 && sessionActive && !path.startsWith("/api/auth/")) location.reload();
   if (!res.ok) {
     const detail = (await res.json().catch(() => null))?.error;
@@ -115,7 +105,6 @@ function qs(filter: object): string {
   return params.toString();
 }
 
-// Fetches the SQLite backup and hands it to the browser as a file download.
 async function downloadBackup(): Promise<void> {
   const res = await fetch("/api/settings/backup");
   if (res.status === 401 && sessionActive) location.reload();
@@ -131,8 +120,6 @@ export const api = {
   downloadBackup,
   queryScenes: (filter: SceneFilter, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes?${qs(filter)}${hideParam()}${refresh ? "&refresh=1" : ""}`),
-  // Same filter shape as queryScenes — sort/date are ignored server-side, it
-  // always picks its own random ~2-month window.
   randomScenes: (filter: SceneFilter, refresh = false) =>
     req<{ count: number; scenes: Scene[]; approximateCount?: boolean }>(`/api/scenes/random?${qs(filter)}${hideParam()}${refresh ? "&refresh=1" : ""}`),
   subscribedFeed: (page: number, perPage: number, window: "week" | "month" | "year", source?: string, showInLibrary = false, refresh = false) => {

@@ -10,9 +10,6 @@ import { fetchFilteredPage, parseHide } from "../statusFilter.js";
 export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
 
-  // Global exclude tags (Settings) apply everywhere scenes are fetched — Browse,
-  // Subscribed, and Favorites all route through the same queryScenesExcluding path
-  // rather than each re-implementing tag filtering.
   router.get("/scenes", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;
@@ -24,17 +21,11 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
       const refresh = q.refresh === "1" || q.refresh === "true";
       const allExcludes = mergeExcludeIds(excludeTagIds, getGlobalExcludeIds());
 
-      // Trending's "Not in library" / "Under 30 min" chips aren't StashDB query
-      // fields, and a Skipped scene needs to actually disappear on the next
-      // fetch — all filtered post-fetch, walking pages like the Subscribed feed
-      // already does, only when actually needed.
       const unadded = q.unadded === "1";
       const maxDuration = q.max_duration ? Number(q.max_duration) : undefined;
       const hide = parseHide(q.hide);
       const ignoredIds = getIgnoredIds();
       if (unadded || maxDuration || hide.length > 0 || ignoredIds.size > 0) {
-        // Only the first raw fetch of a refresh should bypass the source cache,
-        // or each round would wipe the previous round's progress.
         let bypass = refresh;
         const cacheKey = JSON.stringify({ route: "scenes", ...input, page: undefined, per_page: undefined, allExcludes, unadded, maxDuration, hide });
         const result = await fetchFilteredPage(
@@ -65,12 +56,6 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     }
   });
 
-  // "Random" charts mode: a random ~2-month slice of StashDB's history,
-  // otherwise respecting the same tags/performers/studios/exclude filter,
-  // global excludes, ignored scenes, and unadded-only behavior as /scenes.
-  // The window itself is picked and cached server-side (see
-  // queryScenesRandomWindow) so paging forward stays inside the same slice;
-  // `refresh=1` (the section's Refresh button) rerolls a new one.
   router.get("/scenes/random", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;
@@ -122,7 +107,6 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     }
   });
 
-  // Attribute-filtered performer discovery (Filters → Performers sub-tab).
   router.get("/performers", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;
@@ -190,11 +174,6 @@ export function scenesRouter(stashdb: StashDBClient, cfg: AppConfig, localStash:
     }
   });
 
-  // The Subscribed feed merges every saved filter marked `subscribed: true` plus your
-  // favorited StashDB performers (treated as just another source), restricted to
-  // scenes released within a window (week/month/year) — this is meant to be a
-  // "what's new" feed, not a full archive browse of the same filters. Merge
-  // logic lives in subscribedFeed.ts.
   router.get("/subscribed-feed", async (req, res) => {
     try {
       const q = req.query as Record<string, unknown>;

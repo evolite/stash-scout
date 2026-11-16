@@ -31,8 +31,6 @@ const EDITABLE_FIELDS = [
   "oidcAllowed",
 ] as const;
 
-// extraHeaders arrives as [{ name, value }]; a blank value keeps that header's
-// saved secret. Returns the stored "Name: value" per line block (null = clear).
 function parseHeaderRows(rows: unknown, saved: Record<string, string>): { block: string | null } | { error: string } {
   if (!Array.isArray(rows)) return { error: "invalid extraHeaders" };
   const lines: string[] = [];
@@ -47,7 +45,6 @@ function parseHeaderRows(rows: unknown, saved: Record<string, string>): { block:
   return { block: lines.length ? lines.join("\n") : null };
 }
 
-// Returns why the merged config would leave nobody able to log in, or null if fine.
 async function authConfigError(next: AppConfig): Promise<string | null> {
   if (next.authMode === "local" && !(next.authUsername && next.authPasswordHash)) {
     return "local auth needs a username and password";
@@ -66,11 +63,8 @@ async function authConfigError(next: AppConfig): Promise<string | null> {
 
 export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whisparr: WhisparrClient) {
   const router = Router();
-  // Saving can hash a password and trigger OIDC discovery, so cap how often it can be hit.
   const saveLimiter = rateLimit({ windowMs: 60_000, limit: 30 });
 
-  // Consistent online snapshot of app.db (VACUUM INTO). Deliberately excludes
-  // data/.secret-key, so stored API keys in the export only decrypt on this install.
   const backupLimiter = rateLimit({ windowMs: 60_000, limit: 5 });
   router.get("/settings/backup", backupLimiter, (_req, res) => {
     const dir = mkdtempSync(path.join(tmpdir(), "scout-backup-"));
@@ -95,9 +89,6 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     });
   });
 
-  // Non-secret view of the current config, for prefilling the Settings form.
-  // Secret fields are never returned — only whether one is currently set — so
-  // the browser never sees a StashDB/Stash/Whisparr key after it's been saved.
   router.get("/settings/config", (_req, res) => {
     res.json({
       stashdbUrl: cfg.stashdbUrl,
@@ -135,12 +126,9 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     if (patch.authMode !== undefined && !["off", "local", "oidc"].includes(patch.authMode as string)) {
       return res.status(400).json({ error: "invalid authMode" });
     }
-    // Plain password is hashed here and never stored; blank = unchanged.
     if (typeof req.body.authPassword === "string" && req.body.authPassword) {
       patch.authPasswordHash = hashPassword(req.body.authPassword);
     }
-    // Lockout guard: validate the merged result before applying, so a bad
-    // toggle can't leave nobody able to log in.
     const next = { ...cfg, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== "" && v !== undefined)) } as AppConfig;
     const authError = await authConfigError(next);
     if (authError) return res.status(400).json({ error: authError });
@@ -148,8 +136,6 @@ export function settingsRouter(cfg: AppConfig, localStash: LocalStashClient, whi
     res.status(204).end();
   });
 
-  // Single-purpose toggle for the Subscriptions tab's Favorites pseudo-row, so
-  // flipping it there doesn't have to round-trip the whole config form above.
   router.put("/settings/favorites-auto-add", saveLimiter, async (req, res) => {
     if (typeof req.body.enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
     await updateConfig(cfg, { favoritesAutoAdd: req.body.enabled });

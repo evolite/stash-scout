@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# ponytail: no systemd/cron/pm2 in this container, so this is the simplest
-# thing that works — a detached restart loop, started idempotently from
-# .bashrc. Upgrade to a real process manager if this container ever gets one.
 set -u
 cd "$(dirname "$0")/.."
 

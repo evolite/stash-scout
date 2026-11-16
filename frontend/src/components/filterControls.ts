@@ -1,9 +1,5 @@
 import { iconClose } from "../icons.js";
 
-// Shared look-and-feel for the scene Browse filter and the Performers filter so
-// the two sidebars stay visually identical. Both are a rounded surface card of
-// stacked labelled fields, a primary Apply button, and a collapsible "Saved"
-// block pinned at the top.
 export const SIDEBAR_CLASS = "bg-surface rounded-xl p-4 flex flex-col gap-3.5";
 export const LABEL_CLASS = "flex flex-col gap-1 text-xs font-medium text-muted";
 export const PRIMARY_BTN =
@@ -11,9 +7,6 @@ export const PRIMARY_BTN =
 export const GHOST_BTN =
   "bg-black/20 text-text rounded-lg px-3 py-2 text-sm font-medium hover:bg-black/30 transition-colors shrink-0 whitespace-nowrap";
 
-// Centered dashed-border placeholder for a results area with nothing in it yet
-// (no filters applied) or nothing to show (no matches). Shared by the Scenes
-// and Performers browsers so both read the same.
 export function emptyState(title: string, subtitle?: string): HTMLElement {
   const box = document.createElement("div");
   box.className =
@@ -80,8 +73,6 @@ export function fieldSelect(
   return wrap;
 }
 
-// A value + a modifier select (≥ / ≤ / =, or a custom pair). `type` is the
-// value input's type — "number" for height/birth year, "text" for cup size.
 export function fieldModifier(
   label: string,
   value: string | number | undefined,
@@ -144,8 +135,6 @@ export function applyButton(onClick: () => void, text = "Apply filters"): HTMLEl
   return btn;
 }
 
-// A disclosure wrapper: a header button (chevron + title + optional count) that
-// shows/hides `body`. Open/closed state is remembered per `storageKey`.
 export function collapsible(
   title: string,
   storageKey: string,
@@ -201,8 +190,6 @@ export function collapsible(
   return wrap;
 }
 
-// The "type a name, Save" row. `label`/`primary` let the subscription builder
-// reuse it as a "Subscribe" / "Update" button.
 export function saveRow(
   currentName: string,
   placeholder: string,
@@ -230,8 +217,6 @@ export function saveRow(
   return row;
 }
 
-// One row in a saved list: name button (+ optional sub-label), optional trailing
-// controls, delete button.
 export function savedRow(opts: {
   name: string;
   active: boolean;

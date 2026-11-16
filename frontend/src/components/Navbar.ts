@@ -31,8 +31,6 @@ function renderTabs(tabs: { id: Tab; label: string }[], active: Tab, onSelect: (
   return wrap;
 }
 
-// Quieter than the primary tabs on purpose — Settings is a persistent utility
-// link, not a content section competing for attention.
 const UTILITY_TAB_BASE = "flex items-center gap-1.5 h-8 px-3 rounded text-sm transition-colors duration-150";
 const UTILITY_TAB_ACTIVE = UTILITY_TAB_BASE + " bg-surface-2 text-muted";
 const UTILITY_TAB_INACTIVE = UTILITY_TAB_BASE + " text-text-faint hover:text-muted hover:bg-surface-2/60";
@@ -74,8 +72,6 @@ function iconGear(): SVGSVGElement {
   return svg;
 }
 
-// A small mark, not a logo image — a magnifying glass reads as "scout/search"
-// at 18px without needing an asset file.
 function renderLogoMark(): SVGSVGElement {
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
@@ -115,15 +111,8 @@ export function setSfwMode(on: boolean): void {
 
 setSfwMode(__DEV_INSTANCE__ || isSfwMode());
 
-// Populated once at module load — non-secret, only used to build link hrefs.
-// The navbar can render before this resolves (it's a fetch), so both
-// refresh functions below are re-run once config lands to fix up whatever
-// already rendered with an empty URL.
 let localStashRootUrl = "";
 let whisparrBaseUrl = "";
-// Fire-and-forget, NOT awaited — a top-level await here would suspend this
-// module's evaluation (and thus main.ts's first render()) on a network round
-// trip. The refresh functions below back-fill whatever already rendered.
 async function loadNavbarConfig(): Promise<void> {
   try {
     const cfg = await api.getConfig();
@@ -133,16 +122,13 @@ async function loadNavbarConfig(): Promise<void> {
     refreshBadgeVisibility();
     void refreshDownloadingBadges();
   } catch {
-    // leave both empty — links just won't render
+    /* ignore */
   }
 }
 void loadNavbarConfig();
 
-// Off by default — Feed/Trending hide scenes already in the library unless
-// this is switched on. Read by SubscribedView.ts when building its queries.
 const IN_LIBRARY_KEY = "inLibraryMode";
 
-// Read once per grid render by every card — memoized so it isn't a localStorage hit per card.
 let inLibraryCache: boolean | undefined;
 export function isInLibraryMode(): boolean {
   inLibraryCache ??= localStorage.getItem(IN_LIBRARY_KEY) === "1";
@@ -154,18 +140,11 @@ function setInLibraryMode(on: boolean): void {
   localStorage.setItem(IN_LIBRARY_KEY, on ? "1" : "0");
 }
 
-// Bundled locally (frontend/public/brand) rather than hotlinked from each
-// app's own instance URL — those are often only reachable from the server,
-// not from whatever machine the browser is on, so a live favicon fetch would
-// silently fail. Official assets: stashapp/Stash-Docs favicon.ico, and
-// Whisparr/Whisparr Logo/32.png (brand color #FF69B4 sampled from its SVG logo).
 const STASH_ICON_SRC = "/brand/stash.ico";
 const STASH_COLOR = "#c98f5e";
 const WHISPARR_ICON_SRC = "/brand/whisparr.png";
 const WHISPARR_COLOR = "#ff69b4";
 
-// Both brand pills (Stash link, Whisparr/downloading badge) share this exact
-// shape so they read as one matched pair in the navbar.
 const BRAND_PILL_BASE =
   "flex-col justify-center gap-1 h-8 px-3 rounded text-sm text-text-faint no-underline hover:no-underline " +
   "hover:text-muted hover:bg-surface-2/60 hover:-translate-y-0.5 transition duration-150";
@@ -180,23 +159,10 @@ function brandIcon(src: string, alt: string): HTMLImageElement {
   return img;
 }
 
-// Doubles as a Whisparr shortcut when idle — an empty "0 downloading" badge
-// on every page is noise, but an empty slot is wasted space, so it becomes a
-// plain link out to Whisparr until there's actually something to report.
 const DOWNLOADING_POLL_MS = 20_000;
 
-// main.ts fully re-renders the navbar (root.innerHTML = "") on every tab
-// switch, so renderDownloadingBadge/renderStashLink below just repoint this
-// at whichever instance is currently mounted, rather than looking it up via
-// document.querySelectorAll — which finds nothing when refresh runs at
-// creation time, before renderNavbar has appended the returned element.
 let currentBadge: HTMLAnchorElement | null = null;
 
-// Visibility + link target depend only on whether Whisparr is configured
-// (a fast local /api/settings/config call), NOT on the slow /api/stats proxy
-// below. Runs at badge creation — so on any navigation after the first load,
-// where module-level whisparrBaseUrl is already populated, the icon appears
-// synchronously — and again once getConfig() lands on the first load.
 function refreshBadgeVisibility(): void {
   const badge = currentBadge;
   if (!badge) return;
@@ -205,16 +171,11 @@ function refreshBadgeVisibility(): void {
     badge.classList.remove("flex");
     return;
   }
-  // Always a link to Whisparr — only the label/progress-bar content changes.
   badge.href = whisparrBaseUrl;
   badge.target = "_blank";
   badge.rel = "noopener";
   const label = badge.querySelector<HTMLElement>(".js-dl-label")!;
-  // Kept the same brand color in both states — an inline color always
-  // wins over the pill's hover:text-muted, so hovering the badge can't
-  // flash the label a different shade than the idle Stash/Whisparr links.
   label.style.color = WHISPARR_COLOR;
-  // Default until /api/stats reports otherwise, so first paint isn't blank.
   if (!label.textContent) label.textContent = "Whisparr";
   badge.classList.remove("hidden");
   badge.classList.add("flex");
@@ -222,7 +183,6 @@ function refreshBadgeVisibility(): void {
 
 async function refreshDownloadingBadges(): Promise<void> {
   const badge = currentBadge;
-  // No Whisparr → badge is hidden; hidden tab → nobody is looking. Skip the (slow) /api/stats proxy call.
   if (!badge || !whisparrBaseUrl || document.hidden) return;
   try {
     const stats = await api.stats();
@@ -230,7 +190,6 @@ async function refreshDownloadingBadges(): Promise<void> {
     const donut = badge.querySelector<HTMLElement>(".js-dl-donut")!;
     const icon = badge.querySelector<HTMLElement>(".js-dl-icon")!;
     if (stats.downloading > 0) {
-      // While downloading, the donut stands in for the brand icon.
       label.textContent = `${stats.downloading} downloading`;
       const pct = Math.max(0, Math.min(100, stats.downloadProgress ?? 0));
       donut.style.background = `conic-gradient(${WHISPARR_COLOR} ${pct}%, rgba(255,255,255,0.15) 0)`;
@@ -242,12 +201,10 @@ async function refreshDownloadingBadges(): Promise<void> {
       icon.classList.remove("hidden");
     }
   } catch {
-    // leave the badge as-is on a failed refresh
+    /* ignore */
   }
 }
 
-// Started once at module load rather than per render, driving whichever
-// badge is currently mounted via the module-level reference above.
 setInterval(refreshDownloadingBadges, DOWNLOADING_POLL_MS);
 
 function renderDownloadingBadge(): HTMLElement {
@@ -260,11 +217,6 @@ function renderDownloadingBadge(): HTMLElement {
   icon.classList.add("js-dl-icon");
   row.appendChild(icon);
 
-  // Inline donut (conic-gradient ring) rather than a progress bar below the
-  // row — a bar made the flex-col pill grow taller, nudging the Whisparr
-  // icon/text out of vertical alignment with the Stash link next to it.
-  // Sits right before the label so the ring and the "N downloading" count
-  // read as one unit. h-4/w-4 to match the 16px brand icon's line box.
   const donut = document.createElement("span");
   donut.className = "js-dl-donut hidden h-4 w-4 shrink-0 self-center rounded-full";
   const hole = "radial-gradient(closest-side, transparent 62%, #000 63%)";
@@ -351,11 +303,6 @@ function renderToggle(label: string, isOn: () => boolean, setOn: (on: boolean) =
   return btn;
 }
 
-// onLibraryToggle: the app's simple full-rerender-on-change model (see
-// main.ts's setTab) doesn't otherwise reach the "In Library" state into
-// SubscribedView's already-mounted sections — clicking the toggle re-renders the
-// whole app so Feed/Trending re-fetch with the new setting immediately.
-// Set once at boot by main.ts; the Logout button only exists when auth is on.
 let authMode: "off" | "local" | "oidc" = "off";
 export function setNavbarAuthMode(m: typeof authMode): void {
   authMode = m;
@@ -409,7 +356,7 @@ export function renderNavbar(active: Tab, onSelect: (tab: Tab) => void, onLibrar
   right.appendChild(renderDownloadingBadge());
   right.appendChild(renderToggle("In Library", isInLibraryMode, setInLibraryMode, onLibraryToggle));
   right.appendChild(renderToggle("SFW Mode", isSfwMode, setSfwMode));
-  right.appendChild(renderUndoSkip(onLibraryToggle)); // onLibraryToggle is main.ts's full render()
+  right.appendChild(renderUndoSkip(onLibraryToggle));
   right.appendChild(renderSettingsTab(active, onSelect));
   if (authMode !== "off") right.appendChild(renderLogout());
   nav.appendChild(right);

@@ -3,15 +3,10 @@ import { randomUUID } from "node:crypto";
 import { db, performerSearchRowTo as rowTo } from "../db.js";
 import type { SavedPerformerSearch } from "../../shared/types.js";
 
-// Named performer searches — filter params + the fetched result list, so a
-// saved search restores instantly without hitting StashDB. Mirrors
-// routes/filters.ts; "Update search" in the UI just PATCHes fresh results.
 export function performerSearchesRouter() {
   const router = Router();
 
   router.get("/performer-searches", (_req, res) => {
-    // json_array_length lets SQLite count the stored performers without this
-    // process parsing every (potentially multi-MB) results blob.
     const rows = db
       .prepare(
         `SELECT id, name, created_at, updated_at, filter,

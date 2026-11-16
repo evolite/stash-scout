@@ -5,26 +5,25 @@ import { hashPassword } from "./auth.js";
 
 interface StoredSettings {
   stashdbUrl?: string;
-  stashdbApiKey?: string; // encrypted
+  stashdbApiKey?: string;
   localStashUrl?: string;
-  localStashApiKey?: string; // encrypted
+  localStashApiKey?: string;
   localStashRootUrl?: string;
   whisparrBaseUrl?: string;
-  whisparrApiKey?: string; // encrypted
+  whisparrApiKey?: string;
   whisparrRootFolderPath?: string;
   whisparrQualityProfileId?: number;
   favoritesSubscribed?: boolean;
   favoritesAutoAdd?: boolean;
-  extraHeaders?: string; // encrypted
-  // Legacy Cloudflare Access fields — only read to migrate into extraHeaders.
+  extraHeaders?: string;
   cfAccessClientId?: string;
-  cfAccessClientSecret?: string; // encrypted
+  cfAccessClientSecret?: string;
   authMode?: AppConfig["authMode"];
   authUsername?: string;
   authPasswordHash?: string;
   oidcIssuer?: string;
   oidcClientId?: string;
-  oidcClientSecret?: string; // encrypted
+  oidcClientSecret?: string;
   oidcAllowed?: string;
 }
 
@@ -69,9 +68,6 @@ async function persist(cfg: AppConfig): Promise<void> {
   writeSettings(toStore);
 }
 
-// A stored secret that no longer decrypts (DB restored without its .secret-key)
-// must not crash-loop the container — treat it as unset and let the user
-// re-enter it in Settings.
 async function readSecret(field: string, stored: string | undefined, fallback: string | undefined): Promise<string | undefined> {
   if (!stored) return fallback;
   try {
@@ -82,9 +78,6 @@ async function readSecret(field: string, stored: string | undefined, fallback: s
   }
 }
 
-// PORT stays an env var (infra concern, not something you'd edit via the app UI
-// while the app is already listening on it) — everything else configurable and
-// testable moves here.
 export async function loadInitialConfig(): Promise<AppConfig> {
   const stored = readSettings();
   const isFirstBoot = stored === null;
@@ -114,10 +107,6 @@ export async function loadInitialConfig(): Promise<AppConfig> {
     oidcAllowed: s.oidcAllowed ?? envFallback("OIDC_ALLOWED"),
   };
 
-  // One-time migration: if this is the first boot after upgrading and .env had
-  // values, persist them encrypted now so future boots don't depend on .env —
-  // from here on the Settings UI is the source of truth.
-  // Migrate the old Cloudflare Access fields (stored or .env) into extraHeaders.
   let migrated = false;
   if (!s.extraHeaders) {
     const cfId = s.cfAccessClientId ?? envFallback("CF_ACCESS_CLIENT_ID");
@@ -133,16 +122,11 @@ export async function loadInitialConfig(): Promise<AppConfig> {
   return cfg;
 }
 
-// Mutates the live config object in place (rather than replacing it) so every
-// client already holding a reference to it — StashDBClient, WhisparrClient,
-// etc. — picks up the change immediately, no restart required.
 export async function updateConfig(cfg: AppConfig, patch: Record<string, unknown>): Promise<void> {
   for (const [key, value] of Object.entries(patch)) {
     if (value === null) {
       (cfg as any)[key] = undefined;
     } else if (value === undefined || value === "") {
-      // omitted/blank = leave existing value untouched (so secrets don't need
-      // to be re-entered just to change an unrelated field)
       continue;
     } else if (key === "whisparrQualityProfileId") {
       (cfg as any)[key] = Number(value);

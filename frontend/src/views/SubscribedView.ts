@@ -42,7 +42,6 @@ export function renderSubscribedView(): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex flex-col gap-3";
 
-  // Kept in viewState so Back from a performer lands on the same selections.
   const st = getState<{ window: Window; source?: string; sort: "TRENDING" | "POPULARITY" | "RANDOM"; trendingSource?: string }>(
     "subscribed",
     { window: "week", sort: "TRENDING" },
@@ -82,12 +81,6 @@ export function renderSubscribedView(): HTMLElement {
   }
   feedWrap.appendChild(subTabs);
 
-  // Filter-name chip bar — one chip per saved filter currently marked "subscribed"
-  // (plus the always-on "Favorites" source), driven by real data from
-  // /api/filters rather than hardcoded names.
-  // ponytail: chips list every subscribed filter, not just ones with a match
-  // right now (that needs a per-filter count query) — narrow to non-empty
-  // filters later if an empty chip proves annoying in practice.
   const sourceChipBar = document.createElement("div");
   sourceChipBar.className = "flex gap-1.5 flex-wrap mb-3";
   feedWrap.appendChild(sourceChipBar);
@@ -142,11 +135,6 @@ export function renderSubscribedView(): HTMLElement {
   trendingHeadingRow.appendChild(trendingHeading);
   trendingWrap.appendChild(trendingHeadingRow);
 
-  // "Trending" is StashDB's own recency-weighted activity score; "Popularity"
-  // is a plain all-time favorites/o-counter ranking; "Random" picks a random
-  // ~2-month slice of StashDB's history (server-side — see
-  // queryScenesRandomWindow) instead of sorting by either. Same section and
-  // chip bar below either way, just a different query.
   const sortToggle = document.createElement("div");
   sortToggle.className = "flex gap-1 mb-2";
   for (const s of [
@@ -170,11 +158,6 @@ export function renderSubscribedView(): HTMLElement {
   }
   trendingWrap.appendChild(sortToggle);
 
-  // Same exclusive saved-filter chip bar as Subscriptions above — "All matches"
-  // (the default) is plain unfiltered trending, exactly like before; picking a
-  // specific saved filter (or "Favorites") narrows Trending's own
-  // TRENDING-sorted query by that filter's tags/performers/studios/exclude_tags
-  // instead of switching to the windowed subscribed feed Subscriptions uses.
   let subscribedFilters: SavedFilter[] = [];
   const trendingChipBar = document.createElement("div");
   trendingChipBar.className = "flex gap-1.5 flex-wrap mb-3";
@@ -238,13 +221,6 @@ export function renderSubscribedView(): HTMLElement {
   trendingHeadingRow.appendChild(renderRefreshButton(() => trendingSection.refresh()));
   trendingWrap.appendChild(trendingSection.element);
 
-  // Shared by both chip bars — one saved-filters lookup drives Subscriptions'
-  // exclusive source picker and Trending's, keyed the same way (subscribed-flagged
-  // filters + a synthetic "Favorites"/"Favorites" entry). No reload here: the
-  // default "All" selection's query never depends on subscribedFilters (only a
-  // named-filter chip click does, and those chips don't exist to click until
-  // this resolves anyway) — reloading on arrival was a guaranteed-redundant
-  // re-fetch of what trendingSection's own initial load() already got.
   void api.listFilters().then((filters) => {
     subscribedFilters = filters.filter((f) => f.subscribed);
     const names = subscribedFilters.map((f) => f.name);

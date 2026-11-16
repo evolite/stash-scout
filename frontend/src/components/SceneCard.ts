@@ -20,9 +20,6 @@ function formatDuration(seconds: number | null): string {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-// A few close, flat dark neutrals — picked per scene id (not random) so a given
-// card's placeholder color is stable across re-renders, purely for variety
-// when there's no thumbnail image. No gradients.
 const PLACEHOLDER_SHADES = ["#2A2D33", "#26292E", "#2E3138"];
 function placeholderShade(id: string): string {
   let hash = 0;
@@ -40,27 +37,15 @@ function badgeFor(s: Scene, status: SceneStatus | undefined): { text: string; cl
     case "previously-added":
       return { text: "Unmonitored", className: "badge-removed" };
   }
-  // Neutral dark chip: this badge means "matched saved filter", not library
-  // status, so it only shows up when there's no more specific status above.
   if (s.sourceLabel) return { text: s.sourceLabel, className: "bg-black/75 text-text border border-white/[.12] font-semibold" };
   if (status?.kind === "not-added" && isWithinLastWeek(s.release_date)) return { text: "New", className: "badge-new" };
   return undefined;
 }
 
-// One shared floating preview (not one per card) — only ever one hover at a
-// time, and appending to <body> lets it escape the grid's overflow/stacking
-// instead of getting clipped by each card. Large and centered — a proper
-// look at the image, not a small thumbnail-sized peek — with a dimmed
-// backdrop so it reads clearly over whatever grid is behind it.
 const PREVIEW_DELAY_MS = 1000;
 let previewEl: HTMLDivElement | null = null;
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
-// Exported so callers can clear a stray floating preview before an action
-// tears down the card that's showing it — the mouse never leaves in that case
-// (the node is just removed/replaced from under the cursor), so mouseleave
-// never fires and the preview would otherwise stay stuck on screen until the
-// next unrelated hover or scroll.
 export function hidePreview(): void {
   clearTimeout(previewTimer);
   previewEl?.remove();
@@ -83,10 +68,6 @@ function showPreview(url: string): void {
   window.addEventListener("scroll", hidePreview, true);
 }
 
-// excludeEl (the hover-actions button row, when present) sits inside
-// imageWrap, so moving onto it doesn't fire imageWrap's own mouseleave —
-// without this, hovering the Add/Skip buttons still counted as hovering the
-// image and the preview would pop up (or stay showing) right over them.
 function attachHoverPreview(imageWrap: HTMLElement, url: string, excludeEl?: HTMLElement): void {
   function arm() {
     clearTimeout(previewTimer);
@@ -103,10 +84,6 @@ function attachHoverPreview(imageWrap: HTMLElement, url: string, excludeEl?: HTM
   }
 }
 
-// Disables the button and spins its icon for the duration of onClick — the
-// button (and its spinner) normally gets torn down almost immediately anyway
-// once onStatusChange/onRemove re-renders the card, but this is what's
-// actually visible while an Add/Monitor click is in flight instead of nothing.
 function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip" | undefined, onClick: () => void | Promise<void>): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -124,15 +101,6 @@ function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip"
   return btn;
 }
 
-// The single place scene actions live — a compact icon row that only appears
-// on hover, same for every section (Trending, Subscriptions): Play if it's
-// already in the local Stash, otherwise a +/- pair for whatever the current
-// status allows. Skip (-) always removes the card via onRemove (permanent
-// dismiss). Add/Monitor (+) removes it too — but only when "In Library" mode
-// is off, where the list is explicitly "scenes not in your library" (unadded
-// filter) so a just-added scene would fall out on the next refresh anyway.
-// With In Library mode on, the list keeps in-library scenes, so a newly
-// monitored one stays put with an updated badge (onStatusChange).
 function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement | undefined {
   if (!status) return undefined;
   const buttons: HTMLButtonElement[] = [];
@@ -145,7 +113,6 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
       }),
     );
   } else {
-    // Minus first, plus second.
     if (status.kind === "monitored") {
       buttons.push(
         hoverButton("Unmonitor", iconMinus(), "skip", async () => {
@@ -243,7 +210,6 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   studio.className = "SceneCard-text overflow-hidden text-ellipsis whitespace-nowrap";
   studio.textContent = s.studio?.name ?? "";
   if (studio instanceof HTMLButtonElement) {
-    // Pure in-app tab switch, same as the performer links below.
     studio.type = "button";
     studio.className += " bg-transparent border-0 p-0 text-inherit cursor-pointer hover:text-link";
     studio.addEventListener("click", (e) => {
@@ -259,16 +225,12 @@ export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onSta
   meta.appendChild(date);
   footer.appendChild(meta);
 
-  // Which genders show here is a user preference (Settings > Performers) —
-  // see genderPrefs.ts.
   const shownPerformers = s.performers.filter((p) => isGenderShown(p.performer.gender));
   if (shownPerformers.length > 0) {
     const performersRow = document.createElement("div");
     performersRow.className = "sfw-text text-muted mt-1 overflow-hidden text-ellipsis whitespace-nowrap";
     shownPerformers.forEach((p, i) => {
       if (i > 0) performersRow.appendChild(document.createTextNode(", "));
-      // Pure in-app tab switch (see navigation.ts) — not a real link, so no
-      // address-bar change and no page reload.
       const link = document.createElement("button");
       link.type = "button";
       link.className = "hover:text-link bg-transparent border-0 p-0 text-inherit cursor-pointer";

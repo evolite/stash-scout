@@ -3,11 +3,6 @@ import type { AppConfig } from "./config.js";
 import type { Scene, PerformerDetails, StudioDetails, PerformerResult } from "../shared/types.js";
 import { capMap } from "./cacheUtil.js";
 
-// StashDB's schema only has one `tags` filter (no separate exclude_tags field) — an
-// EXCLUDES modifier query and an INCLUDES/INCLUDES_ALL query are mutually exclusive,
-// so "include these AND exclude those" needs two requests intersected client-side.
-// v1 exposes a single tags criterion (one modifier at a time) to match what the API
-// actually supports in one call; combined include+exclude is a documented v2 gap.
 type SetModifier = "INCLUDES" | "INCLUDES_ALL" | "EXCLUDES";
 
 export interface SceneQueryInput {
@@ -23,12 +18,6 @@ export interface SceneQueryInput {
   direction: string;
 }
 
-// The "Discover performers" filter is split in two: `PerformerQueryInput` is
-// what StashDB's queryPerformers resolver actually honours; everything else
-// (eye/hair colour, height, cup size, tattoos, piercings) is a
-// `PerformerClientCriteria` we apply ourselves by paging + filtering StashDB's
-// results — its schema advertises those criteria but the server silently
-// ignores them.
 export interface PerformerQueryInput {
   name?: string;
   gender?: string;
@@ -42,16 +31,12 @@ export interface PerformerQueryInput {
   direction: string;
 }
 
-// Applied client-side (see queryPerformers). height.modifier is GREATER_THAN
-// (≥), LESS_THAN (≤) or EQUALS; the colour/cup fields are exact enum matches.
 export interface PerformerClientCriteria {
   eye_color?: string;
   hair_color?: string;
-  // modifier GREATER_THAN (cup ≥), LESS_THAN (cup ≤) or EQUALS; compared as
-  // upper-cased strings, which orders A<B<…<DD<E correctly enough.
   cup_size?: { value: string; modifier: string };
   height?: { value: number; modifier: string };
-  hasTattoos?: boolean; // true = has ≥1, false = has none
+  hasTattoos?: boolean;
   hasPiercings?: boolean;
 }
 
@@ -80,9 +65,6 @@ function performerHasCriteria(c: PerformerClientCriteria): boolean {
   return !!(c.eye_color || c.hair_color || c.cup_size || c.height) || c.hasTattoos !== undefined || c.hasPiercings !== undefined;
 }
 
-// Does `actual` fail the `modifier` comparison against `target`? LESS_THAN
-// means actual must be ≤ target, EQUALS exact, anything else ≥ (GREATER_THAN).
-// Strings compare lexically (upper-cased cup sizes: A<B<…<DD<E).
 function failsModifier<T extends number | string>(actual: T, target: T, modifier: string): boolean {
   if (modifier === "LESS_THAN") return actual > target;
   if (modifier === "EQUALS") return actual !== target;
@@ -120,13 +102,8 @@ const SCENE_FIELDS = `
 const MAX_PER_PAGE = 40;
 const MAX_LOOKUP_IDS = 100;
 
-// A hung/unresponsive StashDB otherwise leaves fetch() pending indefinitely —
-// Node's fetch has no default timeout — pinning the request handler open.
 const FETCH_TIMEOUT_MS = 15_000;
 
-// Hard backstop against StashDB's rate limit: no more than STASHDB_MAX_RPM requests
-// leave this process in any rolling 60s window, queued (not dropped) beyond that.
-// This bounds the worst case regardless of what any given feature does above it.
 const MAX_REQUESTS_PER_MINUTE = Number(process.env.STASHDB_MAX_RPM ?? 30);
 const requestTimestamps: number[] = [];
 let queue: Promise<void> = Promise.resolve();
@@ -145,14 +122,9 @@ function throttle(): Promise<void> {
   return run;
 }
 
-// Short-lived cache so repeated identical queries (page revisits, the exclude-tags
-// scan below, a re-render firing the same fetch twice) don't cost a fresh call.
 const CACHE_TTL_MS = 20_000;
 const RESPONSE_CACHE_MAX_ENTRIES = 1000;
 const responseCache = new Map<string, { at: number; expiresAt: number; data: unknown }>();
-// Collapses identical queries issued while one is already in flight (a
-// reset()+load() race in the UI, parallel merged-feed sources that resolve to
-// the same query) down to a single upstream request.
 const inflight = new Map<string, Promise<unknown>>();
 
 async function gql<T>(
@@ -200,13 +172,7 @@ async function gql<T>(
   return run;
 }
 
-// Per-filter accumulated results for exclude-tag queries — keyed on the filter
-// (minus page), so "next page" reuses previously-fetched StashDB pages instead
-// of rescanning. Capped in size and lifetime to bound memory and staleness.
 const EXCLUDE_CACHE_TTL_MS = 5 * 60_000;
-// StashDB pages fetched per call; the per-filter cache persists, so a deep or
-// heavily-excluded page resumes the scan on the next call instead of stopping
-// at a fixed total.
 const SCENE_SCAN_BUDGET = Number(process.env.STASHDB_SCENE_SCAN_BUDGET ?? 5);
 interface ExcludeCacheEntry {
   scenes: Scene[];
@@ -217,15 +183,7 @@ interface ExcludeCacheEntry {
 const FILTER_CACHE_MAX_ENTRIES = 200;
 const excludeCache = new Map<string, ExcludeCacheEntry>();
 
-// Same idea as excludeCache, for attribute-filtered performer discovery — page
-// through queryPerformers and keep only the performers matching the client-side
-// criteria, cached per filter so paging forward reuses earlier fetches.
 const MAX_CACHED_PERFORMERS = Number(process.env.STASHDB_MAX_CACHED_PERFORMERS ?? 300);
-// A rare-attribute filter (e.g. RED eyes) could otherwise page the entire
-// ~100k-performer catalogue at the 30 req/min rate limit — over an hour of
-// fetches for one request. Cap the StashDB pages scanned per request; the
-// per-filter cache persists, so paging forward resumes the scan where it left
-// off rather than restarting.
 const PERFORMER_SCAN_BUDGET = Number(process.env.STASHDB_PERFORMER_SCAN_BUDGET ?? 12);
 interface PerformerFilterCacheEntry {
   performers: PerformerResult[];
@@ -235,10 +193,7 @@ interface PerformerFilterCacheEntry {
 }
 const performerFilterCache = new Map<string, PerformerFilterCacheEntry>();
 
-// "Random" charts mode — see queryScenesRandomWindow below. Bounded to
-// 2010-01-01 onward: StashDB's pre-2010 catalog is thin enough that a
-// uniform pick further back mostly lands on a near-empty window.
-const RANDOM_WINDOW_DAYS = 61; // ~2 months
+const RANDOM_WINDOW_DAYS = 61;
 const RANDOM_WINDOW_RANGE_START = new Date("2010-01-01T00:00:00Z").getTime();
 const RANDOM_WINDOW_TTL_MS = 5 * 60_000;
 interface RandomWindowEntry {
@@ -251,20 +206,6 @@ interface RandomWindowEntry {
 }
 const randomWindowCache = new Map<string, RandomWindowEntry>();
 
-// Merged "subscribed filters" feed — same idea as excludeCache but fanning out to
-// several source filters, deduping by scene id, and keeping each source's own
-// page cursor so growing the feed doesn't restart every source from page 1.
-//
-// The output round-robins one scene from each source per fetch round, appended
-// directly to a single flat `merged` list as they're found (rather than kept
-// per-source and re-interleaved by array position on every read). A pure global
-// date sort would let one prolific filter's results fill the entire visible page
-// before a rarer filter's results ever surfaced — round-robin guarantees every
-// subscribed filter gets representation. Appending directly (instead of recomputing
-// row-by-row from each source's current length) matters because a slower source
-// growing between two page fetches would otherwise retroactively fill earlier
-// "rows", shifting every later position and re-serving a scene already sent on a
-// previous page.
 const MERGED_FEED_TTL_MS = 5 * 60_000;
 const MAX_MERGE_ROUNDS = 3;
 interface MergedFeedEntry {
@@ -276,7 +217,6 @@ interface MergedFeedEntry {
 }
 const mergedFeedCache = new Map<string, MergedFeedEntry>();
 
-// Fisher-Yates, in place.
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = randomInt(0, i + 1);
@@ -312,7 +252,7 @@ export class StashDBClient {
       }`,
       variables,
       bypassCache,
-      60_000, // scene data barely changes minute-to-minute; feeds it into the 5-min exclude/merged caches
+      60_000,
     );
     return data.queryScenes;
   }
@@ -345,13 +285,6 @@ export class StashDBClient {
     return data.queryPerformers;
   }
 
-  // Attribute-filtered performer discovery (Filters → Performers). `input` is
-  // the part StashDB filters natively; `criteria` (eye/hair colour, height, cup
-  // size, tattoos, piercings) is applied here by paging through StashDB's
-  // results in the requested sort order and keeping only the matches —
-  // accumulated into a per-filter cache like queryScenesExcluding, capped at
-  // MAX_CACHED_PERFORMERS so a very selective filter comes back
-  // short/approximate rather than scanning the whole catalogue.
   async queryPerformers(
     input: Partial<PerformerQueryInput>,
     criteria: PerformerClientCriteria = {},
@@ -382,7 +315,7 @@ export class StashDBClient {
       entry.performers.length < MAX_CACHED_PERFORMERS &&
       scannedThisRequest < PERFORMER_SCAN_BUDGET
     ) {
-      const { performers } = await this.rawQueryPerformers( // NOSONAR: next page depends on this one (internalPage/exhausted)
+      const { performers } = await this.rawQueryPerformers( // NOSONAR
         { ...input, page: entry.internalPage, per_page: MAX_PER_PAGE },
         bypassCache,
       );
@@ -393,23 +326,12 @@ export class StashDBClient {
     }
 
     return {
-      // Always the count actually matched so far — while not exhausted it's a
-      // lower bound (approximateCount tells the UI more may follow). StashDB's
-      // own total is meaningless here since it ignores the attribute criteria.
       count: entry.performers.length,
       performers: entry.performers.slice(skip, skip + perPage),
       approximateCount: !entry.exhausted,
     };
   }
 
-  // StashDB has no "include tag A, exclude tag B" query — its `tags` filter takes
-  // one modifier. We fake it server-side: page through StashDB's results (which
-  // already include each scene's full tag list), drop scenes carrying an excluded
-  // tag, and keep the accumulated result *cached per filter* (not per page) so
-  // paging forward through the browser reuses what's already been fetched instead
-  // of re-scanning from page 1 every time. Each call fetches at most SCENE_SCAN_BUDGET
-  // pages — we're rate-limited by StashDB, so a heavily-excluded or very deep
-  // query comes back short/approximate and resumes on the next call.
   async queryScenesExcluding(
     input: Partial<SceneQueryInput>,
     excludeTagIds: string[],
@@ -430,7 +352,7 @@ export class StashDBClient {
     const excludeSet = new Set(excludeTagIds);
 
     for (let fetched = 0; entry.scenes.length < skip + perPage && !entry.exhausted && fetched < SCENE_SCAN_BUDGET; fetched++) {
-      const { scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache); // NOSONAR: next page depends on this one (internalPage/exhausted)
+      const { scenes } = await this.queryScenes({ ...input, page: entry.internalPage, per_page: MAX_PER_PAGE }, bypassCache); // NOSONAR
       for (const scene of scenes) {
         if (!scene.tags.some((t) => excludeSet.has(t.id))) entry.scenes.push(scene);
       }
@@ -448,24 +370,6 @@ export class StashDBClient {
     };
   }
 
-  // Picks a random ~2-month slice of StashDB's history and pages through it —
-  // "Random" charts mode. StashDB's DateCriterionInput has no BETWEEN/value2
-  // (confirmed by introspection), just a single value+modifier, so a genuine
-  // date *range* means the same trick as queryScenesExcluding above: fetch
-  // ascending from a random start (GREATER_THAN, cheap and indexed) and drop
-  // anything past the window's end client-side, accumulating into a cache
-  // keyed on the filter (not the page) so paging forward reuses what's
-  // already been fetched. The window itself is part of that cache entry, so
-  // it stays fixed while you page through it and only rerolls on a fresh
-  // cache miss (TTL expiry or an explicit reset/refresh).
-  //
-  // Popularity-within-this-window was considered and dropped: StashDB
-  // exposes no popularity field to sort client-side (confirmed by
-  // introspection), and its own `sort: POPULARITY` can't be combined with a
-  // date *range* (only a one-sided filter) — ranking by it here would mean
-  // paging through popularity order with no chronological cutoff to stop at,
-  // either capped-and-approximate or an unbounded scan. Staying with date
-  // order, which is exact and cheap.
   private randomWindow(): { start: string; end: string } {
     const latestStart = Date.now() - RANDOM_WINDOW_DAYS * 24 * 60 * 60 * 1000;
     const span = Math.max(0, latestStart - RANDOM_WINDOW_RANGE_START);
@@ -484,8 +388,6 @@ export class StashDBClient {
     const page = input.page ?? 1;
     const skip = (page - 1) * perPage;
 
-    // date/sort/direction are ours to set — a saved filter's own date
-    // criterion (if any) would defeat the point of a random window.
     const { date: _date, sort: _sort, direction: _direction, page: _page, per_page: _perPage, ...baseInput } = input;
     const key = JSON.stringify({ ...baseInput, excludeTagIds: [...excludeTagIds].sort((a, b) => a.localeCompare(b)) });
     if (opts.reset || opts.bypassCache) randomWindowCache.delete(key);
@@ -499,7 +401,7 @@ export class StashDBClient {
     const excludeSet = new Set(excludeTagIds);
 
     for (let fetched = 0; entry.scenes.length < skip + perPage && !entry.exhausted && fetched < SCENE_SCAN_BUDGET; fetched++) {
-      await this.advanceRandomWindowEntry(entry, baseInput, excludeSet, opts.bypassCache); // NOSONAR: next page depends on this one (internalPage/exhausted)
+      await this.advanceRandomWindowEntry(entry, baseInput, excludeSet, opts.bypassCache); // NOSONAR
     }
 
     return {
@@ -538,10 +440,6 @@ export class StashDBClient {
     if (!entry.exhausted) entry.internalPage++;
   }
 
-  // Merges several saved filters (the Subscribed feed) into one paginated, deduped
-  // result — round-robinned across sources (see interleave() above) — cached per
-  // filter-set so paging forward reuses each source's already-fetched pages
-  // instead of re-querying every source again.
   async queryMergedFeed(
     sources: { input: Partial<SceneQueryInput>; excludeTagIds: string[]; label: string }[],
     page: number,
@@ -551,13 +449,6 @@ export class StashDBClient {
     opts: { randomize?: boolean; reset?: boolean; bypassCache?: boolean } = {},
   ): Promise<{ count: number; scenes: Scene[]; approximateCount: boolean }> {
     const skip = (page - 1) * perPage;
-    // `reset` re-shuffles on every fresh visit to page 1 rather than only when
-    // the cache naturally expires. It must come from the *client's* requested
-    // page (the caller decides this once, up front) — queryMergedFeed's own
-    // `page` here is fetchFilteredPage's internal round cursor, which always
-    // restarts at 1 within a single request regardless of the page the client
-    // actually asked for, so using it directly would reseed mid-pagination and
-    // reshuffle/duplicate/skip scenes across what should be stable pages.
     if (opts.reset || opts.bypassCache) mergedFeedCache.delete(cacheKey);
     let entry = mergedFeedCache.get(cacheKey);
     if (!entry || Date.now() - entry.at > MERGED_FEED_TTL_MS) {
@@ -571,18 +462,11 @@ export class StashDBClient {
       mergedFeedCache.set(cacheKey, entry);
       capMap(mergedFeedCache, FILTER_CACHE_MAX_ENTRIES);
     }
-    // Visible = the merged list minus whatever's been ignored since — filtered
-    // here (not just skipped on insert) so a scene ignored after being cached
-    // disappears immediately rather than waiting for the cache to expire.
     const visible = () => entry!.merged.filter((s) => !ignoredIds.has(s.id));
 
     let round = 0;
     while (visible().length < skip + perPage && !entry.exhaustedAll && round < MAX_MERGE_ROUNDS) {
-      // Fan out to every source in parallel — the rate limiter (throttle())
-      // still caps actual dispatch, this just stops each source's round-trip
-      // latency from stacking. Each advance does its await then a synchronous
-      // dedup-and-append, so concurrent sources can't interleave a duplicate.
-      await Promise.all( // NOSONAR: each merge round depends on the previous round's cursors
+      await Promise.all( // NOSONAR
         sources.map((src, i) => this.advanceMergedFeedSource(entry!, src, entry!.cursors[i], opts)),
       );
       entry.exhaustedAll = entry.cursors.every((c) => c.exhausted);
@@ -597,11 +481,6 @@ export class StashDBClient {
     };
   }
 
-  // Always fetches in fast, indexed DATE order — StashDB's random sort is a
-  // slow full-table shuffle at this scale. For `randomize`, shuffles each
-  // freshly-fetched batch before appending instead: already-appended scenes
-  // keep their position (so pages already served stay stable), but new
-  // arrivals land in a randomized spot rather than strict date order.
   private async advanceMergedFeedSource(
     entry: MergedFeedEntry,
     src: { input: Partial<SceneQueryInput>; excludeTagIds: string[]; label: string },
@@ -638,10 +517,6 @@ export class StashDBClient {
     return data[queryName];
   }
 
-  // Resolves ids back to names (e.g. re-populating a saved filter's chips) in one
-  // request via aliases, rather than one lookup call per id. Capped — the id
-  // list comes straight from a query string, and one aliased field per id
-  // would otherwise let an arbitrarily long list balloon the GraphQL query.
   private async findByIds<T = { id: string; name: string }>(queryName: string, ids: string[], selection = "id name"): Promise<T[]> {
     if (ids.length === 0) return [];
     const capped = ids.slice(0, MAX_LOOKUP_IDS);
@@ -659,13 +534,11 @@ export class StashDBClient {
       `query (${argsDecl}) { ${fields} }`,
       variables,
       false,
-      30 * 60_000, // id -> name; effectively immutable
+      30 * 60_000,
     );
     return Object.values(data).filter((t): t is T => t !== null);
   }
 
-  // Picked studios plus their sub-studios, so a network covers its whole lineup.
-  // ponytail: one level deep and capped at 500 sub-studios per network; recurse/page if StashDB nests deeper.
   private async withSubStudios(ids: string[]): Promise<string[]> {
     const found = await this.findByIds<{ sub_studios: { studios: { id: string }[] } }>(
       "findStudio",
@@ -687,8 +560,6 @@ export class StashDBClient {
   findPerformersByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
     return this.findByIds("findPerformer", ids);
   }
-  // searchStudio is whole-word only ("brazz" finds nothing), so use
-  // queryStudios' LIKE match on the name instead.
   async findStudios(text: string): Promise<{ id: string; name: string }[]> {
     const data = await gql<{ queryStudios: { studios: { id: string; name: string }[] } }>(
       this.cfg.stashdbUrl,
@@ -706,8 +577,6 @@ export class StashDBClient {
     return this.findByIds("findStudio", ids);
   }
 
-  // Full record for the Performers/Studios tab header — 30-min TTL, same as the
-  // id->name lookups (this data changes rarely).
   async findPerformerDetails(id: string): Promise<PerformerDetails | null> {
     const data = await gql<{ findPerformer: PerformerDetails | null }>(
       this.cfg.stashdbUrl,

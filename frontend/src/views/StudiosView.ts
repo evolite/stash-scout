@@ -8,10 +8,6 @@ import { getState } from "../viewState.js";
 
 const PER_PAGE = 32;
 
-// Mirror of PerformersView: browse one studio's StashDB scenes, optionally
-// narrowed by a chosen subscribed filter's tags/exclude_tags. The browsed studio
-// is pinned as the `studios` criterion. Global exclude tags are applied
-// server-side unconditionally (server/routes/scenes.ts).
 export function renderStudiosView(initialId?: string): HTMLElement {
   const container = document.createElement("div");
   container.className = "flex flex-col gap-4";
@@ -29,7 +25,6 @@ export function renderStudiosView(initialId?: string): HTMLElement {
   const sectionWrap = document.createElement("div");
   container.appendChild(sectionWrap);
 
-  // Survives render() so Back from a performer restores the studio, chip and page.
   const st = getState<{ studioId?: string; filterName?: string }>("studios", {});
   if (initialId && initialId !== st.studioId) {
     st.studioId = initialId;
@@ -105,7 +100,6 @@ export function renderStudiosView(initialId?: string): HTMLElement {
   function loadStudio(id: string, name?: string) {
     if (id !== studioId) st.filterName = undefined;
     studioId = st.studioId = id;
-    // Put the studio in the URL so Back from a performer pops to this studio.
     if (window.location.pathname !== `/studios/${id}`) history.replaceState(null, "", `/studios/${id}`);
     renderChips();
     renderHeaderPlaceholder(name);
@@ -113,7 +107,7 @@ export function renderStudiosView(initialId?: string): HTMLElement {
       (d) => {
         if (studioId === id) header.replaceChildren(renderStudioHeader(d));
       },
-      () => {}, // keep the placeholder on failure
+      () => {},
     );
     mountSection();
   }

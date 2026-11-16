@@ -1,7 +1,5 @@
 import { api } from "../api.js";
 
-// Single-select "jump to this studio" typeahead — mirror of PerformerSearch.
-// Selecting a result navigates immediately instead of adding to a filter list.
 export function renderStudioSearch(onSelect: (id: string, name: string) => void): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "relative max-w-sm";

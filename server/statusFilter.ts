@@ -5,14 +5,8 @@ import type { Scene } from "../shared/types.js";
 import { getSceneStatus } from "./stateMachine.js";
 import { capMap } from "./cacheUtil.js";
 
-// Shared by Subscribed and Favorites: both are "what's new to act on" feeds where
-// scenes already playable (in Stash) or already added to Whisparr in any form
-// don't belong.
 const ALREADY_ADDED_KINDS = new Set(["in-stash", "monitored", "previously-added", "downloading"]);
-const RAW_PAGE_SIZE = 40; // StashDB's max per_page
-// New raw pages scanned per request. The cursor below persists, so a page that
-// didn't fill within budget resumes on the next request (or the UI's
-// next-page prefetch) instead of restarting from raw page 1.
+const RAW_PAGE_SIZE = 40;
 const SCAN_BUDGET = Number(process.env.STASHDB_FILTER_SCAN_BUDGET ?? 5);
 const CURSOR_TTL_MS = 5 * 60_000;
 const CURSOR_MAX_ENTRIES = 200;
@@ -32,8 +26,6 @@ export function parseHide(v: unknown): Orientation[] {
   return typeof v === "string" ? (v.split(",").filter((o) => o === "gay" || o === "lesbian" || o === "straight") as Orientation[]) : [];
 }
 
-// Only MALE/FEMALE count; a scene with no clear all-male / all-female /
-// mixed signal is always kept.
 function orientationHidden(scene: Scene, hide: Orientation[]): boolean {
   if (hide.length === 0) return false;
   const genders = new Set(scene.performers.map((p) => p.performer.gender));
@@ -46,13 +38,6 @@ function orientationHidden(scene: Scene, hide: Orientation[]): boolean {
   return o !== null && hide.includes(o);
 }
 
-// Accumulates the post-filter scene list per filter (cacheKey) across
-// requests, walking raw (StashDB-side) pages from where the last request
-// stopped — filtering after StashDB's own pagination means page N's contents
-// depend on everything before it, so restarting from raw page 1 each time
-// (with a fixed round cap) left deep pages empty. A source that returns a
-// short page while still `approximateCount` just ran out of its own budget:
-// the same raw page is re-read next time, `seen` drops the repeats.
 export async function fetchFilteredPage(
   cfg: AppConfig,
   clients: { localStash: LocalStashClient; whisparr: WhisparrClient },
@@ -70,7 +55,6 @@ export async function fetchFilteredPage(
     cursors.set(cacheKey, entry);
     capMap(cursors, CURSOR_MAX_ENTRIES);
   }
-  // Re-applied on read so a scene skipped after being cached disappears now.
   const visible = () => (opts.excludeIds?.size ? entry!.visible.filter((s) => !opts.excludeIds!.has(s.id)) : entry!.visible);
 
   for (let round = 0; round < SCAN_BUDGET && !entry.exhausted && visible().length < skip + perPage; round++) {

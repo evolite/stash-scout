@@ -33,7 +33,6 @@ export async function getSceneStatus(
   }
 
   if (movie.hasFile) {
-    // Has a file in Whisparr but not matched into local Stash yet (not scanned/synced) — monitored state.
     return { kind: "monitored", movieId: movie.id };
   }
 

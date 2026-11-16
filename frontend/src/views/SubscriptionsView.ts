@@ -20,7 +20,6 @@ function tip(e: HTMLElement, text: string): HTMLElement {
 
 const count = (csv?: string) => (csv ? csv.split(",").filter(Boolean).length : 0);
 
-// Tag/performer/studio filters are stored as ids, so summarise by count.
 function summarise(f: SceneFilter): string[] {
   const out: string[] = [];
   if (f.text) out.push(`"${f.text}"`);
@@ -41,7 +40,6 @@ const ICONS = {
   del: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6",
 };
 
-// 28px icon button; `on` (when given) makes it a toggle: blue icon (bell also filled) when on, grey when off.
 function iconBtn(kind: keyof typeof ICONS, title: string, onClick: () => void, opts: { on?: boolean; danger?: boolean } = {}): HTMLElement {
   const toggleable = opts.on !== undefined;
   const hoverText = opts.danger ? "hover:text-danger" : "hover:text-text";
@@ -65,7 +63,6 @@ export function renderSubscriptionsView(navigate: (tab: Tab) => void): HTMLEleme
   const container = el("div", "flex flex-col gap-5 max-w-3xl");
   const body = el("div", "flex flex-col gap-5");
 
-  // Subscribe (bell) + auto-monitor (download) toggles, shared by filter rows and Favorites.
   function toggles(
     subscribed: boolean,
     autoMonitor: boolean,
@@ -82,7 +79,6 @@ export function renderSubscriptionsView(navigate: (tab: Tab) => void): HTMLEleme
     ];
   }
 
-  // Active rows get an accent edge + tinted background.
   const rowClass = (active: boolean) =>
     `${CARD} px-3 py-3 flex items-start gap-3 border-l-4 ${active ? "border-l-accent bg-accent/5" : "border-l-transparent opacity-80"}`;
 
@@ -130,8 +126,6 @@ export function renderSubscriptionsView(navigate: (tab: Tab) => void): HTMLEleme
     return row;
   }
 
-  // Favorites is a synthetic feed source, not a filters row — a pinned pseudo-row
-  // whose two switches are server settings.
   function favoritesCard(subscribed: boolean, autoAdd: boolean): HTMLElement {
     const row = el("div", rowClass(subscribed));
     const info = el("div", "flex-1 min-w-0 flex flex-col gap-1.5");
@@ -140,15 +134,14 @@ export function renderSubscriptionsView(navigate: (tab: Tab) => void): HTMLEleme
     chips.appendChild(el("span", CHIP, "new scenes from your StashDB favorite performers"));
     info.appendChild(chips);
     row.append(
-      el("span", "shrink-0 w-3"), // aligns with the drag grip on filter rows
+      el("span", "shrink-0 w-3"),
       info,
       ...toggles(subscribed, autoAdd, (n) => api.setFavoritesSubscribed(n), (n) => api.setFavoritesAutoAdd(n)),
-      el("span", "shrink-0 w-7"), // aligns with the delete button on filter rows
+      el("span", "shrink-0 w-7"),
     );
     return row;
   }
 
-  // Native drag-and-drop on the grip handle; saves the DOM order on drop.
   function enableReorder(cards: HTMLElement) {
     let dragged: HTMLElement | null = null;
     cards.addEventListener("dragover", (e) => {

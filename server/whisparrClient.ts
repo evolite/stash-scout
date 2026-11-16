@@ -22,16 +22,11 @@ export interface WhisparrQueueItem {
 const MOVIE_CACHE_TTL_MS = 30_000;
 const QUEUE_CACHE_TTL_MS = 5_000;
 
-// A hung/unresponsive Whisparr otherwise leaves fetch() pending indefinitely —
-// Node's fetch has no default timeout.
 const FETCH_TIMEOUT_MS = 15_000;
 
-// Ported from stashgifs/src/WhisparrClient.ts, trimmed to what the backend needs.
 export class WhisparrClient {
   private movieListCache?: { fetchedAt: number; promise: Promise<WhisparrScene[]> };
   private queueCache?: { fetchedAt: number; promise: Promise<WhisparrQueueItem[]> };
-  // O(1) lookups per scene instead of a linear scan of the whole library; rebuilt
-  // only when the underlying array changes.
   private movieIndex?: { list: WhisparrScene[]; byKey: Map<string, WhisparrScene>; byId: Map<number, WhisparrScene> };
   private queueIndex?: { list: WhisparrQueueItem[]; byMovieId: Map<number, WhisparrQueueItem> };
 
@@ -81,7 +76,6 @@ export class WhisparrClient {
       const byKey = new Map<string, WhisparrScene>();
       const byId = new Map<number, WhisparrScene>();
       for (const m of list) {
-        // first match wins, as the old list.find did
         if (m.stashId && !byKey.has(m.stashId)) byKey.set(m.stashId, m);
         if (m.foreignId && !byKey.has(m.foreignId)) byKey.set(m.foreignId, m);
         byId.set(m.id, m);
@@ -91,8 +85,6 @@ export class WhisparrClient {
     return this.movieIndex;
   }
 
-  // Swap the mutated movie into the cached list so the next status check
-  // doesn't re-download the whole /movie library.
   private async patchMovie(movie: WhisparrScene) {
     const cache = this.movieListCache;
     if (!cache) return;
@@ -129,9 +121,6 @@ export class WhisparrClient {
     return this.queueIndex.byMovieId.get(movieId) ?? null;
   }
 
-  // For the stats dashboard's bulk classification — reuses the same cached
-  // movie list / queue every per-scene status check already fetches, instead
-  // of adding new Whisparr calls.
   async getBulkStatusSource(): Promise<{ movies: WhisparrScene[]; queue: WhisparrQueueItem[] }> {
     const [movies, queue] = await Promise.all([this.getMovieList(), this.getQueue()]);
     return { movies, queue };

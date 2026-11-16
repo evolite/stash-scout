@@ -1,9 +1,3 @@
-// Which performer genders show up on scene cards. Purely a browsing
-// preference (like SFW Mode / In Library in Navbar.ts) — localStorage-backed,
-// not round-tripped through the server config, so it applies instantly with
-// no Save step. StashDB's GenderEnum has exactly these six values (confirmed
-// via introspection); a performer with no reported gender always shows,
-// regardless of these toggles — there's nothing meaningful to filter it by.
 export const GENDERS = [
   { id: "FEMALE", label: "Female" },
   { id: "MALE", label: "Male" },
@@ -16,7 +10,6 @@ export const GENDERS = [
 const KEY = "shownGenders";
 const DEFAULT_SHOWN = ["FEMALE"];
 
-// Memoized: isGenderShown runs per performer per card on every grid render.
 let shownCache: Set<string> | undefined;
 
 export function getShownGenders(): Set<string> {
@@ -72,10 +65,6 @@ export function setHideStraightScenes(v: boolean): void {
   localStorage.setItem(HIDE_STRAIGHT_KEY, String(v));
 }
 
-// Whole-scene filter (distinct from isGenderShown, which only hides
-// individual performer chips within a card). Applied server-side
-// (server/statusFilter.ts) so pages come back full rather than being thinned
-// out after pagination — this just builds the query param.
 export function hideParam(): string {
   const hide = [
     getHideGayScenes() && "gay",

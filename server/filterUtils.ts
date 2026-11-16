@@ -1,8 +1,5 @@
 import type { SceneQueryInput, PerformerQueryInput, PerformerClientCriteria } from "./stashdbClient.js";
 
-// Shared between the ad-hoc /api/scenes query-string filter and a saved filter's
-// stored JSON — both are the same field shape (frontend's SceneFilter, serialized
-// to strings), so one parser covers both sources.
 export function parseStashFilter(q: Record<string, unknown>): { input: Partial<SceneQueryInput>; excludeTagIds: string[] } {
   const input: Partial<SceneQueryInput> = {
     sort: typeof q.sort === "string" ? q.sort : "DATE",
@@ -16,7 +13,6 @@ export function parseStashFilter(q: Record<string, unknown>): { input: Partial<S
     input.performers = { value: q.performers.split(","), modifier: "INCLUDES_ALL" };
   }
   if (typeof q.studios === "string" && q.studios) {
-    // Networks are expanded to their sub-studios in StashDBClient.queryScenes.
     input.studios = { value: q.studios.split(","), modifier: "INCLUDES" };
   }
   if (typeof q.date === "string" && q.date) {
@@ -29,15 +25,9 @@ export function parseStashFilter(q: Record<string, unknown>): { input: Partial<S
   return { input, excludeTagIds };
 }
 
-// Flat query string from the "Discover performers" sidebar -> a StashDB-native
-// `input` plus the `criteria` we filter ourselves (see queryPerformers).
-// `birth_year` takes GREATER_THAN (after) / LESS_THAN (before), default after;
-// `height` also allows EQUALS. tattoos/piercings are "yes" | "no".
-// after/before only (birth year)
 function twoWayModifier(m: unknown): "LESS_THAN" | "GREATER_THAN" {
   return m === "LESS_THAN" ? "LESS_THAN" : "GREATER_THAN";
 }
-// ≥ / ≤ / = (height, cup size); default ≥
 function threeWayModifier(m: unknown): string {
   return m === "LESS_THAN" || m === "EQUALS" ? (m as string) : "GREATER_THAN";
 }
@@ -49,8 +39,6 @@ function yesNo(v: unknown): boolean | undefined {
 
 type Str = (k: string) => string | undefined;
 
-// The StashDB-native half of the performer filter (gender/ethnicity/country/
-// birth year/favourite — everything its API actually filters on).
 function parsePerformerInput(q: Record<string, unknown>, str: Str): Partial<PerformerQueryInput> {
   const input: Partial<PerformerQueryInput> = {
     sort: str("sort") ?? "SCENE_COUNT",
@@ -69,7 +57,6 @@ function parsePerformerInput(q: Record<string, unknown>, str: Str): Partial<Perf
   return input;
 }
 
-// The half we filter ourselves by paging StashDB's results (see queryPerformers).
 function parsePerformerCriteria(q: Record<string, unknown>, str: Str): PerformerClientCriteria {
   const criteria: PerformerClientCriteria = {};
   if (str("eye_color")) criteria.eye_color = str("eye_color");
@@ -87,8 +74,6 @@ function parsePerformerCriteria(q: Record<string, unknown>, str: Str): Performer
   return criteria;
 }
 
-// Flat query string from the "Discover performers" sidebar -> a StashDB-native
-// `input` plus the `criteria` we filter ourselves.
 export function parsePerformerFilter(q: Record<string, unknown>): {
   input: Partial<PerformerQueryInput>;
   criteria: PerformerClientCriteria;

@@ -20,7 +20,6 @@ export function verifyPassword(pw: string, stored: string | undefined): boolean 
   return timingSafeEqual(want, got);
 }
 
-// "<base64url json>.<hmac>" — stateless, so logout only clears the cookie.
 export function sign(payload: object, ttlMs: number, key: Buffer): string {
   const body = Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + ttlMs })).toString("base64url");
   return `${body}.${createHmac("sha256", key).update(body).digest("base64url")}`;
@@ -58,7 +57,6 @@ export async function isLoggedIn(req: Request): Promise<boolean> {
   return !!verify(readCookie(req, COOKIE), await sessionKey());
 }
 
-// Reads cfg.authMode live, so flipping the toggle in Settings applies without a restart.
 export function requireAuth(cfg: AppConfig) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (cfg.authMode === "off" || req.path.startsWith("/auth/") || (await isLoggedIn(req))) return next();

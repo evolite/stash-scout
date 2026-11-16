@@ -11,7 +11,6 @@ export function filtersRouter() {
     res.json(rows.map(rowToFilter));
   });
 
-  // Body: { ids: string[] } in the desired order. Position is the array index.
   router.put("/filters/order", (req, res) => {
     const ids = req.body.ids;
     if (!Array.isArray(ids) || !ids.every((i) => typeof i === "string")) return void res.status(400).json({ error: "ids must be a string array" });

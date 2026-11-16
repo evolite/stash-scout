@@ -21,10 +21,6 @@ export function getIgnoredIds(): Set<string> {
   return new Set((db.prepare("SELECT id FROM ignored_scenes").all() as { id: string }[]).map((s) => s.id));
 }
 
-// Shared by the JSON /subscribed-feed route (paginated, for the frontend grid) and
-// the RSS feed route (single large page, for Whisparr's RSS import list) — both
-// need the exact same "merge every subscribed filter + Favorites, windowed,
-// deduped, unadded-only" result, just rendered differently.
 export async function getSubscribedFeed(
   deps: { stashdb: StashDBClient; cfg: AppConfig; localStash: LocalStashClient; whisparr: WhisparrClient },
   opts: { window: string; page: number; perPage: number; refresh?: boolean; source?: string; unadded?: boolean; hide?: Orientation[]; autoAddOnly?: boolean },
@@ -32,19 +28,12 @@ export async function getSubscribedFeed(
   const { stashdb, cfg, localStash, whisparr } = deps;
   const { page, perPage, refresh = false } = opts;
   const windowDays = SUBSCRIBED_WINDOW_DAYS[opts.window] ?? SUBSCRIBED_WINDOW_DAYS.week;
-  // Month/year are long enough spans that date order goes stale fast — randomize
-  // instead, reshuffling on every fresh page-1 visit (see queryMergedFeed).
   const randomize = opts.window === "month" || opts.window === "year";
 
-  // autoAddOnly (the hourly Whisparr job) narrows the merge to sources the user
-  // opted in: filters flagged auto_add, and Favorites only when its own
-  // setting is on. With nothing opted in there's no feed at all — don't touch
-  // StashDB.
   const subscribedFilters = (
     db.prepare(`SELECT * FROM filters WHERE watched = 1${opts.autoAddOnly ? " AND auto_add = 1" : ""}`).all() as any[]
   ).map(filterRowToSavedFilter);
   const useFavorites = cfg.favoritesSubscribed !== false && (!opts.autoAddOnly || !!cfg.favoritesAutoAdd);
-  // Nothing active (no subscribed filters, Favorites off) → empty feed, no StashDB call.
   if (subscribedFilters.length === 0 && !useFavorites) {
     return { count: 0, scenes: [], approximateCount: false };
   }
@@ -66,14 +55,9 @@ export async function getSubscribedFeed(
         ]
       : []),
   ];
-  // The Subscriptions filter-name chip bar narrows to a single source's matches
-  // instead of the full merge — "all" (or no source) keeps every source active.
   if (opts.source && opts.source !== "all") {
     sources = sources.filter((s) => s.label === opts.source);
   }
-  // cutoff (changes daily) and the global excludes are folded into the cache
-  // key so the window rolls forward and a Settings change is picked up
-  // immediately instead of serving a stale cached merge.
   const cacheKey = JSON.stringify({
     cutoff,
     globalExcludes,
@@ -84,14 +68,8 @@ export async function getSubscribedFeed(
   });
   const ignoredIds = getIgnoredIds();
 
-  // Only the *first* internal round of this request should trigger a reseed —
-  // fetchFilteredPage may call queryMergedFeed several times per request as it
-  // pages through raw results, and re-deleting the cache on every one of those
-  // internal calls would wipe out progress made by the previous call.
   const reseed = (randomize && page === 1) || refresh;
   let pendingReset = reseed;
-  // One-shot like pendingReset: bypassing on every internal round would wipe
-  // the merged-feed cursors each time and re-walk every source from page 1.
   let pendingBypass = refresh;
   const unadded = opts.unadded !== false;
   return fetchFilteredPage(
@@ -102,8 +80,6 @@ export async function getSubscribedFeed(
       pendingReset = false;
       const bypassCache = pendingBypass;
       pendingBypass = false;
-      // Ignored scenes are dropped by fetchFilteredPage instead — filtering
-      // them here would shift raw page boundaries under its cursor.
       return stashdb.queryMergedFeed(sources, rawPage, pp, cacheKey, new Set(), { randomize, reset, bypassCache });
     },
     page,

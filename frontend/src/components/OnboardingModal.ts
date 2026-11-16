@@ -1,7 +1,3 @@
-// Shown once, on first run (nothing configured yet, and not previously
-// dismissed — see main.ts). Appended to <body>, not the app's #root, so it
-// survives root's full-teardown re-renders (main.ts's render() does
-// root.innerHTML = "" on every tab switch/toggle).
 export function renderOnboardingModal(onDismiss: () => void): HTMLElement {
   const overlay = document.createElement("div");
   overlay.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6";

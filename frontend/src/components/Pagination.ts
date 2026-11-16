@@ -13,9 +13,6 @@ export function renderPagination(opts: {
 }): HTMLElement {
   const { page, perPage, count, approximate, onPage } = opts;
   const knownTotalPages = Math.max(1, Math.ceil(count / perPage));
-  // `approximate` = the server hasn't confirmed the end yet, and `count` is
-  // only what it has actually found so far (+1). List just those pages plus
-  // "next" — guessing a full window ahead advertised pages that came back empty.
   const totalPages = approximate ? Math.max(knownTotalPages, page + 1) : knownTotalPages;
 
   const wrap = document.createElement("div");

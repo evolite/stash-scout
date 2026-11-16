@@ -21,16 +21,6 @@ import {
   saveRow,
 } from "./filterControls.js";
 
-// "Discover performers" — attribute search over StashDB. Gender / ethnicity /
-// country / birth year / favourites are filtered by StashDB directly; eye
-// colour, hair colour, height, cup size and has-tattoos / has-piercings are
-// filtered by the server paging through StashDB's results (its API advertises
-// those filters but ignores them). A card opens the Performers tab.
-//
-// A search can be saved by name (the "Preset name" box + Save, same pattern as
-// the scene Browse sidebar) — the filter AND the fetched first page are stored,
-// so a saved search restores instantly with no StashDB call. "Update" re-runs
-// it against StashDB.
 const PER_PAGE = 40;
 const DETAIL_PER_PAGE = 32;
 
@@ -57,7 +47,6 @@ function renderSidebar(
   fields.className = "flex flex-col gap-3.5";
   aside.appendChild(fields);
 
-  // Filtered by StashDB itself.
   fields.append(
     fieldText("Name contains", "name…", draft.name, (v) => (draft.name = v || undefined)),
     fieldSelect("Gender", GENDERS, draft.gender, "Any", (v) => (draft.gender = v || undefined)),
@@ -79,8 +68,6 @@ function renderSidebar(
     fieldCheckbox("Favourites only", draft.is_favorite === "1", (on) => (draft.is_favorite = on ? "1" : undefined)),
   );
 
-  // Divider: everything below is ignored by StashDB and matched by us paging
-  // through its results (see queryPerformers). The "why" is on the ⓘ tooltip.
   const clientBreak = document.createElement("div");
   clientBreak.className = "border-t border-black/20 pt-3 flex items-center gap-1.5";
   const clientTitle = document.createElement("span");
@@ -191,9 +178,6 @@ function renderCard(p: PerformerResult, onOpen: (id: string, name: string) => vo
   return card;
 }
 
-// Persisted across re-mounts (e.g. returning here via the browser Back button
-// after opening a performer) so the grid comes back exactly as it was left —
-// same filter, same results — with no re-query.
 let persistedFilter: PerformerFilter | undefined;
 let persistedResult: PerformerQueryResult | undefined;
 let persistedSearchId: string | undefined;
@@ -207,11 +191,6 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
   const contentCol = document.createElement("div");
   pane.append(sidebarCol, contentCol);
 
-  // Right column shows either the results grid or one performer's detail
-  // (scenes). The filter sidebar stays put across the switch; opening a
-  // performer pushes /performers/<id> so the browser Back button returns to
-  // the grid (main.ts's popstate re-mounts this in grid mode, restoring the
-  // persisted results below — no re-query).
   let detailId: string | undefined = initialDetailId;
 
   let filter: PerformerFilter = persistedFilter
@@ -244,8 +223,6 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     void load();
   }
 
-  // A sidebar action (apply / load saved search) while viewing a performer
-  // drops back to the grid and clears the stale /performers/<id> URL.
   function leaveDetail() {
     if (!detailId) return;
     detailId = undefined;
@@ -254,7 +231,6 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
 
   async function onSave(draft: PerformerFilter, name: string) {
     filter = { ...draft };
-    // Always fetch the page fresh so the stored results match the saved filter.
     const results = await api.queryPerformers({ ...filter, page: 1 });
     try {
       const existing = (await api.listPerformerSearches()).find((s) => s.name === name);
@@ -322,9 +298,6 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     }
   }
 
-  // Collapsible "Saved searches" block pinned at the top of the sidebar. A name restores the stored
-  // first page instantly; ✕ deletes; when one is loaded, "Update" re-runs it
-  // against StashDB and overwrites the stored page.
   async function renderSavedPanel(host: HTMLElement) {
     let searches: Awaited<ReturnType<typeof api.listPerformerSearches>>;
     try {
@@ -408,10 +381,6 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     renderDetail(id, name);
   }
 
-  // Back to the performer grid. Doesn't use history.back() — the previous
-  // history entry can be a scene detail/results page (e.g. arrived here by
-  // clicking a performer from a scene), and "Back to results" must always
-  // return to the performer results.
   function showGrid() {
     if (window.location.pathname.startsWith("/performers/")) history.replaceState(null, "", "/");
     detailId = undefined;
@@ -419,8 +388,6 @@ export function renderPerformerBrowse(initialDetailId?: string): HTMLElement {
     else renderIdleHint();
   }
 
-  // Ported from the old standalone Performers tab: performer search box, header,
-  // subscribed-filter chips, and the scene list pinned to this performer.
   function renderDetail(id: string, knownName?: string) {
     contentCol.innerHTML = "";
 

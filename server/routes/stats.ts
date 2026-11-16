@@ -7,8 +7,6 @@ import type { StatsSummary } from "../../shared/types.js";
 
 const TIMELINE_DAYS = 30;
 
-// Mirrors stateMachine.ts's per-scene bucketing (hasFile/queue/monitored), run
-// once over the whole list instead of once per scene id.
 function classifyMovies(movies: WhisparrScene[], queue: WhisparrQueueItem[]) {
   const queuedMovieIds = new Set(queue.map((q) => q.movieId));
   let downloaded = 0;
@@ -26,8 +24,6 @@ function classifyMovies(movies: WhisparrScene[], queue: WhisparrQueueItem[]) {
   return { totalInWhisparr: movies.length, downloaded, downloading, wanted, unmonitored, monitoredTotal };
 }
 
-// Bytes-weighted so a mostly-done large file counts more than a barely-started
-// small one; null when Whisparr hasn't reported sizes yet (item just queued).
 function aggregateDownloadProgress(queue: WhisparrQueueItem[]): number | null {
   let totalSize = 0;
   let totalRemaining = 0;
@@ -40,8 +36,6 @@ function aggregateDownloadProgress(queue: WhisparrQueueItem[]): number | null {
   return Math.round(((totalSize - totalRemaining) / totalSize) * 100);
 }
 
-// Dense day-by-day series (zero-filled) over the trailing TIMELINE_DAYS window,
-// so the chart shows gaps instead of only the days something was added.
 function buildTimeline(movies: WhisparrScene[]): StatsSummary["timeline"] {
   const countsByDay = new Map<string, number>();
   for (const m of movies) {

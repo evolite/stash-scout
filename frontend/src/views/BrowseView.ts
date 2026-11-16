@@ -25,7 +25,6 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
   container.appendChild(sidebarCol);
   container.appendChild(contentCol);
 
-  // Survives render() so Back from a performer restores the applied filter.
   const st = getState<{ filter?: SceneFilter; name: string }>("browse", { name: "" });
   let filter: SceneFilter = st.filter ?? { page: 1, per_page: PER_PAGE, sort: "DATE", direction: "DESC" };
   let statuses: Record<string, SceneStatus> = {};
@@ -72,9 +71,6 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
     void load();
   }
 
-  // Saves the drafted sidebar filter as a subscription ("new": same name
-  // overwrites that one; "edit": updates the one being edited, renaming if the
-  // name changed), then returns to the Subscriptions tab where it lives.
   async function commitSubscription(draft: SceneFilter, name: string) {
     const { mode, id: editId } = getSubscriptionMode();
     filter = { ...draft };
@@ -97,13 +93,12 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
     const anyDownloading = Object.values(statuses).some((s) => s.kind === "downloading");
     if (anyDownloading) {
       pollTimer = setInterval(() => {
-        if (!container.isConnected) return clearInterval(pollTimer); // view was re-rendered away
+        if (!container.isConnected) return clearInterval(pollTimer);
         void refreshStatuses(scenes);
       }, 5000);
     }
   }
 
-  // Bumped per load(): a slower earlier response must not paint over a newer one.
   let seq = 0;
   const cards = new Map<string, HTMLElement>();
 
@@ -119,9 +114,6 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
     schedulePollingIfDownloading(scenes);
   }
 
-  // A card action only needs its own scene's status re-checked, not every
-  // visible card's — re-running the full batch on every click was fanning out
-  // to up to 2 sequential local Stash lookups per scene on the whole page.
   async function refreshOneStatus(id: string, scenes: Scene[]) {
     const my = seq;
     const result = await api.sceneStatuses([id]);
@@ -150,7 +142,6 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
     grid.replaceChildren(...scenes.map((s) => buildCard(s, scenes)));
   }
 
-  // A status change only needs the affected cards rebuilt, not the whole grid.
   function patchCards(scenes: Scene[], ids: Set<string>) {
     if (ids.size === 0) return;
     hidePreview();

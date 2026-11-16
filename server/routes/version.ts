@@ -7,13 +7,12 @@ const REPO = "evolite/stash-scout";
 const TAGS_URL = `https://api.github.com/repos/${REPO}/tags?per_page=30`;
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 const CHECK_TTL_MS = 6 * 60 * 60_000;
-const RETRY_TTL_MS = 10 * 60_000; // after a failed lookup, don't hammer GitHub
-const MIN_REFRESH_MS = 60_000; // "Check now" can't bypass the cache more than once a minute
+const RETRY_TTL_MS = 10 * 60_000;
+const MIN_REFRESH_MS = 60_000;
 const FETCH_TIMEOUT_MS = 8_000;
 
 const parts = (v: string) => v.replace(/^v/, "").split(".").map((n) => Number.parseInt(n, 10) || 0);
 
-// >0 when a is newer than b (numeric per segment, so 0.10.0 > 0.9.0).
 export function compareVersions(a: string, b: string): number {
   const pa = parts(a);
   const pb = parts(b);
@@ -35,13 +34,8 @@ async function fetchLatestVersion(): Promise<string | null> {
   return newest?.replace(/^v/, "") ?? null;
 }
 
-// Version comes from package.json (injected); the changelog is CHANGELOG.md in
-// the project root, generated at release time by git-cliff and baked into the
-// image — so release notes never need a network call, only "is there a newer
-// version" does. Set DISABLE_UPDATE_CHECK=1 to skip that lookup entirely.
 export function versionRouter(current: string) {
   const router = Router();
-  // Generous: the UI hits each of these once per page load; this only stops abuse.
   const limiter = rateLimit({ windowMs: 60_000, limit: 120 });
   const checkEnabled = process.env.DISABLE_UPDATE_CHECK !== "1";
   let latest: string | null = null;

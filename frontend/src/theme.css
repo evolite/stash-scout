@@ -44,10 +44,6 @@ html.sfw .SceneCard-text {
 }
 
 @layer components {
-  /* Status badge hierarchy is deliberate: In Library is the only *resolved*
-     state, so it's the only one that gets a solid fill. New/Monitored are
-     still pending a decision, so they stay quiet outlines — never the same
-     weight as In Library. */
   .SceneCard-badge {
     @apply absolute top-2 left-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide;
   }

@@ -30,7 +30,6 @@ function renderHero(s: StatsSummary): HTMLElement {
     { label: "Wanted", n: s.wanted, color: "bg-warning" },
     { label: "Unmonitored", n: s.unmonitored, color: "bg-text-faint" },
   ];
-  // Total-zero → empty track only (no divide-by-zero).
   const bar = el("div", "flex h-2 rounded-full overflow-hidden bg-surface-3 gap-px");
   for (const seg of segments) {
     if (!seg.n || !s.totalInWhisparr) continue;
@@ -135,7 +134,6 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
   const maxCount = Math.max(1, ...timeline.map((d) => d.count));
   const midCount = Math.round(maxCount / 2);
 
-  // Y axis: tick labels for 0 / mid / max, right-aligned against the chart.
   const yAxis = document.createElement("div");
   yAxis.className = "shrink-0 flex flex-col justify-between text-right text-[10px] text-muted";
   yAxis.style.height = `${CHART_HEIGHT_PX}px`;
@@ -146,9 +144,6 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
     yAxis.appendChild(tick);
   }
 
-  // Chart area: gridlines at the same 0/mid/max levels, bars absolutely
-  // positioned to fill the area so bottom-anchoring doesn't depend on
-  // flexbox stretch behavior of nested percentage heights.
   const chartArea = document.createElement("div");
   chartArea.className = "relative flex-1";
   chartArea.style.height = `${CHART_HEIGHT_PX}px`;
@@ -182,9 +177,6 @@ function renderTimeline(timeline: StatsSummary["timeline"]): HTMLElement {
   chartRow.appendChild(chartArea);
   wrap.appendChild(chartRow);
 
-  // X axis: one flex-1 slot per day (same gap as the bars) so labels line up
-  // under their bar exactly; only every X_LABEL_INTERVAL-th (plus the last)
-  // actually shows text, to avoid 30 crowded labels.
   const xAxisRow = document.createElement("div");
   xAxisRow.className = "flex gap-2";
   const xAxisSpacer = document.createElement("div");

@@ -98,7 +98,6 @@ interface SettingsPage {
 
 const SAVED_PAGE_KEY = "settingsPage";
 
-// Left nav: grouped buttons that show one page at a time and remember the last one.
 function renderNav(nav: HTMLElement, pages: SettingsPage[], saveBar: HTMLElement): void {
   const navButtons = new Map<string, HTMLButtonElement>();
   function showPage(id: string) {
@@ -145,9 +144,6 @@ export function renderSettingsView(): HTMLElement {
     const [cfg, settings, test] = await Promise.all([api.getConfig(), api.settings(), api.testSettings()]);
     container.innerHTML = "";
 
-    // Radarr-style layout: grouped left nav, one sub page shown at a time.
-    // Every page is built up front and just hidden/shown, so a single Save
-    // covers edits made across the config pages.
     const nav = document.createElement("nav");
     nav.className = "w-52 shrink-0 flex flex-col gap-4 sticky top-4";
     const content = document.createElement("div");
@@ -169,7 +165,6 @@ export function renderSettingsView(): HTMLElement {
       bottomNote.textContent = "Unsaved changes";
     }
 
-    // --- StashDB ---
     const stashdbS = section("StashDB", "Scene & performer metadata.");
     setStatusPill(stashdbS.pill, test.stashdb);
     const stashdbUrl = fieldRow("URL", { value: cfg.stashdbUrl });
@@ -178,7 +173,6 @@ export function renderSettingsView(): HTMLElement {
     stashdbS.body.appendChild(stashdbKey.row);
     addPage("Connections", "stashdb", "StashDB", stashdbS.section, true);
 
-    // --- Local Stash ---
     const stashS = section("Local Stash", "Checks your library.");
     setStatusPill(stashS.pill, test.localStash);
     if (!settings.localStashConfigured) stashS.note.textContent = "not configured";
@@ -192,7 +186,6 @@ export function renderSettingsView(): HTMLElement {
     stashS.body.appendChild(stashKey.row);
     addPage("Connections", "stash", "Local Stash", stashS.section, true);
 
-    // --- Whisparr ---
     const whisparrS = section("Whisparr", "Auto-downloads monitored scenes.");
     setStatusPill(whisparrS.pill, test.whisparr);
     if (!settings.whisparrConfigured) whisparrS.note.textContent = "not configured";
@@ -261,11 +254,8 @@ export function renderSettingsView(): HTMLElement {
     whisparrS.body.appendChild(loadOptionsBtn);
     addPage("Connections", "whisparr", "Whisparr", whisparrS.section, true);
 
-    // --- Custom headers ---
-    // Values are secrets: only names come back from the server, so a saved
-    // header's value box stays blank ("(unchanged)") and blank = keep it.
     const headersS = section("Custom headers", "Sent with every Stash/Whisparr request, e.g. for an auth proxy.");
-    headersS.pill.remove(); // no independent connection test — shared by Stash/Whisparr's own status
+    headersS.pill.remove();
     const headerRows = document.createElement("div");
     headerRows.className = "flex flex-col gap-2";
     function addHeaderRow(name = "", saved = false) {
@@ -310,7 +300,6 @@ export function renderSettingsView(): HTMLElement {
     headersS.body.append(headerRows, addHeaderBtn);
     addPage("Connections", "headers", "Custom headers", headersS.section, true);
 
-    // --- Authentication ---
     const authS = section("Authentication", "Require a login to use this app.");
     authS.pill.remove();
     const modeRow = document.createElement("label");
@@ -330,8 +319,6 @@ export function renderSettingsView(): HTMLElement {
     const oidcAllowed = fieldRow("Allowed email / sub", { value: cfg.oidcAllowed, placeholder: "blank = anyone the provider authenticates" });
     const oidcHint = document.createElement("p");
     oidcHint.className = "m-0 text-xs text-muted";
-    // Built from the URL you're browsing on (the server derives the same value
-    // from the request Host/X-Forwarded-Proto), so it follows wherever the app is served.
     oidcHint.append(
       "Add this as an allowed redirect URI in your OIDC provider (not here) — it must match exactly: ",
     );
@@ -350,7 +337,6 @@ export function renderSettingsView(): HTMLElement {
     syncAuthRows();
     addPage("System", "auth", "Authentication", authS.section, true);
 
-    // --- Backup: one-click download of the SQLite database ---
     const backupPanel = document.createElement("div");
     backupPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const backupTitle = document.createElement("h3");
@@ -388,10 +374,6 @@ export function renderSettingsView(): HTMLElement {
       input.addEventListener("change", markDirty);
     }));
 
-    // --- Performer genders shown on scene cards ---
-    // A browsing preference, not a server-synced connection setting — applies
-    // instantly (localStorage, see genderPrefs.ts), so it's kept outside
-    // the config pages / dirty-tracking Save flow on purpose.
     const gendersPanel = document.createElement("div");
     gendersPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const gendersTitle = document.createElement("h3");
@@ -418,8 +400,6 @@ export function renderSettingsView(): HTMLElement {
     gendersPanel.appendChild(gendersGrid);
     addPage("Browsing", "genders", "Genders on Cards", gendersPanel, false);
 
-    // --- Hide scenes by cast ---
-    // Whole-scene filter, same localStorage pattern as the genders page.
     const sceneFilterPanel = document.createElement("div");
     sceneFilterPanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const sfTitle = document.createElement("h3");
@@ -448,10 +428,6 @@ export function renderSettingsView(): HTMLElement {
     sceneFilterPanel.appendChild(sfRow);
     addPage("Browsing", "hide", "Hide Scenes by Gender", sceneFilterPanel, false);
 
-    // --- Global exclude tags ---
-    // Server-synced but self-persisting (each add/remove hits the API on its
-    // own), so like the genders panel it sits outside the dirty-tracked Save
-    // flow above.
     const excludePanel = document.createElement("div");
     excludePanel.className = "bg-surface border border-line rounded-lg p-5 flex flex-col gap-3";
     const excludeTitle = document.createElement("h3");
@@ -462,7 +438,6 @@ export function renderSettingsView(): HTMLElement {
     addPage("Browsing", "exclude", "Global Exclusion Filters", excludePanel, false);
     void renderExcludeTagsPanel().then((p) => excludePanel.appendChild(p));
 
-    // --- Save bar ---
     const saveBar = document.createElement("div");
     saveBar.className = "flex items-center justify-between gap-2";
     const bottomNote = document.createElement("span");

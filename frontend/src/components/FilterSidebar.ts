@@ -2,9 +2,6 @@ import { api, type SceneFilter } from "../api.js";
 import { iconClose } from "../icons.js";
 import { SIDEBAR_CLASS, LABEL_CLASS, applyButton, saveRow } from "./filterControls.js";
 
-// Tag/performer/studio pickers here are simple comma-separated-id inputs backed by
-// a typeahead search — enough to exercise StashDB's INCLUDES/INCLUDES_ALL/EXCLUDES
-// modifiers without building a full multi-select widget.
 function idPicker(
   label: string,
   placeholder: string,
@@ -140,9 +137,6 @@ export function renderFilterSidebar(
   modifierLabel.appendChild(modifierSelect);
   aside.appendChild(modifierLabel);
 
-  // StashDB's API can't combine an include-tags filter with an exclude-tags filter
-  // in one query, so this is resolved server-side (see /api/scenes handling of
-  // exclude_tags) rather than faked by filtering results in the browser.
   aside.appendChild(
     idPicker("Exclude tags (NOT)", "search tag name...", draft.exclude_tags ?? "", (ids) => {
       draft.exclude_tags = ids || undefined;

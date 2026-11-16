@@ -1,5 +1,3 @@
-/* Dev-only (loaded when __DEV_INSTANCE__ is true; never in the release build).
-   Heavier than prod SFW Mode: images fully obscured, text redacted. */
 html.sfw main img,
 html.sfw .fixed img,
 html.sfw .SceneCard-image,

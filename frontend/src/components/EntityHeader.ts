@@ -1,8 +1,5 @@
 import type { PerformerDetails, StudioDetails } from "../api.js";
 
-// The looked-up performer/studio shown above its scene grid: image + name + a
-// compact fact grid. Used by PerformersView and StudiosView.
-
 function chipRow(label: string, values: string[]): HTMLElement | null {
   if (values.length === 0) return null;
   const row = document.createElement("div");
