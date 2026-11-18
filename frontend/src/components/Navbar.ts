@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { iconUndo } from "../icons.js";
+import { restoreSkipped } from "../skipUndo.js";
 
 export type Tab = "browse" | "subscribed" | "subscriptions" | "performers" | "studios" | "stats" | "settings";
 
@@ -328,7 +329,8 @@ function renderUndoSkip(rerender: () => void): HTMLElement {
   el.setAttribute("aria-label", "Undo skip");
   el.appendChild(iconUndo());
   el.addEventListener("click", async () => {
-    await api.undoLastSkip();
+    const { id } = await api.undoLastSkip();
+    if (id && restoreSkipped(id)) return;
     rerender();
   });
   return el;

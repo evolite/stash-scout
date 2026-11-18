@@ -220,7 +220,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     }),
-  undoLastSkip: () => req(`/api/ignored-scenes/latest`, { method: "DELETE" }),
+  undoLastSkip: () => req<{ id: string | null }>(`/api/ignored-scenes/latest`, { method: "DELETE" }),
   authStatus: () => req<{ mode: "off" | "local" | "oidc"; loggedIn: boolean }>(`/api/auth/status`),
   login: (username: string, password: string) =>
     req(`/api/auth/login`, {

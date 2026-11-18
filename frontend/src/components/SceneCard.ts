@@ -1,4 +1,5 @@
 import { api, type Scene, type SceneStatus } from "../api.js";
+import { rememberSkip, type Restore } from "../skipUndo.js";
 import { iconPlay, iconPlus, iconMinus } from "../icons.js";
 import { navigateToPerformer, navigateToStudio } from "../navigation.js";
 import { isGenderShown } from "../genderPrefs.js";
@@ -101,7 +102,7 @@ function hoverButton(title: string, icon: SVGSVGElement, variant: "add" | "skip"
   return btn;
 }
 
-function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement | undefined {
+function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => Restore | void): HTMLElement | undefined {
   if (!status) return undefined;
   const buttons: HTMLButtonElement[] = [];
   const afterAdd = isInLibraryMode() ? onStatusChange : onRemove;
@@ -124,7 +125,7 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
       buttons.push(
         hoverButton("Skip — permanently dismiss this scene", iconMinus(), "skip", async () => {
           await api.ignoreScene(s.id);
-          onRemove();
+          rememberSkip(s.id, onRemove());
         }),
       );
     }
@@ -153,7 +154,7 @@ function renderHoverActions(s: Scene, status: SceneStatus | undefined, onStatusC
   return hover;
 }
 
-export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => void): HTMLElement {
+export function renderSceneCard(s: Scene, status: SceneStatus | undefined, onStatusChange: () => void, onRemove: () => Restore | void): HTMLElement {
   const card = document.createElement("div");
   card.className = "group relative bg-surface rounded-lg shadow-card overflow-hidden flex flex-col transition-shadow duration-150 ease-out hover:shadow-[0_2px_4px_rgba(0,0,0,.4),0_8px_24px_rgba(0,0,0,.5)]";
 

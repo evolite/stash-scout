@@ -49,9 +49,17 @@ export function renderSceneSection(opts: {
 
   function buildCard(scene: Scene): HTMLElement {
     const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id), () => {
+      const index = currentScenes.indexOf(scene);
+      const loaded = seq;
       currentScenes = currentScenes.filter((s) => s.id !== scene.id);
       cards.delete(scene.id);
       card.remove();
+      return () => {
+        if (!grid.isConnected || seq !== loaded) return false;
+        currentScenes = [...currentScenes.slice(0, index), scene, ...currentScenes.slice(index)];
+        grid.insertBefore(buildCard(scene), grid.children[index] ?? null);
+        return true;
+      };
     });
     cards.set(scene.id, card);
     return card;

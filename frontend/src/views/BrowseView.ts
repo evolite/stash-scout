@@ -125,10 +125,19 @@ export function renderBrowseView(navigate: (tab: Tab) => void): HTMLElement {
 
   function buildCard(scene: Scene, scenes: Scene[]): HTMLElement {
     const card = renderSceneCard(scene, statuses[scene.id], () => refreshOneStatus(scene.id, scenes), () => {
-      scenes.splice(scenes.indexOf(scene), 1);
+      const index = scenes.indexOf(scene);
+      const grid = card.parentElement;
+      const loaded = seq;
+      scenes.splice(index, 1);
       cards.delete(scene.id);
       hidePreview();
       card.remove();
+      return () => {
+        if (!grid?.isConnected || seq !== loaded) return false;
+        scenes.splice(index, 0, scene);
+        grid.insertBefore(buildCard(scene, scenes), grid.children[index] ?? null);
+        return true;
+      };
     });
     cards.set(scene.id, card);
     return card;
