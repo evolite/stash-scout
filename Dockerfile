@@ -23,5 +23,5 @@ USER node
 
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-8787}/healthz?checks=local" || exit 1
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-8787}/healthz" || exit 1
 CMD ["node", "dist-server/server/index.js"]

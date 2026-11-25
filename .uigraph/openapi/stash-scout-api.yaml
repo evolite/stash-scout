@@ -9,12 +9,10 @@ paths:
   /healthz:
     get:
       operationId: healthCheck
-      summary: Health check of the app database and the local Stash connection
-      parameters:
-        - { name: checks, in: query, required: false, description: '"local" skips the Stash check (liveness only)', schema: { type: string, enum: [local] } }
+      summary: Health check of the app itself (process and its database)
       responses:
         "200": { description: All checks pass, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
-        "503": { description: A check failed, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+        "503": { description: The database check failed, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
   /api/auth/status:
     get:
       operationId: getAuthStatus
@@ -326,7 +324,6 @@ components:
           type: object
           properties:
             database: { type: string, enum: [ok, error] }
-            stash: { type: string, description: '"ok", "error", "not_configured", or Stash''s own systemStatus in lowercase (e.g. "needs_migration", "setup")' }
     ScenePage:
       type: object
       properties:

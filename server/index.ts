@@ -50,7 +50,7 @@ app.use("/api", settingsRouter(cfg, localStash, whisparr));
 app.use("/api", statsRouter(cfg, whisparr));
 
 const { version } = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
-app.use(healthRouter(version, db, cfg, localStash));
+app.use(healthRouter(version, db));
 app.use("/api", versionRouter(version));
 
 const frontendDist = path.join(process.cwd(), "frontend", "dist");

@@ -80,17 +80,6 @@ export class LocalStashClient {
     batch.forEach(({ resolve }, i) => resolve(data?.[`u${i}`]?.scenes[0]?.id ?? data?.[`s${i}`]?.scenes[0]?.id ?? null));
   }
 
-  async systemStatus(): Promise<string> {
-    const data = await gql<{ systemStatus: { status: string } }>(
-      this.cfg.localStashUrl!,
-      this.cfg.localStashApiKey!,
-      `query { systemStatus { status } }`,
-      {},
-      this.cfg,
-    );
-    return data.systemStatus.status;
-  }
-
   async testConnection(): Promise<boolean> {
     try {
       await gql<{ __typename: string }>(this.cfg.localStashUrl!, this.cfg.localStashApiKey!, `query { __typename }`, {}, this.cfg);
