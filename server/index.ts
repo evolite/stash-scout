@@ -20,6 +20,7 @@ import { versionRouter } from "./routes/version.js";
 import { authRouter } from "./routes/auth.js";
 import { requireAuth } from "./auth.js";
 import { startAutoAdd } from "./autoAdd.js";
+import { healthRouter } from "./health.js";
 
 const cfg = await loadInitialConfig();
 
@@ -49,7 +50,7 @@ app.use("/api", settingsRouter(cfg, localStash, whisparr));
 app.use("/api", statsRouter(cfg, whisparr));
 
 const { version } = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
-app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok", version }));
+app.use(healthRouter(version, db, cfg, localStash));
 app.use("/api", versionRouter(version));
 
 const frontendDist = path.join(process.cwd(), "frontend", "dist");

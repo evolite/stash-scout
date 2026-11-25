@@ -9,9 +9,12 @@ paths:
   /healthz:
     get:
       operationId: healthCheck
-      summary: Liveness probe
+      summary: Health check of the app database and the local Stash connection
+      parameters:
+        - { name: checks, in: query, required: false, description: '"local" skips the Stash check (liveness only)', schema: { type: string, enum: [local] } }
       responses:
-        "200": { description: Process is alive, content: { application/json: { schema: { type: object, properties: { status: { type: string }, version: { type: string } } } } } }
+        "200": { description: All checks pass, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+        "503": { description: A check failed, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
   /api/auth/status:
     get:
       operationId: getAuthStatus
@@ -314,6 +317,16 @@ paths:
       responses: { "200": { description: Changelog } }
 components:
   schemas:
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, error] }
+        version: { type: string }
+        checks:
+          type: object
+          properties:
+            database: { type: string, enum: [ok, error] }
+            stash: { type: string, description: '"ok", "error", "not_configured", or Stash''s own systemStatus in lowercase (e.g. "needs_migration", "setup")' }
     ScenePage:
       type: object
       properties:
